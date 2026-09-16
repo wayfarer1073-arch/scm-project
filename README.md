@@ -61,3 +61,20 @@ npm run build        # 프로덕션 빌드
 
 - `DATABASE_URL`을 Supabase(또는 다른 관리형 Postgres) 커넥션 문자열로 바꾸고 `npm run db:migrate`를 실행하면 그대로 배포할 수 있습니다.
 - `AUTH_SECRET`은 운영 환경에서 반드시 `openssl rand -base64 32` 등으로 새로 생성하세요.
+
+### Render로 배포하기
+
+저장소 루트의 `render.yaml`이 웹 서비스(Next.js)와 PostgreSQL 인스턴스를 함께 선언하는 Blueprint입니다.
+
+1. Render 대시보드 → **New** → **Blueprint** → 이 GitHub 저장소 연결 (배포할 브랜치 선택).
+2. Render가 `render.yaml`을 읽어 `scm-inventory-db`(Postgres)와 `scm-inventory-dashboard`(웹 서비스)를 함께 생성합니다.
+   `DATABASE_URL`은 두 서비스 간에 자동으로 연결되고, `AUTH_SECRET`은 자동 생성됩니다.
+3. 웹 서비스 환경변수에서 `NEXTAUTH_URL`을 배포된 실제 URL(예: `https://scm-inventory-dashboard.onrender.com`)로 채워주세요.
+4. 첫 배포가 끝나면 Render의 Shell 탭(또는 `DATABASE_URL`을 로컬에 임시로 지정해)에서 초기 데이터를 만듭니다:
+
+   ```bash
+   npm run db:init
+   npm run db:create-admin -- --email admin@company.com --password <강력한-비밀번호> --name 관리자
+   ```
+
+배포 브랜치를 바꾸거나 재배포할 때는 `startCommand`(`prisma migrate deploy`)가 스키마 변경을 자동 적용합니다.

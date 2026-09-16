@@ -1,0 +1,24 @@
+databases:
+  - name: scm-inventory-db
+    plan: starter
+    databaseName: scm_inventory
+    user: scm_inventory
+
+services:
+  - type: web
+    name: scm-inventory-dashboard
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && npm run start
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: scm-inventory-db
+          property: connectionString
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: NEXTAUTH_URL
+        sync: false
+      - key: NODE_ENV
+        value: production
