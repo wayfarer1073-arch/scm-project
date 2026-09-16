@@ -47,7 +47,7 @@ function DialogContent({ className, children, ...props }: React.ComponentProps<t
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute top-4 right-4 rounded-xs opacity-70 outline-none transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring disabled:pointer-events-none">
+        <DialogPrimitive.Close className="absolute top-3 right-3 rounded-md p-1.5 opacity-70 outline-none transition-opacity hover:bg-accent hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none">
           <X className="size-4" />
           <span className="sr-only">닫기</span>
         </DialogPrimitive.Close>

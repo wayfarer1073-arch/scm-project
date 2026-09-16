@@ -293,7 +293,11 @@ export function SkuDetailSheet({ skuId, asOfDate, onOpenChange }: SkuDetailSheet
                         </div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           {formatKstDateTime(e.eventDate)}
-                          <button onClick={() => handleDeleteEvent(e.id)} className="text-muted-foreground hover:text-destructive" aria-label="삭제">
+                          <button
+                            onClick={() => handleDeleteEvent(e.id)}
+                            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            aria-label="삭제"
+                          >
                             <Trash2 className="size-3.5" />
                           </button>
                         </div>

@@ -281,7 +281,20 @@ export function InventoryTable({
               </TableRow>
             )}
             {pageRows.map((r) => (
-              <TableRow key={r.descriptor.skuId} className="cursor-pointer" onClick={() => onSelectSku(r.descriptor.skuId)}>
+              <TableRow
+                key={r.descriptor.skuId}
+                tabIndex={0}
+                role="button"
+                aria-label={`${r.descriptor.productName} 상세 보기`}
+                onClick={() => onSelectSku(r.descriptor.skuId)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    onSelectSku(r.descriptor.skuId);
+                  }
+                }}
+                className="cursor-pointer outline-none focus-visible:bg-muted/60 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
+              >
                 <TableCell className="font-mono text-xs text-muted-foreground">{r.descriptor.productCode}</TableCell>
                 <TableCell>
                   <div className="font-medium">{r.descriptor.productName}</div>
