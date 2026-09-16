@@ -1,0 +1,39 @@
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { auth } from '@/server/auth';
+import { createUser, listUsers } from '@/server/repositories/user-repository';
+
+const schema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1).max(50),
+  password: z.string().min(8, '비밀번호는 8자 이상이어야 합니다.'),
+  role: z.enum(['MEMBER', 'ADMIN']),
+});
+
+export async function GET() {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 });
+  if (session.user.role !== 'ADMIN') return NextResponse.json({ error: '관리자만 조회할 수 있습니다.' }, { status: 403 });
+
+  const users = await listUsers();
+  return NextResponse.json({ users });
+}
+
+export async function POST(request: Request) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 });
+  if (session.user.role !== 'ADMIN') return NextResponse.json({ error: '관리자만 사용자를 추가할 수 있습니다.' }, { status: 403 });
+
+  const body = await request.json();
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? '입력값이 올바르지 않습니다.' }, { status: 400 });
+  }
+
+  try {
+    const user = await createUser(parsed.data);
+    return NextResponse.json({ user }, { status: 201 });
+  } catch {
+    return NextResponse.json({ error: '이미 존재하는 이메일입니다.' }, { status: 409 });
+  }
+}
