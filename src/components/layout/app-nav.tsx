@@ -13,7 +13,7 @@ const NAV_ITEMS = [
 export function AppNav() {
   const pathname = usePathname();
   return (
-    <nav className="flex items-center gap-1">
+    <nav className="flex items-center gap-0.5 rounded-lg border bg-card/80 p-1">
       {NAV_ITEMS.map((item) => {
         const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
         return (
@@ -21,8 +21,8 @@ export function AppNav() {
             key={item.href}
             href={item.href}
             className={cn(
-              'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-              active ? 'bg-secondary text-secondary-foreground' : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
+              'rounded-md px-3 py-1.5 text-xs font-medium transition-colors sm:text-sm',
+              active ? 'bg-slate-950 text-white shadow-sm' : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground',
             )}
           >
             {item.label}

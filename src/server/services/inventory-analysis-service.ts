@@ -1,5 +1,5 @@
-import { analyzeSku, calculateInventoryValueBreakdown, isNewlyAtRisk } from '@/domain/inventory/calculations';
-import type { CompanyKpis, InventoryValueBreakdown, RiskThresholdSettings, SkuAnalysis, WarehouseSummary } from '@/domain/inventory/types';
+import { analyzeSku, calculateInventoryValueBreakdown, calculatePeriodComparison, isNewlyAtRisk } from '@/domain/inventory/calculations';
+import type { CompanyKpis, InventoryValueBreakdown, PeriodComparison, RiskThresholdSettings, SkuAnalysis, WarehouseSummary } from '@/domain/inventory/types';
 
 export type { CompanyKpis, WarehouseSummary } from '@/domain/inventory/types';
 import { loadActiveSkusWithSeries, loadSkuWithSeries, type SkuDescriptor } from '@/server/repositories/inventory-repository';
@@ -9,18 +9,22 @@ export interface InventoryRow {
   descriptor: SkuDescriptor;
   analysis: SkuAnalysis;
   valueBreakdown: InventoryValueBreakdown;
+  periodComparison: PeriodComparison | null;
 }
 
-export async function getInventoryRows(options: { warehouseId?: string; asOfDate: string; settings?: RiskThresholdSettings }): Promise<InventoryRow[]> {
+export async function getInventoryRows(options: { warehouseId?: string; asOfDate: string; compareFromDate?: string; settings?: RiskThresholdSettings }): Promise<InventoryRow[]> {
   const settings = options.settings ?? (await getSettings());
-  const skusWithSeries = await loadActiveSkusWithSeries(options.warehouseId);
+  const skusWithSeries = await loadActiveSkusWithSeries(options.warehouseId, options.asOfDate);
 
   const rows: InventoryRow[] = [];
   for (const { descriptor, observations } of skusWithSeries) {
     const analysis = analyzeSku(observations, options.asOfDate, settings);
     if (!analysis) continue; // asOfDate 이전 관측치가 없는 SKU(예: 미래 등록)는 제외
     const valueBreakdown = calculateInventoryValueBreakdown(analysis.latest);
-    rows.push({ descriptor, analysis, valueBreakdown });
+    const periodComparison = options.compareFromDate
+      ? calculatePeriodComparison(observations, options.compareFromDate, options.asOfDate)
+      : null;
+    rows.push({ descriptor, analysis, valueBreakdown, periodComparison });
   }
   return rows;
 }
@@ -46,6 +50,10 @@ export function calculateCompanyKpis(rows: InventoryRow[]): CompanyKpis {
   let dangerSkuCount = 0;
   let stockoutSoon30dCount = 0;
   let stagnantValue = 0;
+  let totalDecrease = 0;
+  let totalIncrease = 0;
+  let forecastReadyCount = 0;
+  let overstockCandidateValue = 0;
 
   for (const row of rows) {
     totalAvailableStock += row.analysis.latest.availableStock;
@@ -53,12 +61,21 @@ export function calculateCompanyKpis(rows: InventoryRow[]): CompanyKpis {
     totalDepletion7d += row.analysis.window7.totalDepletion;
     if (row.analysis.thresholdRisk.level === 'DANGER') dangerSkuCount += 1;
     if (row.analysis.coverage.coverageDays !== null && row.analysis.coverage.coverageDays <= 30) stockoutSoon30dCount += 1;
+    if (row.analysis.forecast.expectedStockoutDays !== null) forecastReadyCount += 1;
+    if (row.analysis.overstock.isCandidate) overstockCandidateValue += row.valueBreakdown.normalStockValue;
     if (row.analysis.stagnation.isMeaningful && row.analysis.stagnation.stagnantDays >= 30) {
       stagnantValue += row.valueBreakdown.normalStockValue;
     }
     if (row.analysis.dailyChange !== null) {
       hasAnyDayOverDay = true;
       netChangeVsYesterday += row.analysis.dailyChange;
+    }
+    if (row.periodComparison) {
+      totalDecrease += row.periodComparison.totalDepletion;
+      totalIncrease += row.periodComparison.totalIncrease;
+    } else if (row.analysis.dailyChange !== null) {
+      totalDecrease += Math.max(-row.analysis.dailyChange, 0);
+      totalIncrease += Math.max(row.analysis.dailyChange, 0);
     }
   }
 
@@ -71,6 +88,10 @@ export function calculateCompanyKpis(rows: InventoryRow[]): CompanyKpis {
     dangerSkuCount,
     stockoutSoon30dCount,
     stagnantValue,
+    totalDecrease,
+    totalIncrease,
+    forecastReadyCount,
+    overstockCandidateValue,
   };
 }
 

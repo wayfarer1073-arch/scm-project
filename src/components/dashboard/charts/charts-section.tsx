@@ -15,16 +15,22 @@ interface ChartsSectionProps {
   warehouses: { id: string; code: string; name: string }[];
   chartWarehouseId: string | 'ALL';
   onChangeChartWarehouse: (id: string | 'ALL') => void;
+  fromDate: string | null;
+  asOfDate: string;
 }
 
-export function ChartsSection({ rows, dailyTotals, warehouses, chartWarehouseId, onChangeChartWarehouse }: ChartsSectionProps) {
+export function ChartsSection({ rows, dailyTotals, warehouses, chartWarehouseId, onChangeChartWarehouse, fromDate, asOfDate }: ChartsSectionProps) {
   const filteredRows = useMemo(
     () => (chartWarehouseId === 'ALL' ? rows : rows.filter((r) => r.descriptor.warehouseId === chartWarehouseId)),
     [rows, chartWarehouseId],
   );
 
-  const stockSeries = useMemo(() => buildDailySeries(dailyTotals, chartWarehouseId, 'totalAvailableStock'), [dailyTotals, chartWarehouseId]);
-  const valueSeries = useMemo(() => buildDailySeries(dailyTotals, chartWarehouseId, 'totalInventoryValue'), [dailyTotals, chartWarehouseId]);
+  const visibleDailyTotals = useMemo(
+    () => dailyTotals.filter((total) => total.date <= asOfDate && (!fromDate || total.date >= fromDate)),
+    [dailyTotals, fromDate, asOfDate],
+  );
+  const stockSeries = useMemo(() => buildDailySeries(visibleDailyTotals, chartWarehouseId, 'totalAvailableStock'), [visibleDailyTotals, chartWarehouseId]);
+  const valueSeries = useMemo(() => buildDailySeries(visibleDailyTotals, chartWarehouseId, 'totalInventoryValue'), [visibleDailyTotals, chartWarehouseId]);
 
   const riskCounts = useMemo(() => {
     let danger = 0;
@@ -51,7 +57,10 @@ export function ChartsSection({ rows, dailyTotals, warehouses, chartWarehouseId,
   return (
     <section>
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-base font-semibold">핵심 차트</h2>
+        <div>
+          <h2 className="text-base font-semibold">재고 흐름</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">선택한 조회 범위와 창고 필터를 반영합니다.</p>
+        </div>
         <Tabs value={chartWarehouseId} onValueChange={(v) => onChangeChartWarehouse(v)}>
           <TabsList>
             <TabsTrigger value="ALL">전체</TabsTrigger>

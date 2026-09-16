@@ -126,6 +126,24 @@ export interface CompanyKpis {
   dangerSkuCount: number;
   stockoutSoon30dCount: number;
   stagnantValue: number;
+  totalDecrease?: number;
+  totalIncrease?: number;
+  forecastReadyCount?: number;
+  overstockCandidateValue?: number;
+}
+
+export interface PeriodComparison {
+  requestedStartDate: string;
+  requestedEndDate: string;
+  actualStartDate: string;
+  actualEndDate: string;
+  startAvailableStock: number;
+  endAvailableStock: number;
+  netChange: number;
+  totalDepletion: number;
+  totalIncrease: number;
+  observedDays: number;
+  averageDailyDepletion: number | null;
 }
 
 export interface WarehouseSummary {

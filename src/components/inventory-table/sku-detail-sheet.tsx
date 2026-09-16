@@ -11,7 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EventFormDialog } from '@/components/events/event-form-dialog';
-import { buildDailyDeltas, sortObservations } from '@/domain/inventory/calculations';
+import { buildDailyDeltas, calculatePeriodComparison, sortObservations } from '@/domain/inventory/calculations';
 import type { InventoryValueBreakdown, SkuAnalysis, StockObservation } from '@/domain/inventory/types';
 import { formatCoverageDays, formatCurrency, formatNumber, formatSigned } from '@/lib/format';
 import { formatKstDate, formatKstDateTime } from '@/lib/date';
@@ -39,10 +39,11 @@ interface EventItem {
 interface SkuDetailSheetProps {
   skuId: string | null;
   asOfDate: string;
+  fromDate: string | null;
   onOpenChange: (open: boolean) => void;
 }
 
-export function SkuDetailSheet({ skuId, asOfDate, onOpenChange }: SkuDetailSheetProps) {
+export function SkuDetailSheet({ skuId, asOfDate, fromDate, onOpenChange }: SkuDetailSheetProps) {
   const [detail, setDetail] = useState<SkuDetailResponse | null>(null);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -69,6 +70,7 @@ export function SkuDetailSheet({ skuId, asOfDate, onOpenChange }: SkuDetailSheet
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (skuId) reload();
     else {
       setDetail(null);
@@ -81,9 +83,14 @@ export function SkuDetailSheet({ skuId, asOfDate, onOpenChange }: SkuDetailSheet
     if (!detail) return [];
     const cutoff = new Date(asOfDate);
     cutoff.setDate(cutoff.getDate() - rangeDays);
-    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    const cutoffStr = fromDate ?? cutoff.toISOString().slice(0, 10);
     return detail.observations.filter((o) => o.date >= cutoffStr).map((o) => ({ date: o.date, availableStock: o.availableStock }));
-  }, [detail, rangeDays, asOfDate]);
+  }, [detail, rangeDays, asOfDate, fromDate]);
+
+  const periodMetrics = useMemo(() => {
+    if (!detail || !fromDate) return null;
+    return calculatePeriodComparison(detail.observations, fromDate, asOfDate);
+  }, [detail, fromDate, asOfDate]);
 
   const eventMarkers = useMemo(() => {
     if (chartData.length === 0) return [];
@@ -121,7 +128,7 @@ export function SkuDetailSheet({ skuId, asOfDate, onOpenChange }: SkuDetailSheet
 
   return (
     <Sheet open={!!skuId} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-[520px]">
         {loading && !detail && (
           <div className="space-y-6 p-5">
             <div className="space-y-2">
@@ -156,7 +163,7 @@ export function SkuDetailSheet({ skuId, asOfDate, onOpenChange }: SkuDetailSheet
               </SheetDescription>
             </SheetHeader>
 
-            <div className="space-y-6 p-5">
+            <div className="space-y-5 p-4 sm:p-5">
               {detail.analysis.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {detail.analysis.tags.map((t) => (
@@ -165,41 +172,45 @@ export function SkuDetailSheet({ skuId, asOfDate, onOpenChange }: SkuDetailSheet
                 </div>
               )}
 
-              <section>
-                <h3 className="mb-2 text-sm font-semibold">현재 상태</h3>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
-                  <Field label="현재 가용재고" value={`${formatNumber(detail.analysis.latest.availableStock)}개`} />
-                  <Field label="정상재고" value={`${formatNumber(detail.analysis.latest.normalStock)}개`} />
-                  <Field label="불량재고" value={`${formatNumber(detail.analysis.latest.defectiveStock)}개`} />
-                  <Field label="입고대기" value={`${formatNumber(detail.analysis.latest.incomingStock)}개`} />
-                  <Field label="단위원가" value={formatCurrency(detail.analysis.latest.unitCost)} />
-                  <Field label="재고자산 (정상재고 기준)" value={formatCurrency(detail.valueBreakdown.normalStockValue)} />
-                </div>
-                <div className="mt-2 grid grid-cols-3 gap-2 rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
-                  <div>가용재고 금액: {formatCurrency(detail.valueBreakdown.availableStockValue)}</div>
-                  <div>불량재고 금액: {formatCurrency(detail.valueBreakdown.defectiveStockValue)}</div>
-                  <div>입고대기 금액: {formatCurrency(detail.valueBreakdown.incomingStockValue)}</div>
-                </div>
+              <section className="grid grid-cols-2 gap-2">
+                <MetricCard label="가용재고" value={`${formatNumber(detail.analysis.latest.availableStock)}개`} />
+                <MetricCard label="재고자산" value={formatCurrency(detail.valueBreakdown.normalStockValue)} />
+                <MetricCard label="Coverage" value={formatCoverageDays(detail.analysis.coverage.coverageDays)} />
+                <MetricCard
+                  label="예상 소진일"
+                  value={detail.analysis.forecast.expectedStockoutDate ? formatKstDate(detail.analysis.forecast.expectedStockoutDate) : '데이터 축적 중'}
+                />
               </section>
+
+              {fromDate && (
+                <section className="rounded-xl border bg-muted/30 p-3">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-xs font-semibold">선택 기간 변화</h3>
+                    <span className="text-[11px] text-muted-foreground">
+                      {periodMetrics ? `${periodMetrics.actualStartDate.slice(5)} — ${periodMetrics.actualEndDate.slice(5)} 관측 기준` : `${fromDate.slice(5)} — ${asOfDate.slice(5)}`}
+                    </span>
+                  </div>
+                  {periodMetrics ? (
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                      <Field label="순 변화" value={`${formatSigned(periodMetrics.netChange)}개`} />
+                      <Field label="관측 감소" value={`${formatNumber(periodMetrics.totalDepletion)}개`} />
+                      <Field label="관측 증가" value={`${formatNumber(periodMetrics.totalIncrease)}개`} />
+                      <Field label="기간 일평균 소진" value={fmtRate(periodMetrics.averageDailyDepletion)} />
+                    </div>
+                  ) : <p className="text-xs text-muted-foreground">두 날짜를 비교할 관측 데이터가 부족합니다.</p>}
+                </section>
+              )}
 
               <Separator />
 
               <section>
                 <h3 className="mb-2 text-sm font-semibold">추세</h3>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                   <Field label="7일 평균 소진" value={fmtRate(detail.analysis.window7.averageDailyDepletion)} />
                   <Field label="14일 평균 소진" value={fmtRate(detail.analysis.window14.averageDailyDepletion)} />
                   <Field label="30일 평균 소진" value={fmtRate(detail.analysis.window30.averageDailyDepletion)} />
                   <Field label="소진 가속/둔화" value={accelerationText(detail.analysis)} />
-                  <Field label="Coverage" value={formatCoverageDays(detail.analysis.coverage.coverageDays)} />
-                  <Field
-                    label="예상 소진일 (현재 추세 기준)"
-                    value={
-                      detail.analysis.forecast.expectedStockoutDate
-                        ? `${formatKstDate(detail.analysis.forecast.expectedStockoutDate)} · 신뢰도 ${confidenceLabel(detail.analysis.forecast.confidence)}`
-                        : '데이터 축적 중'
-                    }
-                  />
+                  <Field label="예측 신뢰도" value={confidenceLabel(detail.analysis.forecast.confidence)} />
                 </div>
               </section>
 
@@ -208,15 +219,15 @@ export function SkuDetailSheet({ skuId, asOfDate, onOpenChange }: SkuDetailSheet
               <section>
                 <div className="mb-2 flex items-center justify-between">
                   <h3 className="text-sm font-semibold">가용재고 추이</h3>
-                  <Tabs value={String(rangeDays)} onValueChange={(v) => setRangeDays(Number(v) as 30 | 60 | 90)}>
+                  {!fromDate && <Tabs value={String(rangeDays)} onValueChange={(v) => setRangeDays(Number(v) as 30 | 60 | 90)}>
                     <TabsList>
                       <TabsTrigger value="30">30일</TabsTrigger>
                       <TabsTrigger value="60">60일</TabsTrigger>
                       <TabsTrigger value="90">90일</TabsTrigger>
                     </TabsList>
-                  </Tabs>
+                  </Tabs>}
                 </div>
-                <div className="h-56">
+                <div className="h-48">
                   {chartData.length < 2 ? (
                     <div className="flex h-full items-center justify-center text-sm text-muted-foreground">데이터 축적 중</div>
                   ) : (
@@ -328,6 +339,15 @@ function Field({ label, value }: { label: string; value: string }) {
     <div>
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="font-medium tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+function MetricCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border bg-card p-3">
+      <div className="text-[11px] text-muted-foreground">{label}</div>
+      <div className="mt-1 text-base font-semibold tracking-tight tabular-nums">{value}</div>
     </div>
   );
 }

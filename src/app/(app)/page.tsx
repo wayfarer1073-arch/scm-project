@@ -5,18 +5,29 @@ import { loadDailyWarehouseTotals } from '@/server/repositories/inventory-reposi
 import { todayKstDateString } from '@/lib/date';
 import { DashboardClient } from '@/components/dashboard/dashboard-client';
 
-export default async function DashboardPage() {
-  const asOfDate = todayKstDateString();
+function isDateString(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const params = await searchParams;
+  const today = todayKstDateString();
+  const mode = params.mode === 'range' ? 'range' : 'day';
+  const requestedTo = isDateString(params.to) ? params.to : isDateString(params.date) ? params.date : today;
+  const asOfDate = requestedTo > today ? today : requestedTo;
+  const requestedFrom = isDateString(params.from) ? params.from : asOfDate;
+  const fromDate = requestedFrom > asOfDate ? asOfDate : requestedFrom;
   const [warehouses, settings, rows, dailyTotals] = await Promise.all([
     listWarehouses(),
     getSettings(),
-    getInventoryRows({ asOfDate }),
+    getInventoryRows({ asOfDate, compareFromDate: mode === 'range' ? fromDate : undefined }),
     loadDailyWarehouseTotals(),
   ]);
 
   return (
     <DashboardClient
       asOfDate={asOfDate}
+      fromDate={mode === 'range' ? fromDate : null}
       warehouses={warehouses.map((w) => ({ id: w.id, code: w.code, name: w.name }))}
       settings={settings}
       rows={rows}
