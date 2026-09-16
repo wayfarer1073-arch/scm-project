@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { UploadCloud, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
 import { toast } from 'sonner';
@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { formatKstDate, formatKstDateTime, todayKstDateString } from '@/lib/date';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { formatKstDate, formatKstDateTime, todayKstDateString, yesterdayKstDateString } from '@/lib/date';
 
 interface ValidationIssue {
   level: 'ERROR' | 'WARNING';
@@ -29,13 +30,46 @@ type UiState =
   | { phase: 'success'; rowCount: number; issues: ValidationIssue[] }
   | { phase: 'duplicate'; snapshotDate: string; uploadedAt: string; uploadedByName: string; rowCount: number };
 
+type ExistingSnapshot = { rowCount: number; uploadedAt: string; uploadedByName: string; version: number };
+
+type PastDateCheck = { status: 'idle' | 'checking' | 'done'; existing: ExistingSnapshot | null };
+
 export function WarehouseUploadCard({ warehouse, latestSnapshot }: WarehouseUploadCardProps) {
   const router = useRouter();
-  const [snapshotDate, setSnapshotDate] = useState(todayKstDateString());
+  const [mode, setMode] = useState<'today' | 'past'>('today');
+  const [pastDate, setPastDate] = useState(yesterdayKstDateString());
   const [file, setFile] = useState<File | null>(null);
   const [state, setState] = useState<UiState>({ phase: 'idle' });
   const [conflict, setConflict] = useState<{ uploadedAt: string; uploadedByName: string; rowCount: number; version: number } | null>(null);
+  const [pastCheck, setPastCheck] = useState<PastDateCheck>({ status: 'idle', existing: null });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const effectiveDate = mode === 'today' ? todayKstDateString() : pastDate;
+
+  useEffect(() => {
+    if (mode !== 'past' || !pastDate) return;
+    let cancelled = false;
+    setPastCheck({ status: 'checking', existing: null });
+    fetch(`/api/warehouses/${warehouse.id}/snapshot-check?date=${pastDate}`)
+      .then((res) => res.json())
+      .then((body) => {
+        if (cancelled) return;
+        setPastCheck({ status: 'done', existing: body.exists ? body.snapshot : null });
+      })
+      .catch(() => {
+        if (!cancelled) setPastCheck({ status: 'done', existing: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, pastDate, warehouse.id]);
+
+  function switchMode(next: 'today' | 'past') {
+    setMode(next);
+    setFile(null);
+    setState({ phase: 'idle' });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
 
   async function submit(replaceExisting: boolean) {
     if (!file) {
@@ -45,7 +79,7 @@ export function WarehouseUploadCard({ warehouse, latestSnapshot }: WarehouseUplo
     setState({ phase: 'uploading' });
     const formData = new FormData();
     formData.append('warehouseId', warehouse.id);
-    formData.append('snapshotDate', snapshotDate);
+    formData.append('snapshotDate', effectiveDate);
     formData.append('replaceExisting', String(replaceExisting));
     formData.append('file', file);
 
@@ -83,6 +117,7 @@ export function WarehouseUploadCard({ warehouse, latestSnapshot }: WarehouseUplo
       toast.success(`${warehouse.name}: ${body.rowCount}건 저장 완료`);
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      setPastCheck({ status: 'idle', existing: null });
       router.refresh();
     } catch {
       toast.error('네트워크 오류로 업로드에 실패했습니다.');
@@ -112,10 +147,39 @@ export function WarehouseUploadCard({ warehouse, latestSnapshot }: WarehouseUplo
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="space-y-1.5">
-            <Label htmlFor={`date-${warehouse.id}`}>재고 기준일</Label>
-            <Input id={`date-${warehouse.id}`} type="date" value={snapshotDate} onChange={(e) => setSnapshotDate(e.target.value)} max={todayKstDateString()} />
-          </div>
+          <Tabs value={mode} onValueChange={(v) => switchMode(v as 'today' | 'past')}>
+            <TabsList className="w-full">
+              <TabsTrigger value="today">오늘 자료</TabsTrigger>
+              <TabsTrigger value="past">과거 자료</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {mode === 'today' ? (
+            <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+              <span className="text-muted-foreground">재고 기준일</span> <span className="font-medium">{formatKstDate(effectiveDate)} (오늘)</span>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Label htmlFor={`date-${warehouse.id}`}>재고 기준일 (과거)</Label>
+              <Input
+                id={`date-${warehouse.id}`}
+                type="date"
+                value={pastDate}
+                onChange={(e) => setPastDate(e.target.value)}
+                max={yesterdayKstDateString()}
+              />
+              {pastCheck.status === 'done' && pastCheck.existing && (
+                <div role="alert" className="flex items-start gap-1.5 rounded-md border border-status-warning/30 bg-status-warning-bg p-2.5 text-xs text-status-warning">
+                  <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                  <span>
+                    이 날짜엔 이미 {pastCheck.existing.uploadedByName}님이 {formatKstDateTime(pastCheck.existing.uploadedAt)}에 올린 자료(
+                    {pastCheck.existing.rowCount.toLocaleString()}건)가 있습니다. 업로드를 진행하면 교체 여부를 다시 확인합니다.
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label htmlFor={`file-${warehouse.id}`}>Excel 파일 (.xls, .xlsx)</Label>
             <Input
@@ -180,9 +244,9 @@ export function WarehouseUploadCard({ warehouse, latestSnapshot }: WarehouseUplo
       <Dialog open={!!conflict} onOpenChange={(open) => !open && setConflict(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>이미 존재하는 스냅샷입니다</DialogTitle>
+            <DialogTitle>{mode === 'past' ? '과거 데이터를 덮어쓰시겠습니까?' : '이미 존재하는 스냅샷입니다'}</DialogTitle>
             <DialogDescription>
-              {warehouse.name}의 {formatKstDate(snapshotDate)} 기준 스냅샷이 이미 있습니다 ({conflict?.rowCount.toLocaleString()}건,{' '}
+              {warehouse.name}의 {formatKstDate(effectiveDate)} 기준 스냅샷이 이미 있습니다 ({conflict?.rowCount.toLocaleString()}건,{' '}
               {conflict?.uploadedByName}, {conflict ? formatKstDateTime(conflict.uploadedAt) : ''} 업로드). 새 파일로 교체하시겠습니까? 기존
               스냅샷은 이력으로 보존되고 최신 버전만 분석에 사용됩니다.
             </DialogDescription>

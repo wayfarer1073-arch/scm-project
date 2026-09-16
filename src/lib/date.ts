@@ -7,6 +7,13 @@ export function todayKstDateString(): string {
   return formatInTimeZone(new Date(), KST_TIMEZONE, 'yyyy-MM-dd');
 }
 
+/** 오늘(KST 기준)의 전날짜를 'yyyy-MM-dd'로 반환한다. */
+export function yesterdayKstDateString(): string {
+  const d = new Date(`${todayKstDateString()}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 export function formatKstDate(date: Date | string): string {
   return formatInTimeZone(date, KST_TIMEZONE, 'yyyy-MM-dd');
 }
