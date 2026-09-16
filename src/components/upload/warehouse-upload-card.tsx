@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { UploadCloud, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ type UiState =
   | { phase: 'success'; rowCount: number; issues: ValidationIssue[] };
 
 export function WarehouseUploadCard({ warehouse, latestSnapshot }: WarehouseUploadCardProps) {
+  const router = useRouter();
   const [snapshotDate, setSnapshotDate] = useState(todayKstDateString());
   const [file, setFile] = useState<File | null>(null);
   const [state, setState] = useState<UiState>({ phase: 'idle' });
@@ -69,6 +71,7 @@ export function WarehouseUploadCard({ warehouse, latestSnapshot }: WarehouseUplo
       toast.success(`${warehouse.name}: ${body.rowCount}건 저장 완료`);
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      router.refresh();
     } catch {
       toast.error('네트워크 오류로 업로드에 실패했습니다.');
       setState({ phase: 'idle' });

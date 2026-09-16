@@ -84,9 +84,9 @@ export function EventFormDialog({ open, onOpenChange, warehouseId, skuId, skuLab
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>이벤트 유형</Label>
+              <Label htmlFor="event-type">이벤트 유형</Label>
               <Select value={eventType} onValueChange={(v) => setEventType(v as EventTypeValue)}>
-                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="event-type" className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {EVENT_TYPE_OPTIONS.map((o) => (
                     <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -95,17 +95,17 @@ export function EventFormDialog({ open, onOpenChange, warehouseId, skuId, skuLab
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>수량 (선택)</Label>
-              <Input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="예: 150" />
+              <Label htmlFor="event-quantity">수량 (선택)</Label>
+              <Input id="event-quantity" type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="예: 150" />
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label>날짜/시간</Label>
-            <Input type="datetime-local" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+            <Label htmlFor="event-date">날짜/시간</Label>
+            <Input id="event-date" type="datetime-local" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label>내용</Label>
-            <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="예: 발주 입고 150개 반영" rows={3} />
+            <Label htmlFor="event-note">내용</Label>
+            <Textarea id="event-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="예: 발주 입고 150개 반영" rows={3} />
           </div>
         </div>
         <DialogFooter>

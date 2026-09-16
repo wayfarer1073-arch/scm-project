@@ -69,8 +69,11 @@ export function SettingsForm({ isAdmin, warehouses, settings, users: initialUser
         <CardContent className="space-y-3">
           {warehouses.map((w) => (
             <div key={w.id} className="flex items-center gap-2">
-              <span className="w-10 shrink-0 rounded bg-muted px-1.5 py-0.5 text-center text-[11px] font-medium text-muted-foreground">{w.code}</span>
+              <Label htmlFor={`warehouse-name-${w.id}`} className="w-10 shrink-0 rounded bg-muted px-1.5 py-0.5 text-center text-[11px] font-medium text-muted-foreground">
+                {w.code}
+              </Label>
               <Input
+                id={`warehouse-name-${w.id}`}
                 value={warehouseNames[w.id]}
                 onChange={(e) => setWarehouseNames((prev) => ({ ...prev, [w.id]: e.target.value }))}
                 disabled={!isAdmin}
@@ -134,10 +137,11 @@ export function SettingsForm({ isAdmin, warehouses, settings, users: initialUser
 }
 
 function ThresholdField({ label, value, onChange, disabled }: { label: string; value: number; onChange: (v: number) => void; disabled: boolean }) {
+  const id = `threshold-${label.replace(/[^a-zA-Z0-9가-힣]+/g, '-')}`;
   return (
     <div className="space-y-1.5">
-      <Label>{label}</Label>
-      <Input type="number" min={1} value={value} onChange={(e) => onChange(Number(e.target.value))} disabled={disabled} />
+      <Label htmlFor={id}>{label}</Label>
+      <Input id={id} type="number" min={1} value={value} onChange={(e) => onChange(Number(e.target.value))} disabled={disabled} />
     </div>
   );
 }
@@ -198,16 +202,28 @@ function UserManagement({
         </div>
         <Separator />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Input placeholder="이메일" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <Input placeholder="이름" value={name} onChange={(e) => setName(e.target.value)} />
-          <Input placeholder="임시 비밀번호 (8자 이상)" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          <Select value={role} onValueChange={(v) => setRole(v as 'MEMBER' | 'ADMIN')}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="MEMBER">멤버</SelectItem>
-              <SelectItem value="ADMIN">관리자</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="space-y-1.5">
+            <Label htmlFor="new-user-email">이메일</Label>
+            <Input id="new-user-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="new-user-name">이름</Label>
+            <Input id="new-user-name" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="new-user-password">임시 비밀번호 (8자 이상)</Label>
+            <Input id="new-user-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="new-user-role">권한</Label>
+            <Select value={role} onValueChange={(v) => setRole(v as 'MEMBER' | 'ADMIN')}>
+              <SelectTrigger id="new-user-role"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="MEMBER">멤버</SelectItem>
+                <SelectItem value="ADMIN">관리자</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <Button onClick={addUser} disabled={submitting || !email || !name || password.length < 8}>
           사용자 추가
