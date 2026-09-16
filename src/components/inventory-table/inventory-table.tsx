@@ -27,6 +27,7 @@ interface InventoryTableProps {
   onClearQuickFilter: () => void;
   onSelectSku: (skuId: string) => void;
   asOfDate: string;
+  fromDate: string | null;
 }
 
 type SortKey = 'stockoutFast' | 'coverageAsc' | 'depletionRateDesc' | 'accelerationDesc' | 'valueDesc' | 'stagnantDesc' | 'increaseDesc';
@@ -58,7 +59,9 @@ function sortValue(row: InventoryRow, key: SortKey): number | null {
     case 'stagnantDesc':
       return row.analysis.stagnation.isMeaningful ? row.analysis.stagnation.stagnantDays : null;
     case 'increaseDesc':
-      return row.analysis.dailyChange !== null && row.analysis.dailyChange > 0 ? row.analysis.dailyChange : null;
+      return row.periodComparison
+        ? row.periodComparison.totalIncrease
+        : row.analysis.dailyChange !== null && row.analysis.dailyChange > 0 ? row.analysis.dailyChange : null;
     default:
       return null;
   }
@@ -77,6 +80,7 @@ export function InventoryTable({
   onClearQuickFilter,
   onSelectSku,
   asOfDate,
+  fromDate,
 }: InventoryTableProps) {
   const [search, setSearch] = useState('');
   const [riskFilter, setRiskFilter] = useState<'ALL' | 'DANGER' | 'WARNING' | 'NORMAL'>('ALL');
@@ -142,9 +146,12 @@ export function InventoryTable({
   }
 
   return (
-    <section className="space-y-3">
+    <section className="scroll-mt-20 space-y-3 rounded-2xl border bg-card p-4 shadow-[0_18px_50px_-42px_rgba(15,23,42,0.65)] sm:p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold">전체 재고 분석</h2>
+        <div>
+          <h2 className="text-base font-semibold">전체 재고 현황</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">행을 선택하면 최근 추이와 주요 KPI를 확인할 수 있습니다.</p>
+        </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-muted-foreground">{sorted.length.toLocaleString('ko-KR')}건</span>
           <Button variant="outline" size="sm" onClick={downloadCurrentView}>
@@ -251,7 +258,7 @@ export function InventoryTable({
         </Select>
       </div>
 
-      <div className="rounded-md border">
+      <div className="overflow-x-auto rounded-xl border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -259,16 +266,16 @@ export function InventoryTable({
               <TableHead className="min-w-[220px]">상품명</TableHead>
               <TableHead>창고</TableHead>
               <TableHead className="text-right">가용재고</TableHead>
-              <TableHead className="text-right">정상재고</TableHead>
-              <SortableHead label="전일 대비" active={sortKey === 'increaseDesc'} asc={sortAsc} onClick={() => toggleSort('increaseDesc')} />
-              <TableHead className="text-right">7일 소진량</TableHead>
+              <TableHead className="hidden text-right 2xl:table-cell">정상재고</TableHead>
+              <SortableHead label={fromDate ? '기간 변화' : '전일 대비'} active={sortKey === 'increaseDesc'} asc={sortAsc} onClick={() => toggleSort('increaseDesc')} />
+              <TableHead className="hidden text-right xl:table-cell">7일 소진량</TableHead>
               <SortableHead label="7일 일평균 소진" active={sortKey === 'depletionRateDesc'} asc={sortAsc} onClick={() => toggleSort('depletionRateDesc')} />
-              <SortableHead label="7일 vs 이전 변화율" active={sortKey === 'accelerationDesc'} asc={sortAsc} onClick={() => toggleSort('accelerationDesc')} />
+              <SortableHead className="hidden 2xl:table-cell" label="7일 vs 이전 변화율" active={sortKey === 'accelerationDesc'} asc={sortAsc} onClick={() => toggleSort('accelerationDesc')} />
               <SortableHead label="Coverage" active={sortKey === 'coverageAsc'} asc={sortAsc} onClick={() => toggleSort('coverageAsc')} />
               <SortableHead label="예상 소진일" active={sortKey === 'stockoutFast'} asc={sortAsc} onClick={() => toggleSort('stockoutFast')} />
-              <TableHead className="text-right">단위원가</TableHead>
+              <TableHead className="hidden text-right 2xl:table-cell">단위원가</TableHead>
               <SortableHead label="재고금액" active={sortKey === 'valueDesc'} asc={sortAsc} onClick={() => toggleSort('valueDesc')} />
-              <SortableHead label="정체일수" active={sortKey === 'stagnantDesc'} asc={sortAsc} onClick={() => toggleSort('stagnantDesc')} />
+              <SortableHead className="hidden xl:table-cell" label="정체일수" active={sortKey === 'stagnantDesc'} asc={sortAsc} onClick={() => toggleSort('stagnantDesc')} />
               <TableHead>상태</TableHead>
             </TableRow>
           </TableHeader>
@@ -308,12 +315,21 @@ export function InventoryTable({
                 </TableCell>
                 <TableCell>{r.descriptor.warehouseCode}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatNumber(r.analysis.latest.availableStock)}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatNumber(r.analysis.latest.normalStock)}</TableCell>
+                <TableCell className="hidden text-right tabular-nums 2xl:table-cell">{formatNumber(r.analysis.latest.normalStock)}</TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {r.analysis.dailyChange === null ? <span className="text-muted-foreground">데이터 축적 중</span> : formatSigned(r.analysis.dailyChange)}
+                  {fromDate ? (
+                    r.periodComparison ? (
+                      <div>
+                        <span className={r.periodComparison.netChange > 0 ? 'text-status-increase' : r.periodComparison.netChange < 0 ? 'text-status-warning' : ''}>
+                          {formatSigned(r.periodComparison.netChange)}
+                        </span>
+                        <div className="text-[10px] text-muted-foreground">감소 {formatNumber(r.periodComparison.totalDepletion)} · 증가 {formatNumber(r.periodComparison.totalIncrease)}</div>
+                      </div>
+                    ) : <span className="text-muted-foreground">비교 불가</span>
+                  ) : r.analysis.dailyChange === null ? <span className="text-muted-foreground">데이터 축적 중</span> : formatSigned(r.analysis.dailyChange)}
                 </TableCell>
-                <TableCell className="text-right tabular-nums">{formatNumber(r.analysis.window7.totalDepletion)}</TableCell>
-                <TableCell className="text-right tabular-nums">
+                <TableCell className="hidden text-right tabular-nums xl:table-cell">{formatNumber(r.analysis.window7.totalDepletion)}</TableCell>
+                <TableCell className="hidden text-right tabular-nums 2xl:table-cell">
                   {r.analysis.window7.averageDailyDepletion === null ? '-' : formatNumber(r.analysis.window7.averageDailyDepletion)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
@@ -329,9 +345,9 @@ export function InventoryTable({
                 <TableCell className="text-right text-xs">
                   {r.analysis.forecast.expectedStockoutDate ? formatKstDate(r.analysis.forecast.expectedStockoutDate) : <span className="text-muted-foreground">데이터 축적 중</span>}
                 </TableCell>
-                <TableCell className="text-right tabular-nums">{formatNumber(r.analysis.latest.unitCost)}</TableCell>
+                <TableCell className="hidden text-right tabular-nums 2xl:table-cell">{formatNumber(r.analysis.latest.unitCost)}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatCurrency(r.valueBreakdown.normalStockValue)}</TableCell>
-                <TableCell className="text-right tabular-nums">
+                <TableCell className="hidden text-right tabular-nums xl:table-cell">
                   {r.analysis.stagnation.isMeaningful ? `${r.analysis.stagnation.stagnantDays}일` : <span className="text-muted-foreground">-</span>}
                 </TableCell>
                 <TableCell>
@@ -360,9 +376,9 @@ export function InventoryTable({
   );
 }
 
-function SortableHead({ label, active, asc, onClick }: { label: string; active: boolean; asc: boolean; onClick: () => void }) {
+function SortableHead({ label, active, asc, onClick, className }: { label: string; active: boolean; asc: boolean; onClick: () => void; className?: string }) {
   return (
-    <TableHead className="text-right">
+    <TableHead className={`text-right ${className ?? ''}`}>
       <button type="button" onClick={onClick} className="inline-flex items-center gap-1 hover:text-foreground">
         {label}
         {active ? asc ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" /> : <ArrowUpDown className="size-3 opacity-40" />}

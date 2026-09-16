@@ -14,24 +14,31 @@ import { calculateCompanyKpis, calculateWarehouseSummaries, buildActionCenterCar
 import type { RiskThresholdSettings } from '@/domain/inventory/types';
 import type { DailyWarehouseTotal } from '@/server/repositories/inventory-repository';
 import type { QuickFilter, TableTab } from '@/lib/inventory-filters';
+import { DateRangeControl } from '@/components/dashboard/date-range-control';
+import { todayKstDateString } from '@/lib/date';
 
 interface DashboardClientProps {
   asOfDate: string;
+  fromDate: string | null;
   warehouses: { id: string; code: string; name: string }[];
   settings: RiskThresholdSettings;
   rows: InventoryRow[];
   dailyTotals: DailyWarehouseTotal[];
 }
 
-export function DashboardClient({ asOfDate, warehouses, rows, dailyTotals }: DashboardClientProps) {
+export function DashboardClient({ asOfDate, fromDate, warehouses, rows, dailyTotals }: DashboardClientProps) {
   const [warehouseFilter, setWarehouseFilter] = useState<string | 'ALL'>('ALL');
   const [tableTab, setTableTab] = useState<TableTab>('ALL');
   const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
   const [selectedSkuId, setSelectedSkuId] = useState<string | null>(null);
 
-  const kpis = useMemo(() => calculateCompanyKpis(rows), [rows]);
+  const visibleRows = useMemo(
+    () => (warehouseFilter === 'ALL' ? rows : rows.filter((row) => row.descriptor.warehouseId === warehouseFilter)),
+    [rows, warehouseFilter],
+  );
+  const kpis = useMemo(() => calculateCompanyKpis(visibleRows), [visibleRows]);
   const warehouseSummaries = useMemo(() => calculateWarehouseSummaries(rows), [rows]);
-  const actionCenterCards = useMemo(() => buildActionCenterCards(rows), [rows]);
+  const actionCenterCards = useMemo(() => buildActionCenterCards(visibleRows), [visibleRows]);
 
   function handleActionCenterSelect(tab: TableTab, qf: QuickFilter) {
     setTableTab(tab);
@@ -41,8 +48,15 @@ export function DashboardClient({ asOfDate, warehouses, rows, dailyTotals }: Das
 
   if (rows.length === 0) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="flex w-full max-w-md flex-col items-center gap-4 rounded-lg border border-dashed p-10 text-center">
+      <div className="space-y-7">
+        <div className="flex flex-col gap-1">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Inventory intelligence</p>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">재고 운영 현황</h1>
+          <p className="text-sm text-muted-foreground">{asOfDate} 기준 재고 상태입니다.</p>
+        </div>
+        <DateRangeControl key={`${fromDate ?? 'day'}-${asOfDate}`} asOfDate={asOfDate} fromDate={fromDate} maxDate={todayKstDateString()} />
+        <div className="flex items-center justify-center py-12">
+          <div className="flex w-full max-w-md flex-col items-center gap-4 rounded-2xl border border-dashed bg-card p-10 text-center">
           <div className="flex size-12 items-center justify-center rounded-full bg-muted">
             <UploadCloud className="size-6 text-muted-foreground" aria-hidden="true" />
           </div>
@@ -55,15 +69,24 @@ export function DashboardClient({ asOfDate, warehouses, rows, dailyTotals }: Das
               <UploadCloud className="size-4" /> 업로드 하러 가기
             </Link>
           </Button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
+      <div className="flex flex-col gap-1">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Inventory intelligence</p>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">재고 운영 현황</h1>
+        <p className="text-sm text-muted-foreground">
+          {fromDate ? `${fromDate}부터 ${asOfDate}까지의 변화와 현재 상태를 함께 봅니다.` : `${asOfDate} 기준 재고 상태입니다.`}
+        </p>
+      </div>
+      <DateRangeControl key={`${fromDate ?? 'day'}-${asOfDate}`} asOfDate={asOfDate} fromDate={fromDate} maxDate={todayKstDateString()} />
       <ActionCenter cards={actionCenterCards} onSelect={handleActionCenterSelect} />
-      <KpiCards kpis={kpis} />
+      <KpiCards kpis={kpis} fromDate={fromDate} asOfDate={asOfDate} />
       <WarehouseSummaryCards summaries={warehouseSummaries} activeWarehouseId={warehouseFilter} onSelect={setWarehouseFilter} />
       <ChartsSection
         rows={rows}
@@ -71,6 +94,8 @@ export function DashboardClient({ asOfDate, warehouses, rows, dailyTotals }: Das
         warehouses={warehouses}
         chartWarehouseId={warehouseFilter}
         onChangeChartWarehouse={setWarehouseFilter}
+        fromDate={fromDate}
+        asOfDate={asOfDate}
       />
       <div id="inventory-table-section">
         <InventoryTable
@@ -87,9 +112,10 @@ export function DashboardClient({ asOfDate, warehouses, rows, dailyTotals }: Das
           onClearQuickFilter={() => setQuickFilter(null)}
           onSelectSku={setSelectedSkuId}
           asOfDate={asOfDate}
+          fromDate={fromDate}
         />
       </div>
-      <SkuDetailSheet skuId={selectedSkuId} asOfDate={asOfDate} onOpenChange={(open) => !open && setSelectedSkuId(null)} />
+      <SkuDetailSheet skuId={selectedSkuId} asOfDate={asOfDate} fromDate={fromDate} onOpenChange={(open) => !open && setSelectedSkuId(null)} />
     </div>
   );
 }

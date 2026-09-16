@@ -36,6 +36,7 @@ export function EventFormDialog({ open, onOpenChange, warehouseId, skuId, skuLab
 
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setQuantity(defaultQuantity !== undefined ? String(defaultQuantity) : '');
       setEventDate(defaultEventDate ? `${defaultEventDate}T09:00` : nowLocalInputValue());
       setNote('');

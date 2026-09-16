@@ -15,16 +15,43 @@ export interface SkuDescriptor {
 }
 
 /** isActive(최신 스냅샷에 존재) SKU 목록과, 각 SKU의 전체 관측 시계열을 한 번에 로드한다(N+1 방지) */
-export async function loadActiveSkusWithSeries(warehouseId?: string): Promise<{ descriptor: SkuDescriptor; observations: StockObservation[] }[]> {
+export async function loadActiveSkusWithSeries(
+  warehouseId?: string,
+  asOfDate?: string,
+): Promise<{ descriptor: SkuDescriptor; observations: StockObservation[] }[]> {
+  const latestSnapshots = await prisma.inventorySnapshot.findMany({
+    where: {
+      status: 'ACTIVE',
+      ...(warehouseId ? { warehouseId } : {}),
+      ...(asOfDate ? { snapshotDate: { lte: new Date(`${asOfDate}T00:00:00.000Z`) } } : {}),
+    },
+    select: { id: true, warehouseId: true },
+    orderBy: { snapshotDate: 'desc' },
+  });
+  const latestSnapshotIds = [...new Map(latestSnapshots.map((snapshot) => [snapshot.warehouseId, snapshot.id])).values()];
+  if (latestSnapshotIds.length === 0) return [];
+
+  const latestItems = await prisma.inventoryItem.findMany({
+    where: { snapshotId: { in: latestSnapshotIds } },
+    select: { skuId: true },
+  });
+  const activeSkuIds = [...new Set(latestItems.map((item) => item.skuId))];
+
   const skus = await prisma.sku.findMany({
-    where: { isActive: true, ...(warehouseId ? { warehouseId } : {}) },
+    where: { id: { in: activeSkuIds }, ...(warehouseId ? { warehouseId } : {}) },
     include: { warehouse: { select: { id: true, code: true, name: true } } },
   });
   if (skus.length === 0) return [];
 
   const skuIds = skus.map((s) => s.id);
   const items = await prisma.inventoryItem.findMany({
-    where: { skuId: { in: skuIds }, snapshot: { status: 'ACTIVE' } },
+    where: {
+      skuId: { in: skuIds },
+      snapshot: {
+        status: 'ACTIVE',
+        ...(asOfDate ? { snapshotDate: { lte: new Date(`${asOfDate}T00:00:00.000Z`) } } : {}),
+      },
+    },
     include: { snapshot: { select: { snapshotDate: true } } },
     orderBy: { snapshot: { snapshotDate: 'asc' } },
   });

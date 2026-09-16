@@ -8,6 +8,7 @@ import type {
   DepletionAcceleration,
   InventoryValueBreakdown,
   OverstockCandidateInfo,
+  PeriodComparison,
   RiskThresholdSettings,
   SkuAnalysis,
   StagnationInfo,
@@ -62,6 +63,37 @@ export function buildDailyDeltas(sortedObservations: StockObservation[]): DailyD
     });
   }
   return deltas;
+}
+
+/** 두 선택일 사이의 변화를 계산한다. 선택일에 스냅샷이 없으면 해당 날짜 이전의 가장 가까운 관측치를 사용한다. */
+export function calculatePeriodComparison(
+  observations: StockObservation[],
+  startDate: string,
+  endDate: string,
+): PeriodComparison | null {
+  const sorted = sortObservations(observations).filter((observation) => observation.date <= endDate);
+  const start = [...sorted].reverse().find((observation) => observation.date <= startDate);
+  const end = sorted.at(-1);
+  if (!start || !end || end.date < start.date) return null;
+
+  const deltas = buildDailyDeltas(sorted).filter((delta) => delta.toDate > start.date && delta.toDate <= end.date);
+  const observedDays = deltas.reduce((sum, delta) => sum + delta.intervalDays, 0);
+  const totalDepletion = deltas.reduce((sum, delta) => sum + delta.depletion, 0);
+  const totalIncrease = deltas.reduce((sum, delta) => sum + delta.increase, 0);
+
+  return {
+    requestedStartDate: startDate,
+    requestedEndDate: endDate,
+    actualStartDate: start.date,
+    actualEndDate: end.date,
+    startAvailableStock: start.availableStock,
+    endAvailableStock: end.availableStock,
+    netChange: end.availableStock - start.availableStock,
+    totalDepletion,
+    totalIncrease,
+    observedDays,
+    averageDailyDepletion: observedDays > 0 ? totalDepletion / observedDays : null,
+  };
 }
 
 /**

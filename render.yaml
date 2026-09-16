@@ -1,6 +1,6 @@
 databases:
   - name: scm-inventory-db
-    plan: starter
+    plan: free
     databaseName: scm_inventory
     user: scm_inventory
 
@@ -8,8 +8,9 @@ services:
   - type: web
     name: scm-inventory-dashboard
     runtime: node
-    plan: starter
-    buildCommand: npm ci && npx prisma generate && npm run build
+    plan: free
+    # NODE_ENV=production이어도 Tailwind/PostCSS/TypeScript 등 빌드 도구가 필요하다.
+    buildCommand: npm ci --include=dev && npx prisma generate && npm run build
     startCommand: npx prisma migrate deploy && npm run start
     envVars:
       - key: DATABASE_URL

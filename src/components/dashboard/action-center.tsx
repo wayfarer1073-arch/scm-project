@@ -1,7 +1,6 @@
 'use client';
 
 import { AlertOctagon, Clock, Flame, TrendingUp, PauseCircle, PackageOpen } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { ActionCenterCard, ActionCenterCategory } from '@/server/services/inventory-analysis-service';
 import type { QuickFilter, TableTab } from '@/lib/inventory-filters';
@@ -22,31 +21,37 @@ interface ActionCenterProps {
 
 export function ActionCenter({ cards, onSelect }: ActionCenterProps) {
   return (
-    <section>
-      <h2 className="mb-3 text-base font-semibold">오늘 확인해야 할 재고</h2>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+    <section className="overflow-hidden rounded-2xl border bg-card shadow-[0_18px_50px_-38px_rgba(15,23,42,0.65)]">
+      <div className="flex items-center justify-between border-b px-5 py-4">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Action center</p>
+          <h2 className="mt-1 text-lg font-semibold">우선 확인할 재고</h2>
+        </div>
+        <p className="hidden text-xs text-muted-foreground sm:block">항목을 누르면 전체 재고 목록에 바로 적용됩니다.</p>
+      </div>
+      <div className="grid grid-cols-2 divide-x divide-y sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
         {cards.map((card) => {
           const meta = CARD_META[card.category];
           const Icon = meta.icon;
           return (
-            <Card
+            <button
               key={card.category}
               role="button"
               tabIndex={0}
               onClick={() => onSelect(meta.tab, meta.quickFilter)}
               onKeyDown={(e) => e.key === 'Enter' && onSelect(meta.tab, meta.quickFilter)}
               className={cn(
-                'cursor-pointer transition-all duration-150 hover:border-border hover:shadow-md active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                'min-h-40 cursor-pointer bg-card p-4 text-left outline-none transition-colors hover:bg-muted/45 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring',
                 card.count === 0 && 'opacity-60',
               )}
             >
-              <CardHeader className="pb-1">
+              <div className="pb-3">
                 <div className={cn('flex size-7 items-center justify-center rounded-md', meta.tone)}>
                   <Icon className="size-4" />
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-1.5 pt-0">
-                <CardTitle className="font-normal text-muted-foreground">{card.title}</CardTitle>
+              </div>
+              <div className="space-y-1.5">
+                <div className="text-xs font-medium text-muted-foreground">{card.title}</div>
                 <div className="text-2xl font-semibold tabular-nums">{card.count.toLocaleString('ko-KR')}</div>
                 {card.sampleSkus.length > 0 && (
                   <ul className="space-y-0.5 pt-1 text-xs text-muted-foreground">
@@ -57,8 +62,8 @@ export function ActionCenter({ cards, onSelect }: ActionCenterProps) {
                     ))}
                   </ul>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </button>
           );
         })}
       </div>
