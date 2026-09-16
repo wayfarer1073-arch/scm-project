@@ -23,6 +23,15 @@ export function getLatestActiveSnapshotBefore(warehouseId: string, beforeDate: D
   });
 }
 
+/** 창고 내에서 파일명과 무관하게 내용(해시)이 완전히 동일한 기존 스냅샷을 찾는다. */
+export function findSnapshotByFileHash(warehouseId: string, fileHash: string) {
+  return prisma.inventorySnapshot.findFirst({
+    where: { warehouseId, status: 'ACTIVE', fileHash },
+    include: { uploadedBy: { select: { name: true } } },
+    orderBy: { snapshotDate: 'desc' },
+  });
+}
+
 export async function getSnapshotProductCodes(snapshotId: string): Promise<string[]> {
   const items = await prisma.inventoryItem.findMany({ where: { snapshotId }, select: { productCode: true } });
   return items.map((i) => i.productCode);

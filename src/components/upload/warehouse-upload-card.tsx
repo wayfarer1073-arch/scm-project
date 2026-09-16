@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { UploadCloud, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { UploadCloud, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,7 +26,8 @@ type UiState =
   | { phase: 'idle' }
   | { phase: 'uploading' }
   | { phase: 'error'; issues: ValidationIssue[] }
-  | { phase: 'success'; rowCount: number; issues: ValidationIssue[] };
+  | { phase: 'success'; rowCount: number; issues: ValidationIssue[] }
+  | { phase: 'duplicate'; snapshotDate: string; uploadedAt: string; uploadedByName: string; rowCount: number };
 
 export function WarehouseUploadCard({ warehouse, latestSnapshot }: WarehouseUploadCardProps) {
   const router = useRouter();
@@ -64,6 +65,17 @@ export function WarehouseUploadCard({ warehouse, latestSnapshot }: WarehouseUplo
       if (!res.ok) {
         toast.error(body.error ?? '업로드 중 오류가 발생했습니다.');
         setState({ phase: 'idle' });
+        return;
+      }
+      if (body.status === 'DUPLICATE') {
+        setState({
+          phase: 'duplicate',
+          snapshotDate: body.existing.snapshotDate,
+          uploadedAt: body.existing.uploadedAt,
+          uploadedByName: body.existing.uploadedByName,
+          rowCount: body.existing.rowCount,
+        });
+        toast.message('내용이 동일한 파일이라 저장하지 않았습니다.');
         return;
       }
 
@@ -149,6 +161,17 @@ export function WarehouseUploadCard({ warehouse, latestSnapshot }: WarehouseUplo
                   {warningIssues.length > 6 && <li>외 {warningIssues.length - 6}건 경고</li>}
                 </ul>
               )}
+            </div>
+          )}
+
+          {state.phase === 'duplicate' && (
+            <div className="rounded-md border bg-muted/60 p-3 text-xs text-muted-foreground">
+              <div className="mb-1 flex items-center gap-1.5 font-medium text-foreground">
+                <Info className="size-3.5" />
+                동일한 내용의 파일이라 저장하지 않았습니다
+              </div>
+              파일명과 관계없이 {formatKstDate(state.snapshotDate)} 기준으로 {state.uploadedByName}님이{' '}
+              {formatKstDateTime(state.uploadedAt)}에 올린 스냅샷({state.rowCount.toLocaleString()}건)과 내용이 완전히 동일합니다.
             </div>
           )}
         </CardContent>

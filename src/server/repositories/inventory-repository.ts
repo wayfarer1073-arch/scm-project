@@ -28,7 +28,15 @@ export async function loadActiveSkusWithSeries(
     select: { id: true, warehouseId: true },
     orderBy: { snapshotDate: 'desc' },
   });
-  const latestSnapshotIds = [...new Map(latestSnapshots.map((snapshot) => [snapshot.warehouseId, snapshot.id])).values()];
+  // snapshotDate desc로 정렬되어 있으므로, 창고별로 "처음 등장하는" 항목만 남겨야 최신 스냅샷이 된다
+  // (Map을 새 배열로 바로 만들면 뒤에 오는 과거 스냅샷이 값을 덮어써 가장 오래된 스냅샷이 선택되는 버그가 생긴다).
+  const latestSnapshotIdByWarehouse = new Map<string, string>();
+  for (const snapshot of latestSnapshots) {
+    if (!latestSnapshotIdByWarehouse.has(snapshot.warehouseId)) {
+      latestSnapshotIdByWarehouse.set(snapshot.warehouseId, snapshot.id);
+    }
+  }
+  const latestSnapshotIds = [...latestSnapshotIdByWarehouse.values()];
   if (latestSnapshotIds.length === 0) return [];
 
   const latestItems = await prisma.inventoryItem.findMany({

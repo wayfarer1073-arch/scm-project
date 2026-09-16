@@ -2,7 +2,8 @@ import { listWarehouses } from '@/server/repositories/warehouse-repository';
 import { getSettings } from '@/server/repositories/settings-repository';
 import { getInventoryRows } from '@/server/services/inventory-analysis-service';
 import { loadDailyWarehouseTotals } from '@/server/repositories/inventory-repository';
-import { todayKstDateString } from '@/lib/date';
+import { getLatestActiveSnapshot } from '@/server/repositories/snapshot-repository';
+import { todayKstDateString, dateOnlyToString } from '@/lib/date';
 import { DashboardClient } from '@/components/dashboard/dashboard-client';
 
 function isDateString(value: unknown): value is string {
@@ -24,6 +25,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     loadDailyWarehouseTotals(),
   ]);
 
+  const latestUploads = await Promise.all(
+    warehouses.map(async (w) => {
+      const latest = await getLatestActiveSnapshot(w.id);
+      return {
+        warehouseId: w.id,
+        snapshotDate: latest ? dateOnlyToString(latest.snapshotDate) : null,
+        uploadedAt: latest ? latest.uploadedAt.toISOString() : null,
+      };
+    }),
+  );
+
   return (
     <DashboardClient
       asOfDate={asOfDate}
@@ -32,6 +44,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       settings={settings}
       rows={rows}
       dailyTotals={dailyTotals}
+      latestUploads={latestUploads}
     />
   );
 }

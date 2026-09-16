@@ -17,6 +17,12 @@ import type { QuickFilter, TableTab } from '@/lib/inventory-filters';
 import { DateRangeControl } from '@/components/dashboard/date-range-control';
 import { todayKstDateString } from '@/lib/date';
 
+interface LatestUpload {
+  warehouseId: string;
+  snapshotDate: string | null;
+  uploadedAt: string | null;
+}
+
 interface DashboardClientProps {
   asOfDate: string;
   fromDate: string | null;
@@ -24,9 +30,10 @@ interface DashboardClientProps {
   settings: RiskThresholdSettings;
   rows: InventoryRow[];
   dailyTotals: DailyWarehouseTotal[];
+  latestUploads: LatestUpload[];
 }
 
-export function DashboardClient({ asOfDate, fromDate, warehouses, rows, dailyTotals }: DashboardClientProps) {
+export function DashboardClient({ asOfDate, fromDate, warehouses, rows, dailyTotals, latestUploads }: DashboardClientProps) {
   const [warehouseFilter, setWarehouseFilter] = useState<string | 'ALL'>('ALL');
   const [tableTab, setTableTab] = useState<TableTab>('ALL');
   const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
@@ -83,7 +90,7 @@ export function DashboardClient({ asOfDate, fromDate, warehouses, rows, dailyTot
       <DateRangeControl key={`${fromDate ?? 'day'}-${asOfDate}`} asOfDate={asOfDate} fromDate={fromDate} maxDate={todayKstDateString()} />
       <ActionCenter cards={actionCenterCards} onSelect={handleActionCenterSelect} />
       <KpiCards kpis={kpis} fromDate={fromDate} asOfDate={asOfDate} />
-      <WarehouseSummaryCards summaries={warehouseSummaries} activeWarehouseId={warehouseFilter} onSelect={setWarehouseFilter} />
+      <WarehouseSummaryCards summaries={warehouseSummaries} activeWarehouseId={warehouseFilter} onSelect={setWarehouseFilter} latestUploads={latestUploads} />
       <ChartsSection
         rows={rows}
         dailyTotals={dailyTotals}

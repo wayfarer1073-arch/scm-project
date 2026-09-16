@@ -1,17 +1,26 @@
 'use client';
 
+import { UploadCloud } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatNumber, formatPercent } from '@/lib/format';
+import { formatKstDate, formatKstDateTime } from '@/lib/date';
 import type { WarehouseSummary } from '@/server/services/inventory-analysis-service';
+
+interface LatestUpload {
+  warehouseId: string;
+  snapshotDate: string | null;
+  uploadedAt: string | null;
+}
 
 interface WarehouseSummaryCardsProps {
   summaries: WarehouseSummary[];
   activeWarehouseId: string | 'ALL';
   onSelect: (warehouseId: string | 'ALL') => void;
+  latestUploads: LatestUpload[];
 }
 
-export function WarehouseSummaryCards({ summaries, activeWarehouseId, onSelect }: WarehouseSummaryCardsProps) {
+export function WarehouseSummaryCards({ summaries, activeWarehouseId, onSelect, latestUploads }: WarehouseSummaryCardsProps) {
   return (
     <section>
       <div className="mb-3 flex items-center justify-between">
@@ -21,6 +30,7 @@ export function WarehouseSummaryCards({ summaries, activeWarehouseId, onSelect }
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {summaries.map((s) => {
           const active = activeWarehouseId === s.warehouseId;
+          const upload = latestUploads.find((u) => u.warehouseId === s.warehouseId);
           return (
             <Card
               key={s.warehouseId}
@@ -45,6 +55,16 @@ export function WarehouseSummaryCards({ summaries, activeWarehouseId, onSelect }
                 <Metric label="장기 정체 비율" value={formatPercent(s.stagnantRatio)} />
                 <Metric label="과잉재고 후보 비율" value={formatPercent(s.overstockCandidateRatio)} />
               </CardContent>
+              <div className="flex items-center gap-1.5 border-t px-5 py-2.5 text-[11px] text-muted-foreground">
+                <UploadCloud className="size-3 shrink-0" aria-hidden="true" />
+                {upload?.uploadedAt ? (
+                  <span>
+                    최근 업로드 {formatKstDate(upload.snapshotDate!)} 기준 · {formatKstDateTime(upload.uploadedAt)}
+                  </span>
+                ) : (
+                  <span>아직 업로드된 스냅샷이 없습니다</span>
+                )}
+              </div>
             </Card>
           );
         })}

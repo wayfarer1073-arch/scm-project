@@ -5,6 +5,7 @@ import type { ValidationIssue } from '@/domain/excel/types';
 import {
   createSnapshot,
   findActiveSnapshot,
+  findSnapshotByFileHash,
   getLatestActiveSnapshotBefore,
   getSnapshotProductCodes,
 } from '@/server/repositories/snapshot-repository';
@@ -25,6 +26,10 @@ export type UploadResult =
       status: 'CONFLICT';
       existing: { snapshotId: string; uploadedAt: Date; uploadedByName: string; rowCount: number; version: number };
     }
+  | {
+      status: 'DUPLICATE';
+      existing: { snapshotDate: Date; uploadedAt: Date; uploadedByName: string; rowCount: number };
+    }
   | { status: 'SUCCESS'; snapshotId: string; rowCount: number; issues: ValidationIssue[] };
 
 function sha256(buffer: Buffer): string {
@@ -37,6 +42,21 @@ export async function processUpload(request: UploadRequest): Promise<UploadResul
   const errors = parseResult.issues.filter((i) => i.level === 'ERROR');
   if (errors.length > 0) {
     return { status: 'ERROR', issues: parseResult.issues };
+  }
+
+  const fileHash = sha256(request.fileBuffer);
+
+  const duplicate = await findSnapshotByFileHash(request.warehouseId, fileHash);
+  if (duplicate) {
+    return {
+      status: 'DUPLICATE',
+      existing: {
+        snapshotDate: duplicate.snapshotDate,
+        uploadedAt: duplicate.uploadedAt,
+        uploadedByName: duplicate.uploadedBy.name,
+        rowCount: duplicate.rowCount,
+      },
+    };
   }
 
   if (!request.replaceExisting) {
@@ -58,8 +78,6 @@ export async function processUpload(request: UploadRequest): Promise<UploadResul
   const previousSnapshot = await getLatestActiveSnapshotBefore(request.warehouseId, request.snapshotDate);
   const previousProductCodes = previousSnapshot ? await getSnapshotProductCodes(previousSnapshot.id) : null;
   const crossCheck = validateAgainstPreviousSnapshot(parseResult.rows, previousProductCodes);
-
-  const fileHash = sha256(request.fileBuffer);
 
   const snapshot = await createSnapshot({
     warehouseId: request.warehouseId,
