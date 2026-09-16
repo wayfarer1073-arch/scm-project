@@ -32,13 +32,9 @@ export function DashboardClient({ asOfDate, fromDate, warehouses, rows, dailyTot
   const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
   const [selectedSkuId, setSelectedSkuId] = useState<string | null>(null);
 
-  const visibleRows = useMemo(
-    () => (warehouseFilter === 'ALL' ? rows : rows.filter((row) => row.descriptor.warehouseId === warehouseFilter)),
-    [rows, warehouseFilter],
-  );
-  const kpis = useMemo(() => calculateCompanyKpis(visibleRows), [visibleRows]);
+  const kpis = useMemo(() => calculateCompanyKpis(rows), [rows]);
   const warehouseSummaries = useMemo(() => calculateWarehouseSummaries(rows), [rows]);
-  const actionCenterCards = useMemo(() => buildActionCenterCards(visibleRows), [visibleRows]);
+  const actionCenterCards = useMemo(() => buildActionCenterCards(rows), [rows]);
 
   function handleActionCenterSelect(tab: TableTab, qf: QuickFilter) {
     setTableTab(tab);

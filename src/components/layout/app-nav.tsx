@@ -22,7 +22,7 @@ export function AppNav() {
             href={item.href}
             className={cn(
               'rounded-md px-3 py-1.5 text-xs font-medium transition-colors sm:text-sm',
-              active ? 'bg-slate-950 text-white shadow-sm' : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground',
+              active ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground',
             )}
           >
             {item.label}

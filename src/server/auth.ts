@@ -38,8 +38,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return token;
     },
     session: async ({ session, token }) => {
-      session.user.id = typeof token.id === 'string' ? token.id : '';
-      session.user.role = token.role === 'ADMIN' ? 'ADMIN' : 'MEMBER';
+      session.user.id = token.id;
+      session.user.role = token.role;
       return session;
     },
   },

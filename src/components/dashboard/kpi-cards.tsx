@@ -13,10 +13,10 @@ export function KpiCards({ kpis, fromDate, asOfDate }: KpiCardsProps) {
   const periodLabel = fromDate ? `${fromDate.slice(5)} — ${asOfDate.slice(5)}` : '직전 관측 대비';
   const periodDays = fromDate ? Math.max(1, Math.round((Date.parse(`${asOfDate}T00:00:00Z`) - Date.parse(`${fromDate}T00:00:00Z`)) / 86_400_000)) : null;
   const primary = [
-    { label: '총 재고자산', value: formatCurrency(kpis.totalInventoryValue), detail: '정상재고 × 원가', icon: CircleDollarSign, tone: 'bg-slate-950 text-white' },
-    { label: '총 가용재고', value: `${formatNumber(kpis.totalAvailableStock)}개`, detail: `${formatNumber(kpis.totalSkuCount)}개 SKU`, icon: Boxes, tone: 'bg-blue-50 text-blue-700' },
-    { label: '관측 재고 감소', value: `${formatNumber(kpis.totalDecrease ?? 0)}개`, detail: periodLabel, icon: ArrowDownRight, tone: 'bg-amber-50 text-amber-700' },
-    { label: '관측 재고 증가', value: `${formatNumber(kpis.totalIncrease ?? 0)}개`, detail: `${periodLabel} · 입고/반품/조정 가능`, icon: ArrowUpRight, tone: 'bg-sky-50 text-sky-700' },
+    { label: '총 재고자산', value: formatCurrency(kpis.totalInventoryValue), detail: '정상재고 × 원가', icon: CircleDollarSign, tone: 'bg-primary text-primary-foreground' },
+    { label: '총 가용재고', value: `${formatNumber(kpis.totalAvailableStock)}개`, detail: `${formatNumber(kpis.totalSkuCount)}개 SKU`, icon: Boxes, tone: 'bg-status-increase-bg text-status-increase' },
+    { label: '관측 재고 감소', value: `${formatNumber(kpis.totalDecrease ?? 0)}개`, detail: periodLabel, icon: ArrowDownRight, tone: 'bg-status-warning-bg text-status-warning' },
+    { label: '관측 재고 증가', value: `${formatNumber(kpis.totalIncrease ?? 0)}개`, detail: `${periodLabel} · 입고/반품/조정 가능`, icon: ArrowUpRight, tone: 'bg-status-normal-bg text-status-normal' },
   ];
 
   return (

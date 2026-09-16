@@ -12,8 +12,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur-xl supports-[backdrop-filter]:bg-background/75">
         <div className="mx-auto flex h-16 max-w-[1600px] items-center gap-7 px-4 sm:px-6 lg:px-8">
           <span className="flex items-center gap-2.5 text-sm font-semibold tracking-tight">
-            <span className="flex size-8 items-center justify-center rounded-xl bg-slate-950 text-[10px] font-bold tracking-wider text-white" aria-hidden="true">SCM</span>
-            <span className="hidden sm:inline">Inventory</span>
+            <span className="flex size-8 items-center justify-center rounded-xl bg-primary text-[10px] font-bold tracking-wider text-primary-foreground" aria-hidden="true">
+              재고
+            </span>
+            <span className="hidden sm:inline">재고관리 대시보드</span>
           </span>
           <AppNav />
           <div className="ml-auto flex items-center gap-3">
