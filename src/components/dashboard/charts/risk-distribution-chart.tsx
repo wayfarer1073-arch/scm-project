@@ -1,12 +1,64 @@
 'use client';
 
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatNumber } from '@/lib/format';
 
 interface RiskDistributionChartProps {
   danger: number;
   warning: number;
   normal: number;
+}
+
+const RADIAN = Math.PI / 180;
+
+interface LeaderLabelProps {
+  cx: number;
+  cy: number;
+  midAngle: number;
+  outerRadius: number;
+  value: number;
+  percent: number;
+  name: string;
+  fill: string;
+}
+
+/**
+ * 위험/주의는 작은 슬라이스로 붙어있는 경우가 많아 각도 기준으로만 라벨을 배치하면 겹친다.
+ * 그래서 라벨 텍스트는 카테고리별 고정 슬롯에 배치하고, 리더라인의 시작점만 실제 조각 위치에서 뽑는다.
+ */
+const LABEL_SLOTS: Record<string, { side: 'left' | 'right'; yOffset: number }> = {
+  위험: { side: 'right', yOffset: -34 },
+  주의: { side: 'right', yOffset: 10 },
+  정상: { side: 'left', yOffset: -12 },
+};
+
+function LeaderLineLabel({ cx, cy, midAngle, outerRadius, value, percent, name, fill }: LeaderLabelProps) {
+  if (value === 0) return null;
+  const cos = Math.cos(-RADIAN * midAngle);
+  const sin = Math.sin(-RADIAN * midAngle);
+  const sx = cx + (outerRadius + 6) * cos;
+  const sy = cy + (outerRadius + 6) * sin;
+
+  const slot = LABEL_SLOTS[name] ?? { side: cos >= 0 ? 'right' : 'left', yOffset: 0 };
+  const dir = slot.side === 'right' ? 1 : -1;
+  const ey = cy + slot.yOffset;
+  const ex = cx + dir * (outerRadius + 44);
+  const mx = ex - dir * 14;
+  const textAnchor = slot.side === 'right' ? 'start' : 'end';
+
+  return (
+    <g>
+      <path d={`M${sx},${sy} L${mx},${ey} L${ex},${ey}`} stroke={fill} strokeWidth={1.5} fill="none" />
+      <circle cx={sx} cy={sy} r={2.5} fill={fill} />
+      <text x={ex + dir * 4} y={ey - 3} textAnchor={textAnchor} fontSize={12} fontWeight={600} fill="var(--color-foreground)">
+        {name}
+      </text>
+      <text x={ex + dir * 4} y={ey + 12} textAnchor={textAnchor} fontSize={11} fill="var(--color-muted-foreground)">
+        {`${value.toLocaleString('ko-KR')}건 · ${Math.round(percent * 100)}%`}
+      </text>
+    </g>
+  );
 }
 
 export function RiskDistributionChart({ danger, warning, normal }: RiskDistributionChartProps) {
@@ -22,17 +74,47 @@ export function RiskDistributionChart({ danger, warning, normal }: RiskDistribut
       <CardHeader className="pb-2">
         <CardTitle className="text-sm">재고 위험상태 분포</CardTitle>
       </CardHeader>
-      <CardContent className="h-64 pt-0">
+      <CardContent className="h-72 pt-0">
         {total === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">데이터가 없습니다</div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie data={data} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={2}>
+            <PieChart margin={{ top: 24, right: 96, bottom: 24, left: 72 }}>
+              <Pie
+                data={data}
+                dataKey="value"
+                nameKey="name"
+                innerRadius={52}
+                outerRadius={76}
+                paddingAngle={3}
+                stroke="var(--color-card)"
+                strokeWidth={2}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                label={(props: any) => (
+                  <LeaderLineLabel
+                    cx={props.cx}
+                    cy={props.cy}
+                    midAngle={props.midAngle}
+                    outerRadius={props.outerRadius}
+                    value={props.value}
+                    percent={props.percent}
+                    name={props.name}
+                    fill={data[props.index].color}
+                  />
+                )}
+                labelLine={false}
+                isAnimationActive={false}
+              >
                 {data.map((d) => (
                   <Cell key={d.name} fill={d.color} />
                 ))}
               </Pie>
+              <text x="50%" y="47%" textAnchor="middle" dominantBaseline="central" fontSize={22} fontWeight={700} fill="var(--color-foreground)">
+                {formatNumber(total)}
+              </text>
+              <text x="50%" y="56%" textAnchor="middle" dominantBaseline="central" fontSize={11} fill="var(--color-muted-foreground)">
+                전체 SKU
+              </text>
               <Tooltip
                 formatter={(value, name) => {
                   const v = Number(value);
@@ -40,7 +122,6 @@ export function RiskDistributionChart({ danger, warning, normal }: RiskDistribut
                 }}
                 contentStyle={{ fontSize: 12, borderRadius: 8 }}
               />
-              <Legend verticalAlign="bottom" height={24} iconType="circle" wrapperStyle={{ fontSize: 12 }} />
             </PieChart>
           </ResponsiveContainer>
         )}

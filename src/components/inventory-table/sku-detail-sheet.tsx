@@ -228,7 +228,7 @@ export function SkuDetailSheet({ skuId, asOfDate, onOpenChange }: SkuDetailSheet
                             <stop offset="100%" stopColor="var(--color-chart-1)" stopOpacity={0} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                        <CartesianGrid stroke="var(--color-border)" vertical={false} />
                         <XAxis dataKey="date" tickFormatter={(d: string) => formatKstDate(d).slice(5)} fontSize={11} stroke="var(--color-muted-foreground)" tickLine={false} axisLine={false} />
                         <YAxis width={44} fontSize={11} stroke="var(--color-muted-foreground)" tickLine={false} axisLine={false} />
                         <Tooltip labelFormatter={(d) => formatKstDate(String(d))} formatter={(v) => [`${Number(v).toLocaleString('ko-KR')}개`, '가용재고']} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
