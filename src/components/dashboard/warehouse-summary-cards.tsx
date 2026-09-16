@@ -26,8 +26,13 @@ export function WarehouseSummaryCards({ summaries, activeWarehouseId, onSelect }
               key={s.warehouseId}
               role="button"
               tabIndex={0}
+              aria-pressed={active}
               onClick={() => onSelect(active ? 'ALL' : s.warehouseId)}
-              className={cn('cursor-pointer transition-shadow hover:shadow-md', active && 'ring-2 ring-ring')}
+              onKeyDown={(e) => e.key === 'Enter' && onSelect(active ? 'ALL' : s.warehouseId)}
+              className={cn(
+                'cursor-pointer transition-all duration-150 hover:border-border hover:shadow-md active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                active && 'border-primary/40 ring-2 ring-ring',
+              )}
             >
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">{s.warehouseName}</CardTitle>

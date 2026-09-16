@@ -41,17 +41,21 @@ export function DashboardClient({ asOfDate, warehouses, rows, dailyTotals }: Das
 
   if (rows.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-        <UploadCloud className="size-10 text-muted-foreground" />
-        <div>
-          <h2 className="text-lg font-semibold">아직 업로드된 재고 데이터가 없습니다</h2>
-          <p className="mt-1 text-sm text-muted-foreground">창고별 Excel을 업로드하면 대시보드가 자동으로 채워집니다.</p>
+      <div className="flex items-center justify-center py-16">
+        <div className="flex w-full max-w-md flex-col items-center gap-4 rounded-lg border border-dashed p-10 text-center">
+          <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+            <UploadCloud className="size-6 text-muted-foreground" aria-hidden="true" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold">아직 업로드된 재고 데이터가 없습니다</h2>
+            <p className="mt-1 text-sm text-muted-foreground">창고별 Excel을 업로드하면 대시보드가 자동으로 채워집니다.</p>
+          </div>
+          <Button asChild>
+            <Link href="/upload">
+              <UploadCloud className="size-4" /> 업로드 하러 가기
+            </Link>
+          </Button>
         </div>
-        <Button asChild>
-          <Link href="/upload">
-            <UploadCloud className="size-4" /> 업로드 하러 가기
-          </Link>
-        </Button>
       </div>
     );
   }

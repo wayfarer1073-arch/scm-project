@@ -35,7 +35,10 @@ export function ActionCenter({ cards, onSelect }: ActionCenterProps) {
               tabIndex={0}
               onClick={() => onSelect(meta.tab, meta.quickFilter)}
               onKeyDown={(e) => e.key === 'Enter' && onSelect(meta.tab, meta.quickFilter)}
-              className={cn('cursor-pointer transition-shadow hover:shadow-md', card.count === 0 && 'opacity-60')}
+              className={cn(
+                'cursor-pointer transition-all duration-150 hover:border-border hover:shadow-md active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                card.count === 0 && 'opacity-60',
+              )}
             >
               <CardHeader className="pb-1">
                 <div className={cn('flex size-7 items-center justify-center rounded-md', meta.tone)}>
