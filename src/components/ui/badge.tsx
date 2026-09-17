@@ -17,6 +17,8 @@ const badgeVariants = cva(
         normal: 'border-transparent bg-status-normal-bg text-status-normal',
         increase: 'border-transparent bg-status-increase-bg text-status-increase',
         stagnant: 'border-transparent bg-status-stagnant-bg text-status-stagnant',
+        notice: 'border-transparent bg-tag-notice-bg text-tag-notice',
+        resolved: 'border-transparent bg-tag-resolved-bg text-tag-resolved',
       },
     },
     defaultVariants: { variant: 'default' },

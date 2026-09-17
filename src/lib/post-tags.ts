@@ -1,8 +1,8 @@
 export const POST_TAG_OPTIONS = [
-  { value: 'ISSUE', label: '이슈', badgeVariant: 'outline' },
-  { value: 'NOTICE', label: '공지', badgeVariant: 'default' },
+  { value: 'NOTICE', label: '공지', badgeVariant: 'notice' },
+  { value: 'ISSUE', label: '이슈', badgeVariant: 'danger' },
+  { value: 'RESOLVED', label: '해결', badgeVariant: 'resolved' },
   { value: 'CHAT', label: '잡담', badgeVariant: 'secondary' },
-  { value: 'RESOLVED', label: '해결', badgeVariant: 'normal' },
 ] as const;
 
 export type PostTagValue = (typeof POST_TAG_OPTIONS)[number]['value'];
