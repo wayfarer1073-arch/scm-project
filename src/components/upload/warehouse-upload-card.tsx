@@ -232,10 +232,11 @@ export function WarehouseUploadCard({ warehouse, latestSnapshot }: WarehouseUplo
             <div className="rounded-md border bg-muted/60 p-3 text-xs text-muted-foreground">
               <div className="mb-1 flex items-center gap-1.5 font-medium text-foreground">
                 <Info className="size-3.5" />
-                동일한 내용의 파일이라 저장하지 않았습니다
+                동일한 데이터입니다
               </div>
               파일명과 관계없이 {formatKstDate(state.snapshotDate)} 기준으로 {state.uploadedByName}님이{' '}
-              {formatKstDateTime(state.uploadedAt)}에 올린 스냅샷({state.rowCount.toLocaleString()}건)과 내용이 완전히 동일합니다.
+              {formatKstDateTime(state.uploadedAt)}에 올린 스냅샷({state.rowCount.toLocaleString()}건)과 품목·재고수량이 동일하여 저장하지
+              않았습니다.
             </div>
           )}
         </CardContent>
