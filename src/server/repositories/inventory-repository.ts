@@ -130,7 +130,9 @@ export async function loadActiveSkusWithSeries(
     list.push({
       date: dateOnlyToString(item.snapshot.snapshotDate),
       inboundQuantity: inboundQuantityBySkuDate.get(`${item.skuId}|${dateOnlyToString(item.snapshot.snapshotDate)}`) ?? 0,
-      availableStock: item.availableStock,
+      // 현재 업로드 규격은 정상재고를 유일한 재고 수량으로 사용한다. 과거 스냅샷도
+      // 별도 가용재고 열이 비어 0으로 저장됐을 수 있으므로 정상재고로 분석한다.
+      availableStock: item.normalStock,
       normalStock: item.normalStock,
       defectiveStock: item.defectiveStock,
       incomingStock: item.incomingStock,
@@ -176,7 +178,6 @@ export async function loadDailyWarehouseTotals(): Promise<DailyWarehouseTotal[]>
     where: { snapshot: { status: 'ACTIVE', ...mockFilter }, sku: { isHiddenFromDashboard: false } },
     select: {
       skuId: true,
-      availableStock: true,
       normalStock: true,
       unitCost: true,
       unitCostProvided: true,
@@ -203,7 +204,7 @@ export async function loadDailyWarehouseTotals(): Promise<DailyWarehouseTotal[]>
     const date = dateOnlyToString(item.snapshot.snapshotDate);
     const key = `${date}|${item.snapshot.warehouseId}`;
     const existing = map.get(key) ?? { date, warehouseId: item.snapshot.warehouseId, totalAvailableStock: 0, totalInventoryValue: 0 };
-    existing.totalAvailableStock += item.availableStock;
+    existing.totalAvailableStock += item.normalStock;
     existing.totalInventoryValue += resolvedCost.totalCost;
     map.set(key, existing);
   }
@@ -247,7 +248,7 @@ export async function loadSkuWithSeries(
     return {
       date: dateOnlyToString(item.snapshot.snapshotDate),
       inboundQuantity: inboundQuantityBySkuDate.get(`${item.skuId}|${dateOnlyToString(item.snapshot.snapshotDate)}`) ?? 0,
-      availableStock: item.availableStock,
+      availableStock: item.normalStock,
       normalStock: item.normalStock,
       defectiveStock: item.defectiveStock,
       incomingStock: item.incomingStock,
