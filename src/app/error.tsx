@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 
 export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-muted/40 px-4 text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-4 text-center">
       <AlertTriangle className="size-10 text-status-danger" aria-hidden="true" />
       <div>
         <h1 className="text-lg font-semibold">문제가 발생했습니다</h1>

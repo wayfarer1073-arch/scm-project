@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-muted/40 px-4 text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-4 text-center">
       <PackageSearch className="size-10 text-muted-foreground" aria-hidden="true" />
       <div>
         <h1 className="text-lg font-semibold">페이지를 찾을 수 없습니다</h1>
