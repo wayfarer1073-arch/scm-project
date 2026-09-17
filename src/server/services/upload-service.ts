@@ -37,17 +37,18 @@ function sha256(buffer: Buffer): string {
 }
 
 /**
- * 품목코드와 재고수량(정상/불량/가용/입고대기)만으로 데이터 동일성을 판단한다. 파일명·헤더 순서·부가
- * 컬럼(공급처, 판매가 등)이 달라도 품목·수량이 같으면 "동일한 데이터"로 취급한다.
+ * 실제 분석에 쓰는 최소 필드만으로 데이터 동일성을 판단한다. 파일명·헤더 순서·무시되는 부가 컬럼이
+ * 달라도 상품코드/상품명/원가/원가합/정상재고가 같으면 "동일한 데이터"로 취급한다.
  */
 function computeContentSignature(rows: ParsedInventoryRow[]): string {
   const normalizedRows = rows
     .map((r) => ({
       productCode: r.productCode,
+      productName: r.productName,
+      unitCost: r.unitCost,
+      unitCostProvided: !r.costMissing,
+      totalCost: r.totalCost,
       normalStock: r.normalStock,
-      defectiveStock: r.defectiveStock,
-      availableStock: r.availableStock,
-      incomingStock: r.incomingStock,
     }))
     .sort((a, b) => a.productCode.localeCompare(b.productCode));
   return sha256(Buffer.from(JSON.stringify(normalizedRows)));

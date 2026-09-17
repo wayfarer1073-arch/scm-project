@@ -6,188 +6,123 @@ function buildXlsxBuffer(aoa: (string | number)[][]): Buffer {
   const worksheet = XLSX.utils.aoa_to_sheet(aoa);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
-  const out = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-  return out as Buffer;
+  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
 }
 
-const HEADER = ['상품코드', '상품명', '옵션', '바코드', '원가', '정상재고', '가용재고', '입고대기', '불량재고', '경고수량', '위험수량', '로케이션'];
+describe('parseInventoryWorkbook - 최소 헤더 기반 업로드', () => {
+  it('컬럼 순서와 불필요한 컬럼에 상관없이 필요한 다섯 필드만 읽는다', () => {
+    const rows = [
+      ['공급처', '정상재고', '상품명', '원가합', '메모', '상품코드', '원가'],
+      ['거래처A', '10', '상품A', '9,500', '저장하지 않음', '00001', '1,000'],
+    ];
+    const result = parseInventoryWorkbook(buildXlsxBuffer(rows));
 
-describe('parseInventoryWorkbook - 정상 xlsx', () => {
-  it('헤더명 기준으로 컬럼 순서가 달라도 정확히 매핑한다', () => {
-    // 컬럼 순서를 표준과 다르게 섞는다
-    const shuffledHeader = ['상품명', '상품코드', '가용재고', '원가', '정상재고', '바코드', '옵션', '입고대기', '불량재고', '위험수량', '경고수량', '로케이션'];
-    const rows = [shuffledHeader, ['테스트상품', '00001', '850', '1000', '900', '8801234567890', '', '0', '0', '20', '50', 'A-01-01']];
-    const buffer = buildXlsxBuffer(rows);
-    const result = parseInventoryWorkbook(buffer);
-    expect(result.issues.filter((i) => i.level === 'ERROR')).toHaveLength(0);
+    expect(result.issues.filter((issue) => issue.level === 'ERROR')).toHaveLength(0);
     expect(result.rows).toHaveLength(1);
-    expect(result.rows[0].productCode).toBe('00001');
-    expect(result.rows[0].availableStock).toBe(850);
-    expect(result.rows[0].unitCost).toBe(1000);
-    expect(result.rows[0].dangerQty).toBe(20);
-    expect(result.rows[0].warningQty).toBe(50);
+    expect(result.rows[0]).toMatchObject({
+      productCode: '00001',
+      productName: '상품A',
+      unitCost: 1000,
+      totalCost: 9500,
+      normalStock: 10,
+      availableStock: 10,
+      extra: {},
+    });
   });
 
-  it('콤마 천단위 구분자와 공백을 normalize한다', () => {
-    const rows = [HEADER, ['00002', '상품B', '', '', '1,500', '1,000', '900', '0', '0', '10', '5', ' A-02 ']];
-    const buffer = buildXlsxBuffer(rows);
-    const result = parseInventoryWorkbook(buffer);
-    expect(result.rows[0].unitCost).toBe(1500);
-    expect(result.rows[0].normalStock).toBe(1000);
-    expect(result.rows[0].location).toBe('A-02');
+  it('품목코드·품목명·매입단가·재고수량 같은 별칭도 인식한다', () => {
+    const rows = [
+      ['품목명', '재고수량', '품목코드', '매입단가'],
+      ['상품B', '7', 'SKU-2', '1,250원'],
+    ];
+    const result = parseInventoryWorkbook(buildXlsxBuffer(rows));
+
+    expect(result.issues.filter((issue) => issue.level === 'ERROR')).toHaveLength(0);
+    expect(result.rows[0]).toMatchObject({ productCode: 'SKU-2', productName: '상품B', unitCost: 1250, totalCost: null, normalStock: 7 });
   });
 
-  it('빈 재고 수량 셀은 0으로 처리한다', () => {
-    const rows = [HEADER, ['00003', '상품C', '', '', '1000', '', '', '', '', '', '', '']];
-    const buffer = buildXlsxBuffer(rows);
-    const result = parseInventoryWorkbook(buffer);
-    expect(result.rows[0].normalStock).toBe(0);
-    expect(result.rows[0].availableStock).toBe(0);
-  });
-});
+  it('원가와 원가합 헤더가 모두 없어도 업로드하고 원가 누락을 표시한다', () => {
+    const rows = [
+      ['상품코드', '상품명', '정상재고'],
+      ['A-1', '상품A', '5'],
+    ];
+    const result = parseInventoryWorkbook(buildXlsxBuffer(rows));
 
-describe('parseInventoryWorkbook - 검증 규칙', () => {
-  it('필수 컬럼이 없으면 ERROR를 반환하고 저장하지 않는다', () => {
-    const rows = [['상품명', '가용재고'], ['상품A', '100']];
-    const buffer = buildXlsxBuffer(rows);
-    const result = parseInventoryWorkbook(buffer);
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].costMissing).toBe(true);
+    expect(result.rows[0].unitCost).toBe(0);
+    expect(result.rows[0].totalCost).toBeNull();
+    expect(result.issues.some((issue) => issue.code === 'COST_MISSING' && issue.level === 'WARNING')).toBe(true);
+  });
+
+  it('필수 헤더가 없으면 저장하지 않는다', () => {
+    const rows = [['상품명', '정상재고'], ['상품A', '100']];
+    const result = parseInventoryWorkbook(buildXlsxBuffer(rows));
     expect(result.rows).toHaveLength(0);
-    expect(result.issues.some((i) => i.code === 'MISSING_REQUIRED_COLUMN')).toBe(true);
+    expect(result.issues.some((issue) => issue.code === 'MISSING_REQUIRED_COLUMN' && issue.column === 'productCode')).toBe(true);
   });
 
-  it('헤더만 있고 상품 데이터가 한 건도 없으면 ERROR를 반환한다(회귀 테스트)', () => {
-    const rows = [HEADER];
-    const buffer = buildXlsxBuffer(rows);
-    const result = parseInventoryWorkbook(buffer);
-    expect(result.rows).toHaveLength(0);
-    expect(result.issues.some((i) => i.code === 'NO_DATA_ROWS' && i.level === 'ERROR')).toBe(true);
-  });
+  it('상품코드·상품명 누락과 상품코드 중복은 WARNING으로 표시되고 그 행만 제외된다(파일 전체를 막지 않음, 회귀 테스트)', () => {
+    const rows = [
+      ['상품코드', '상품명', '정상재고'],
+      ['', '상품A', '1'],
+      ['A', '', '1'],
+      ['B', '상품B', '1'],
+      ['B', '상품B-2', '2'],
+    ];
+    const result = parseInventoryWorkbook(buildXlsxBuffer(rows));
 
-  it('상품코드 누락 행은 WARNING으로 표시되고 그 행만 제외된다(회귀 테스트: 한 행 문제로 파일 전체가 막히면 안 됨)', () => {
-    const rows = [HEADER, ['', '상품A', '', '', '1000', '10', '10', '0', '0', '0', '0', '']];
-    const buffer = buildXlsxBuffer(rows);
-    const result = parseInventoryWorkbook(buffer);
-    expect(result.rows).toHaveLength(0);
-    expect(result.issues.some((i) => i.code === 'MISSING_PRODUCT_CODE' && i.level === 'WARNING')).toBe(true);
-  });
-
-  it('상품코드 중복은 WARNING으로 표시되고 중복 행만 제외된다', () => {
-    const rows = [HEADER, ['00001', '상품A', '', '', '1000', '10', '10', '0', '0', '0', '0', ''], ['00001', '상품A2', '', '', '1000', '5', '5', '0', '0', '0', '0', '']];
-    const buffer = buildXlsxBuffer(rows);
-    const result = parseInventoryWorkbook(buffer);
-    expect(result.issues.some((i) => i.code === 'DUPLICATE_PRODUCT_CODE' && i.level === 'WARNING')).toBe(true);
-  });
-
-  it('숫자로 파싱할 수 없는 값은 WARNING으로 표시되고 해당 행만 제외된다', () => {
-    const rows = [HEADER, ['00001', '상품A', '', '', '원가없음', '10', '10', '0', '0', '0', '0', '']];
-    const buffer = buildXlsxBuffer(rows);
-    const result = parseInventoryWorkbook(buffer);
-    expect(result.rows).toHaveLength(0);
-    expect(result.issues.some((i) => i.code === 'NUMBER_PARSE_FAILED' && i.level === 'WARNING')).toBe(true);
+    expect(result.rows).toHaveLength(1);
+    expect(result.issues.some((issue) => issue.code === 'MISSING_PRODUCT_CODE' && issue.level === 'WARNING')).toBe(true);
+    expect(result.issues.some((issue) => issue.code === 'MISSING_PRODUCT_NAME' && issue.level === 'WARNING')).toBe(true);
+    expect(result.issues.some((issue) => issue.code === 'DUPLICATE_PRODUCT_CODE' && issue.level === 'WARNING')).toBe(true);
+    expect(result.issues.filter((issue) => issue.level === 'ERROR')).toHaveLength(0);
   });
 
   it('여러 행 중 한 행에만 문제가 있어도 나머지 정상 행은 전부 저장된다(핵심 회귀 테스트)', () => {
     const rows = [
-      HEADER,
-      ['00001', '아크바 실론티', '', '', '1000', '10', '10', '0', '0', '0', '0', ''],
-      ['', '상품코드누락', '', '', '1000', '10', '10', '0', '0', '0', '0', ''],
-      ['00002', '드럼스틱', '', '', '1000', '원가아님', '10', '0', '0', '0', '0', ''],
-      ['00003', '나나콘', '', '', '1000', '10', '10', '0', '0', '0', '0', ''],
+      ['상품코드', '상품명', '정상재고', '원가'],
+      ['00001', '아크바 실론티', '10', '1000'],
+      ['', '상품코드누락', '10', '1000'],
+      ['00002', '드럼스틱', '숫자아님', '1000'],
+      ['00003', '나나콘', '10', '1000'],
     ];
-    const buffer = buildXlsxBuffer(rows);
-    const result = parseInventoryWorkbook(buffer);
+    const result = parseInventoryWorkbook(buildXlsxBuffer(rows));
+
     expect(result.rows).toHaveLength(2);
     expect(result.rows.map((r) => r.productCode).sort()).toEqual(['00001', '00003']);
-    expect(result.issues.filter((i) => i.level === 'ERROR')).toHaveLength(0);
-    expect(result.issues.filter((i) => i.level === 'WARNING')).toHaveLength(2);
+    expect(result.issues.filter((issue) => issue.level === 'ERROR')).toHaveLength(0);
+    expect(result.issues.filter((issue) => issue.level === 'WARNING')).toHaveLength(2);
   });
 
-  it('원가 누락은 WARNING이며 행은 저장된다', () => {
-    const rows = [HEADER, ['00001', '상품A', '', '', '', '10', '10', '0', '0', '0', '0', '']];
-    const buffer = buildXlsxBuffer(rows);
-    const result = parseInventoryWorkbook(buffer);
-    expect(result.rows).toHaveLength(1);
-    expect(result.issues.some((i) => i.code === 'COST_MISSING' && i.level === 'WARNING')).toBe(true);
+  it('정상재고는 정수여야 하고 숫자 범위를 검사한다', () => {
+    const decimal = parseInventoryWorkbook(buildXlsxBuffer([['상품코드', '상품명', '정상재고'], ['A', '상품A', '1.5']]));
+    const overflow = parseInventoryWorkbook(buildXlsxBuffer([['상품코드', '상품명', '정상재고'], ['A', '상품A', '99999999999']]));
+
+    expect(decimal.rows).toHaveLength(0);
+    expect(decimal.issues.some((issue) => issue.code === 'NUMBER_NOT_INTEGER')).toBe(true);
+    expect(overflow.rows).toHaveLength(0);
+    expect(overflow.issues.some((issue) => issue.code === 'NUMBER_OUT_OF_RANGE')).toBe(true);
   });
 
-  it('음수 재고는 WARNING이며 행은 저장된다', () => {
-    const rows = [HEADER, ['00001', '상품A', '', '', '1000', '-5', '-5', '0', '0', '0', '0', '']];
-    const buffer = buildXlsxBuffer(rows);
-    const result = parseInventoryWorkbook(buffer);
-    expect(result.rows).toHaveLength(1);
-    expect(result.issues.some((i) => i.code === 'NEGATIVE_STOCK' && i.level === 'WARNING')).toBe(true);
-  });
-
-  it('정수 컬럼(재고/임계값)에 소수가 들어오면 WARNING으로 표시되고 그 행만 제외된다(회귀 테스트)', () => {
-    const rows = [HEADER, ['00001', '상품A', '', '', '1000', '10.5', '10', '0', '0', '0', '0', '']];
-    const buffer = buildXlsxBuffer(rows);
-    const result = parseInventoryWorkbook(buffer);
+  it('헤더만 있고 데이터가 없으면 오류를 반환한다', () => {
+    const result = parseInventoryWorkbook(buildXlsxBuffer([['상품코드', '상품명', '정상재고']]));
     expect(result.rows).toHaveLength(0);
-    expect(result.issues.some((i) => i.code === 'NUMBER_NOT_INTEGER' && i.column === 'normalStock' && i.level === 'WARNING')).toBe(true);
-  });
-
-  it('원가처럼 소수 허용 컬럼은 소수를 그대로 받아들인다', () => {
-    const rows = [HEADER, ['00001', '상품A', '', '', '1000.55', '10', '10', '0', '0', '0', '0', '']];
-    const buffer = buildXlsxBuffer(rows);
-    const result = parseInventoryWorkbook(buffer);
-    expect(result.rows).toHaveLength(1);
-    expect(result.rows[0].unitCost).toBe(1000.55);
-  });
-
-  it('정수 컬럼이 Postgres Int 범위를 초과하면 WARNING으로 표시되고 그 행만 제외된다(회귀 테스트)', () => {
-    const rows = [HEADER, ['00001', '상품A', '', '', '1000', '99999999999', '10', '0', '0', '0', '0', '']];
-    const buffer = buildXlsxBuffer(rows);
-    const result = parseInventoryWorkbook(buffer);
-    expect(result.rows).toHaveLength(0);
-    expect(result.issues.some((i) => i.code === 'NUMBER_OUT_OF_RANGE' && i.column === 'normalStock' && i.level === 'WARNING')).toBe(true);
+    expect(result.issues.some((issue) => issue.code === 'NO_DATA_ROWS')).toBe(true);
   });
 });
 
-describe('parseInventoryWorkbook - 전용 컬럼 없는 canonical 필드', () => {
-  it('공급처/판매가/공급가/시중가는 인식되지만 전용 컬럼이 없으므로 extra에 보존된다(회귀 테스트)', () => {
-    const headerWithPrices = [...HEADER, '공급처', '판매가', '공급가', '시중가'];
-    const rows = [headerWithPrices, ['00001', '상품A', '', '', '1000', '10', '10', '0', '0', '0', '0', '', '거래처X', '5000', '3000', '5500']];
-    const buffer = buildXlsxBuffer(rows);
-    const result = parseInventoryWorkbook(buffer);
-    expect(result.issues.filter((i) => i.level === 'ERROR')).toHaveLength(0);
-    expect(result.rows).toHaveLength(1);
-    expect(result.rows[0].extra['공급처']).toBe('거래처X');
-    expect(result.rows[0].extra['판매가']).toBe('5000');
-    expect(result.rows[0].extra['공급가']).toBe('3000');
-    expect(result.rows[0].extra['시중가']).toBe('5500');
-  });
-});
-
-describe('parseInventoryWorkbook - HTML 기반 유사-xls 파일', () => {
-  it('사방넷류 ERP가 내보내는 HTML table 형식(.xls 확장자)을 정상 파싱한다', () => {
+describe('parseInventoryWorkbook - HTML 기반 유사-xls', () => {
+  it('최소 헤더를 가진 HTML table도 정상 파싱한다', () => {
     const html = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office">
-      <head><style>.style1{mso-number-format:\\@;}</style></head>
-      <body><table border=1>
-      <tr><td class=header>상품코드</td><td class=header>상품명</td><td class=header>옵션</td><td class=header>바코드</td><td class=header>원가</td><td class=header>정상재고</td><td class=header>가용재고</td><td class=header>입고대기</td><td class=header>불량재고</td><td class=header>경고수량</td><td class=header>위험수량</td><td class=header>로케이션</td></tr>
-      <tr><td class='style1'>00001</td><td class='style1'>(MH)포켓몬 츄잉팝스 젤리 70g</td><td class='style1'></td><td class='style1'>8809585965863</td><td class='style2'>1,200</td><td class='style3'>500</td><td class='style2'><span class='zero_color'>420</span></td><td class='style2'>0</td><td class='style2'>0</td><td class='style2'>50</td><td class='style2'>20</td><td class='style1'>E01-06-01</td></tr>
+      <html><body><table>
+      <tr><td>상품코드</td><td>상품명</td><td>원가</td><td>정상재고</td></tr>
+      <tr><td>00001</td><td>A&#40;special&#x29;</td><td>1,200</td><td>420</td></tr>
       </table></body></html>
     `;
-    const buffer = Buffer.from(html, 'utf-8');
-    const result = parseInventoryWorkbook(buffer);
-    expect(result.issues.filter((i) => i.level === 'ERROR')).toHaveLength(0);
-    expect(result.rows).toHaveLength(1);
-    expect(result.rows[0].productCode).toBe('00001');
-    expect(result.rows[0].availableStock).toBe(420);
-    expect(result.rows[0].unitCost).toBe(1200);
-    expect(result.rows[0].productName).toBe('(MH)포켓몬 츄잉팝스 젤리 70g');
-  });
+    const result = parseInventoryWorkbook(Buffer.from(html, 'utf-8'));
 
-  it('숫자 HTML 엔티티(십진/16진)를 문자로 디코딩한다(회귀 테스트)', () => {
-    const html = `
-      <html><body><table border=1>
-      <tr><td>상품코드</td><td>상품명</td><td>옵션</td><td>바코드</td><td>원가</td><td>정상재고</td><td>가용재고</td><td>입고대기</td><td>불량재고</td><td>경고수량</td><td>위험수량</td><td>로케이션</td></tr>
-      <tr><td>00001</td><td>A&#40;special&#x29; item</td><td></td><td></td><td>100</td><td>1</td><td>1</td><td>0</td><td>0</td><td>0</td><td>0</td><td></td></tr>
-      </table></body></html>
-    `;
-    const buffer = Buffer.from(html, 'utf-8');
-    const result = parseInventoryWorkbook(buffer);
-    expect(result.rows).toHaveLength(1);
-    expect(result.rows[0].productName).toBe('A(special) item');
+    expect(result.issues.filter((issue) => issue.level === 'ERROR')).toHaveLength(0);
+    expect(result.rows[0]).toMatchObject({ productCode: '00001', productName: 'A(special)', unitCost: 1200, normalStock: 420, availableStock: 420 });
   });
 });

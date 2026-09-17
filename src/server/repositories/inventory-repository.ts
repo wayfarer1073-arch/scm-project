@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { dateOnlyToString } from '@/lib/date';
 import type { StockObservation } from '@/domain/inventory/types';
+import { resolveInventoryCost } from '@/domain/inventory/costs';
 import type { Prisma } from '@prisma/client';
 
 /**
@@ -86,7 +87,7 @@ export async function loadActiveSkusWithSeries(
   const activeSkuIds = [...new Set(latestItems.map((item) => item.skuId))];
 
   const skus = await prisma.sku.findMany({
-    where: { id: { in: activeSkuIds }, isHiddenFromDashboard: false, ...(warehouseId ? { warehouseId } : {}) },
+    where: { id: { in: activeSkuIds }, isActive: true, isHiddenFromDashboard: false, ...(warehouseId ? { warehouseId } : {}) },
     include: { warehouse: { select: { id: true, code: true, name: true } } },
   });
   if (skus.length === 0) return [];
@@ -107,20 +108,36 @@ export async function loadActiveSkusWithSeries(
   const inboundQuantityBySkuDate = await loadInboundQuantityBySkuDate(skuIds, asOfDate);
 
   const observationsBySku = new Map<string, StockObservation[]>();
+  const latestKnownUnitCostBySku = new Map<string, number>();
   // items가 snapshotDate asc로 정렬되어 있으므로, 마지막에 덮어써지는 값이 asOfDate 시점 기준
   // "가장 최근" 관측치의 상품 속성이 된다. sku.current*는 asOfDate와 무관하게 항상 "지금" 값이라
   // 과거 조회에 미래 변경 사항이 섞여 보이므로 쓰지 않는다.
   const latestAttrsBySku = new Map<string, { productName: string; option: string | null; barcode: string | null; location: string | null }>();
   for (const item of items) {
+    const resolvedCost = resolveInventoryCost(
+      {
+        unitCost: Number(item.unitCost),
+        unitCostProvided: item.unitCostProvided,
+        totalCost: item.totalCost === null ? null : Number(item.totalCost),
+        normalStock: item.normalStock,
+      },
+      latestKnownUnitCostBySku.get(item.skuId) ?? null,
+    );
+    if (resolvedCost.latestKnownUnitCost !== null) {
+      latestKnownUnitCostBySku.set(item.skuId, resolvedCost.latestKnownUnitCost);
+    }
     const list = observationsBySku.get(item.skuId) ?? [];
     list.push({
       date: dateOnlyToString(item.snapshot.snapshotDate),
       inboundQuantity: inboundQuantityBySkuDate.get(`${item.skuId}|${dateOnlyToString(item.snapshot.snapshotDate)}`) ?? 0,
-      availableStock: item.availableStock,
+      // 현재 업로드 규격은 정상재고를 유일한 재고 수량으로 사용한다. 과거 스냅샷도
+      // 별도 가용재고 열이 비어 0으로 저장됐을 수 있으므로 정상재고로 분석한다.
+      availableStock: item.normalStock,
       normalStock: item.normalStock,
       defectiveStock: item.defectiveStock,
       incomingStock: item.incomingStock,
-      unitCost: Number(item.unitCost),
+      unitCost: resolvedCost.unitCost,
+      totalCost: resolvedCost.totalCost,
       warningQty: item.warningQty,
       dangerQty: item.dangerQty,
     });
@@ -158,21 +175,37 @@ export interface DailyWarehouseTotal {
 export async function loadDailyWarehouseTotals(): Promise<DailyWarehouseTotal[]> {
   const mockFilter = await resolveMockFilter();
   const items = await prisma.inventoryItem.findMany({
-    where: { snapshot: { status: 'ACTIVE', ...mockFilter }, sku: { isHiddenFromDashboard: false } },
+    where: { snapshot: { status: 'ACTIVE', ...mockFilter }, sku: { isActive: true, isHiddenFromDashboard: false } },
     select: {
-      availableStock: true,
+      skuId: true,
       normalStock: true,
       unitCost: true,
+      unitCostProvided: true,
+      totalCost: true,
       snapshot: { select: { warehouseId: true, snapshotDate: true } },
     },
+    orderBy: { snapshot: { snapshotDate: 'asc' } },
   });
   const map = new Map<string, DailyWarehouseTotal>();
+  const latestKnownUnitCostBySku = new Map<string, number>();
   for (const item of items) {
+    const resolvedCost = resolveInventoryCost(
+      {
+        unitCost: Number(item.unitCost),
+        unitCostProvided: item.unitCostProvided,
+        totalCost: item.totalCost === null ? null : Number(item.totalCost),
+        normalStock: item.normalStock,
+      },
+      latestKnownUnitCostBySku.get(item.skuId) ?? null,
+    );
+    if (resolvedCost.latestKnownUnitCost !== null) {
+      latestKnownUnitCostBySku.set(item.skuId, resolvedCost.latestKnownUnitCost);
+    }
     const date = dateOnlyToString(item.snapshot.snapshotDate);
     const key = `${date}|${item.snapshot.warehouseId}`;
     const existing = map.get(key) ?? { date, warehouseId: item.snapshot.warehouseId, totalAvailableStock: 0, totalInventoryValue: 0 };
-    existing.totalAvailableStock += item.availableStock;
-    existing.totalInventoryValue += item.normalStock * Number(item.unitCost);
+    existing.totalAvailableStock += item.normalStock;
+    existing.totalInventoryValue += resolvedCost.totalCost;
     map.set(key, existing);
   }
   return [...map.values()].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
@@ -183,7 +216,7 @@ export async function loadSkuWithSeries(
   asOfDate?: string,
 ): Promise<{ descriptor: SkuDescriptor; observations: StockObservation[] } | null> {
   const sku = await prisma.sku.findUnique({ where: { id: skuId }, include: { warehouse: { select: { id: true, code: true, name: true } } } });
-  if (!sku || sku.isHiddenFromDashboard) return null;
+  if (!sku || !sku.isActive || sku.isHiddenFromDashboard) return null;
 
   const mockFilter = await resolveMockFilter(sku.warehouseId);
   const items = await prisma.inventoryItem.findMany({
@@ -200,17 +233,31 @@ export async function loadSkuWithSeries(
   });
   const inboundQuantityBySkuDate = await loadInboundQuantityBySkuDate([skuId], asOfDate);
 
-  const observations: StockObservation[] = items.map((item) => ({
-    date: dateOnlyToString(item.snapshot.snapshotDate),
-    inboundQuantity: inboundQuantityBySkuDate.get(`${item.skuId}|${dateOnlyToString(item.snapshot.snapshotDate)}`) ?? 0,
-    availableStock: item.availableStock,
-    normalStock: item.normalStock,
-    defectiveStock: item.defectiveStock,
-    incomingStock: item.incomingStock,
-    unitCost: Number(item.unitCost),
-    warningQty: item.warningQty,
-    dangerQty: item.dangerQty,
-  }));
+  let latestKnownUnitCost: number | null = null;
+  const observations: StockObservation[] = items.map((item) => {
+    const resolvedCost = resolveInventoryCost(
+      {
+        unitCost: Number(item.unitCost),
+        unitCostProvided: item.unitCostProvided,
+        totalCost: item.totalCost === null ? null : Number(item.totalCost),
+        normalStock: item.normalStock,
+      },
+      latestKnownUnitCost,
+    );
+    latestKnownUnitCost = resolvedCost.latestKnownUnitCost;
+    return {
+      date: dateOnlyToString(item.snapshot.snapshotDate),
+      inboundQuantity: inboundQuantityBySkuDate.get(`${item.skuId}|${dateOnlyToString(item.snapshot.snapshotDate)}`) ?? 0,
+      availableStock: item.normalStock,
+      normalStock: item.normalStock,
+      defectiveStock: item.defectiveStock,
+      incomingStock: item.incomingStock,
+      unitCost: resolvedCost.unitCost,
+      totalCost: resolvedCost.totalCost,
+      warningQty: item.warningQty,
+      dangerQty: item.dangerQty,
+    };
+  });
 
   // asOfDate 시점 기준 가장 최근 관측치의 상품 속성을 쓴다(과거 조회에 이후 변경분이 섞이지 않도록).
   const latestItem = items.at(-1);
@@ -242,9 +289,10 @@ export interface SkuVisibilityRow {
   isHiddenFromDashboard: boolean;
 }
 
-/** 설정 화면의 "SKU 숨기기" 관리용 — 숨김 여부와 무관하게 전체 SKU를 창고명·코드 순으로 나열한다. */
+/** 설정 화면의 "SKU 숨기기" 관리용 — 최신 업로드에 남아 있는 SKU만 나열한다. */
 export async function listAllSkusForVisibilityAdmin(): Promise<SkuVisibilityRow[]> {
   const skus = await prisma.sku.findMany({
+    where: { isActive: true },
     include: { warehouse: { select: { code: true, name: true } } },
     orderBy: [{ warehouse: { sortOrder: 'asc' } }, { productCode: 'asc' }],
   });
@@ -285,6 +333,9 @@ export async function searchSkusInWarehouse(warehouseId: string, query: string, 
   const normalizedQuery = q.replace(/\s+/g, '').toLowerCase();
 
   const skus = await prisma.sku.findMany({
+    // isActive(가장 최근 스냅샷에 존재하는지)로 거르지 않는다 — 입고 처리는 최근 업로드에서
+    // 빠진("사라진") SKU에 재고가 들어올 때 쓰는 경우가 많아, 여기서 걸러버리면 정작
+    // 입고를 기록해야 할 SKU를 검색으로 찾을 수 없게 된다.
     where: { warehouseId },
     select: { id: true, productCode: true, currentProductName: true },
     orderBy: { productCode: 'asc' },

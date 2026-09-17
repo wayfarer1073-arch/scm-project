@@ -3,21 +3,9 @@
 export const CANONICAL_FIELDS = [
   'productCode',
   'productName',
-  'option',
-  'barcode',
   'unitCost',
+  'totalCost',
   'normalStock',
-  'availableStock',
-  'incomingStock',
-  'defectiveStock',
-  'warningQty',
-  'dangerQty',
-  'location',
-  'category',
-  'supplierName',
-  'salePrice',
-  'supplyPrice',
-  'marketPrice',
 ] as const;
 
 export type CanonicalField = (typeof CANONICAL_FIELDS)[number];
@@ -26,47 +14,22 @@ export type CanonicalField = (typeof CANONICAL_FIELDS)[number];
 export const REQUIRED_FIELDS: CanonicalField[] = [
   'productCode',
   'productName',
-  'unitCost',
   'normalStock',
-  'availableStock',
-  'incomingStock',
-  'defectiveStock',
-  'warningQty',
-  'dangerQty',
 ];
 
 export const NUMERIC_FIELDS: CanonicalField[] = [
   'unitCost',
+  'totalCost',
   'normalStock',
-  'availableStock',
-  'incomingStock',
-  'defectiveStock',
-  'warningQty',
-  'dangerQty',
-  'salePrice',
-  'supplyPrice',
-  'marketPrice',
 ];
 
-/** 실제 샘플 파일 헤더명을 기준으로 한 매핑. 컬럼명이 약간 달라도 인식할 수 있게 후보를 여러 개 둔다. */
+/** 양식과 컬럼 순서에 상관없이 최소 재고 필드를 찾기 위한 헤더 별칭. */
 export const HEADER_ALIASES: Record<CanonicalField, string[]> = {
-  productCode: ['상품코드', '상품 코드', 'SKU', 'SKU코드'],
-  productName: ['상품명', '상품 명', '제품명'],
-  option: ['옵션', '옵션명'],
-  barcode: ['바코드'],
-  unitCost: ['원가', '단가', '단위원가'],
-  normalStock: ['정상재고'],
-  availableStock: ['가용재고'],
-  incomingStock: ['입고대기'],
-  defectiveStock: ['불량재고'],
-  warningQty: ['경고수량'],
-  dangerQty: ['위험수량'],
-  location: ['로케이션', '로케이션이력', '위치'],
-  category: ['카테고리', '분류'],
-  supplierName: ['공급처'],
-  salePrice: ['판매가'],
-  supplyPrice: ['공급가'],
-  marketPrice: ['시중가'],
+  productCode: ['상품코드', '상품 코드', '품목코드', '품목 코드', '품번', 'SKU', 'SKU코드', 'SKU 코드'],
+  productName: ['상품명', '상품 명', '제품명', '제품 명', '품목명', '품목 명'],
+  unitCost: ['원가', '단가', '단위원가', '단위 원가', '매입가', '매입단가'],
+  totalCost: ['원가합', '원가 합', '원가합계', '원가 합계', '총원가', '원가총액', '재고원가', '재고금액'],
+  normalStock: ['정상재고', '정상 재고', '재고수량', '재고 수량', '현재고', '현재 재고', '재고'],
 };
 
 export interface ParsedInventoryRow {
@@ -76,6 +39,8 @@ export interface ParsedInventoryRow {
   option: string | null;
   barcode: string | null;
   unitCost: number;
+  /** 업로드 원가합. null이면 유효 원가 × 정상재고로 계산한다. */
+  totalCost: number | null;
   normalStock: number;
   availableStock: number;
   incomingStock: number;
@@ -84,8 +49,9 @@ export interface ParsedInventoryRow {
   dangerQty: number;
   location: string | null;
   category: string | null;
-  /** 원본 부가 필드 전체 (export/보존용) */
+  /** 호환성을 위한 빈 객체. 최소 업로드에서는 불필요한 원본 열을 저장하지 않는다. */
   extra: Record<string, string>;
+  /** 원가 헤더가 없거나 해당 셀이 비어 있어 이전 SKU 원가를 이어받아야 하는지 여부 */
   costMissing: boolean;
 }
 

@@ -412,16 +412,16 @@ export function isNewlyAtRisk(analysis: SkuAnalysis): boolean {
   return RISK_RANK[analysis.thresholdRisk.level] > RISK_RANK[prevRisk];
 }
 
-/** 재고자산 계산. 정상재고 × 단위원가만 기본 자산으로 인정하고, 나머지는 별도 항목으로만 제공(이중계산 금지) */
-export function calculateInventoryValue(observation: Pick<StockObservation, 'normalStock' | 'unitCost'>): number {
-  return observation.normalStock * observation.unitCost;
+/** 업로드 원가합을 우선하고, 없으면 정상재고 × 유효 단위원가를 사용한다. */
+export function calculateInventoryValue(observation: Pick<StockObservation, 'normalStock' | 'unitCost' | 'totalCost'>): number {
+  return observation.totalCost ?? observation.normalStock * observation.unitCost;
 }
 
 export function calculateInventoryValueBreakdown(
-  observation: Pick<StockObservation, 'normalStock' | 'availableStock' | 'defectiveStock' | 'incomingStock' | 'unitCost'>,
+  observation: Pick<StockObservation, 'normalStock' | 'availableStock' | 'defectiveStock' | 'incomingStock' | 'unitCost' | 'totalCost'>,
 ): InventoryValueBreakdown {
   return {
-    normalStockValue: observation.normalStock * observation.unitCost,
+    normalStockValue: calculateInventoryValue(observation),
     availableStockValue: observation.availableStock * observation.unitCost,
     defectiveStockValue: observation.defectiveStock * observation.unitCost,
     incomingStockValue: observation.incomingStock * observation.unitCost,

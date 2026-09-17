@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Pencil, Check, X, UploadCloud } from 'lucide-react';
+import { Pencil, Check, X, UploadCloud, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -48,6 +48,7 @@ export function ExpirationManagement({ isAdmin, warehouses, initialEntries }: Ex
   const [editingSkuId, setEditingSkuId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deletingSkuId, setDeletingSkuId] = useState<string | null>(null);
 
   async function refreshEntries() {
     const res = await fetch('/api/expiration');
@@ -111,6 +112,27 @@ export function ExpirationManagement({ isAdmin, warehouses, initialEntries }: Ex
       toast.error('수정에 실패했습니다.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function deleteExpiration(entry: ExpirationRow) {
+    if (!confirm(`${entry.productName}의 소비기한 항목을 삭제할까요?`)) return;
+
+    setDeletingSkuId(entry.skuId);
+    try {
+      const res = await fetch(`/api/expiration/${entry.skuId}`, { method: 'DELETE' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(body.error ?? '삭제에 실패했습니다.');
+        return;
+      }
+      setEntries((prev) => prev.filter((item) => item.skuId !== entry.skuId));
+      if (editingSkuId === entry.skuId) setEditingSkuId(null);
+      toast.success('소비기한 항목을 삭제했습니다.');
+    } catch {
+      toast.error('네트워크 오류로 삭제에 실패했습니다.');
+    } finally {
+      setDeletingSkuId(null);
     }
   }
 
@@ -186,9 +208,28 @@ export function ExpirationManagement({ isAdmin, warehouses, initialEntries }: Ex
                         <span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${badge.className}`}>{badge.label}</span>
                         <span className="text-xs tabular-nums text-muted-foreground">{formatKstDate(entry.expirationDate)}</span>
                         {isAdmin && (
-                          <Button size="icon" variant="ghost" className="size-7" onClick={() => startEdit(entry)} aria-label={`${entry.productName} 소비기한 수정`}>
-                            <Pencil className="size-3.5" />
-                          </Button>
+                          <>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="size-7"
+                              disabled={deletingSkuId === entry.skuId}
+                              onClick={() => startEdit(entry)}
+                              aria-label={`${entry.productName} 소비기한 수정`}
+                            >
+                              <Pencil className="size-3.5" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              disabled={deletingSkuId === entry.skuId}
+                              onClick={() => deleteExpiration(entry)}
+                              aria-label={`${entry.productName} 소비기한 삭제`}
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </>
                         )}
                       </>
                     )}

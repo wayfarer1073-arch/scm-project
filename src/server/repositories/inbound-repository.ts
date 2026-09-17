@@ -9,7 +9,11 @@ export interface InboundEntryRow {
   quantity: number;
 }
 
-/** 특정 창고·날짜에 기록된 입고 특이사항 목록. 스냅샷 버전과 무관하게 (SKU, 날짜) 자체로 조회한다. */
+/**
+ * 특정 창고·날짜에 기록된 입고 특이사항 목록. 스냅샷 버전과 무관하게 (SKU, 날짜) 자체로 조회한다.
+ * isActive(최근 스냅샷 존재 여부)로 거르지 않는다 — 최근 업로드에서 빠진 SKU에 입고를 기록한
+ * 경우에도 그 기록이 캘린더에서 사라지면 안 된다.
+ */
 export function listInboundEntriesForDate(warehouseId: string, date: string): Promise<InboundEntryRow[]> {
   return prisma.snapshotInbound.findMany({
     where: { snapshotDate: new Date(`${date}T00:00:00.000Z`), sku: { warehouseId } },
@@ -44,8 +48,10 @@ export type AddInboundEntryResult = { ok: true; entry: InboundEntryRow } | { ok:
 /** 같은 (SKU, 날짜)에 이미 기록이 있으면 수량을 더한다(하루에 여러 번 나눠 입고된 경우를 그대로 반영). */
 export async function addInboundEntry(input: AddInboundEntryInput): Promise<AddInboundEntryResult> {
   const sku = await prisma.sku.findUnique({ where: { id: input.skuId } });
+  // isActive는 검사하지 않는다 — 최근 스냅샷에서 빠진 SKU라도(재고가 바닥나 한동안 업로드
+  // 목록에 없었을 뿐인 경우 등) 새로 들어오는 입고는 기록할 수 있어야 한다.
   if (!sku || sku.warehouseId !== input.warehouseId) {
-    return { ok: false, error: '해당 SKU는 지정한 창고에 속하지 않습니다.' };
+    return { ok: false, error: '해당 창고에 속한 SKU가 아닙니다.' };
   }
 
   const snapshotDate = new Date(`${input.date}T00:00:00.000Z`);

@@ -1,6 +1,5 @@
 import { prisma } from '@/lib/prisma';
 import type { ParsedInventoryRow } from '@/domain/excel/types';
-import type { Prisma } from '@prisma/client';
 
 export function findActiveSnapshot(warehouseId: string, snapshotDate: Date) {
   return prisma.inventorySnapshot.findFirst({
@@ -91,7 +90,7 @@ export async function createSnapshot(input: CreateSnapshotInput) {
                   currentOption: row.option,
                   currentBarcode: row.barcode,
                   currentLocation: row.location,
-                  currentUnitCost: row.unitCost,
+                  ...(!row.costMissing ? { currentUnitCost: row.unitCost } : {}),
                   currentWarningQty: row.warningQty,
                   currentDangerQty: row.dangerQty,
                   lastSeenDate: input.snapshotDate,
@@ -106,7 +105,7 @@ export async function createSnapshot(input: CreateSnapshotInput) {
             currentOption: row.option,
             currentBarcode: row.barcode,
             currentLocation: row.location,
-            currentUnitCost: row.unitCost,
+            currentUnitCost: row.costMissing ? 0 : row.unitCost,
             currentWarningQty: row.warningQty,
             currentDangerQty: row.dangerQty,
             firstSeenDate: input.snapshotDate,
@@ -127,13 +126,14 @@ export async function createSnapshot(input: CreateSnapshotInput) {
             location: row.location,
             category: row.category,
             unitCost: row.unitCost,
+            unitCostProvided: !row.costMissing,
+            totalCost: row.totalCost,
             normalStock: row.normalStock,
             defectiveStock: row.defectiveStock,
             availableStock: row.availableStock,
             incomingStock: row.incomingStock,
             warningQty: row.warningQty,
             dangerQty: row.dangerQty,
-            extra: row.extra as Prisma.InputJsonValue,
           },
         });
       }
