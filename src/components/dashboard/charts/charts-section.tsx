@@ -49,7 +49,7 @@ export function ChartsSection({ rows, dailyTotals, warehouses, chartWarehouseId,
       [...filteredRows]
         .filter((r) => r.analysis.window7.totalDepletion > 0)
         .sort((a, b) => b.analysis.window7.totalDepletion - a.analysis.window7.totalDepletion)
-        .slice(0, 10)
+        .slice(0, 7)
         .map((r) => ({ productName: r.descriptor.productName, depletion: r.analysis.window7.totalDepletion })),
     [filteredRows],
   );
