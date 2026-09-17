@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/server/auth';
 import { processUpload } from '@/server/services/upload-service';
+import { todayKstDateString } from '@/lib/date';
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20MB — 일반적인 재고 Excel보다 훨씬 넉넉한 상한
 
@@ -28,9 +29,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '기준일 형식이 올바르지 않습니다.' }, { status: 400 });
   }
 
+  const snapshotDate = new Date(`${snapshotDateStr}T00:00:00.000Z`);
+  // new Date()는 "2026-02-30" 같은 존재하지 않는 날짜를 3월 2일 등으로 자동 보정하므로,
+  // 되돌린 날짜 문자열이 입력과 일치하는지 검사해 실제 달력 날짜인지 확인한다.
+  if (Number.isNaN(snapshotDate.getTime()) || snapshotDate.toISOString().slice(0, 10) !== snapshotDateStr) {
+    return NextResponse.json({ error: '존재하지 않는 날짜입니다.' }, { status: 400 });
+  }
+  if (snapshotDateStr > todayKstDateString()) {
+    return NextResponse.json({ error: '미래 날짜는 기준일로 선택할 수 없습니다.' }, { status: 400 });
+  }
+
   const arrayBuffer = await file.arrayBuffer();
   const fileBuffer = Buffer.from(arrayBuffer);
-  const snapshotDate = new Date(`${snapshotDateStr}T00:00:00.000Z`);
 
   const result = await processUpload({
     warehouseId,

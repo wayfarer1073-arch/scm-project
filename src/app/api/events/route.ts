@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/server/auth';
+import { prisma } from '@/lib/prisma';
 import { createEvent, listEventsForSku, listEventsForWarehouse } from '@/server/repositories/event-repository';
 
 const createEventSchema = z.object({
@@ -39,6 +40,13 @@ export async function POST(request: Request) {
   const parsed = createEventSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: '입력값이 올바르지 않습니다.', issues: parsed.error.issues }, { status: 400 });
+  }
+
+  if (parsed.data.skuId) {
+    const sku = await prisma.sku.findUnique({ where: { id: parsed.data.skuId }, select: { warehouseId: true } });
+    if (!sku || sku.warehouseId !== parsed.data.warehouseId) {
+      return NextResponse.json({ error: '해당 SKU는 지정한 창고에 속하지 않습니다.' }, { status: 400 });
+    }
   }
 
   const event = await createEvent({

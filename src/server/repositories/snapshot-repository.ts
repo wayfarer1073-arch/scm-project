@@ -81,15 +81,23 @@ export async function createSnapshot(input: CreateSnapshotInput) {
       for (const row of input.rows) {
         const sku = await tx.sku.upsert({
           where: { warehouseId_productCode: { warehouseId: input.warehouseId, productCode: row.productCode } },
+          // "현재값" 캐시(current*)는 이 업로드가 해당 창고의 가장 최신 스냅샷일 때만 갱신한다.
+          // 과거 날짜를 뒤늦게 백필하면서 무조건 덮어쓰면, 최신 실제 상품명이 옛 백필 값으로
+          // 되돌아가버린다.
           update: {
-            currentProductName: row.productName,
-            currentOption: row.option,
-            currentBarcode: row.barcode,
-            currentLocation: row.location,
-            currentUnitCost: row.unitCost,
-            currentWarningQty: row.warningQty,
-            currentDangerQty: row.dangerQty,
-            ...(isLatestSnapshot ? { lastSeenDate: input.snapshotDate, isActive: true } : {}),
+            ...(isLatestSnapshot
+              ? {
+                  currentProductName: row.productName,
+                  currentOption: row.option,
+                  currentBarcode: row.barcode,
+                  currentLocation: row.location,
+                  currentUnitCost: row.unitCost,
+                  currentWarningQty: row.warningQty,
+                  currentDangerQty: row.dangerQty,
+                  lastSeenDate: input.snapshotDate,
+                  isActive: true,
+                }
+              : {}),
           },
           create: {
             warehouseId: input.warehouseId,

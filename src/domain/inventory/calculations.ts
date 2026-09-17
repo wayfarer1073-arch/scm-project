@@ -165,7 +165,9 @@ export function calculateCoverage(
   if (averageDailyDepletion === null || averageDailyDepletion <= 0) {
     return { coverageDays: null, band: null };
   }
-  const coverageDays = currentAvailableStock / averageDailyDepletion;
+  // 가용재고가 이미 0 이하(마이너스 재고 포함)면 "N일 뒤 소진"이 아니라 이미 소진된 상태다.
+  // 그대로 나누면 음수 Coverage가 나와 화면에 "-5일" 같은 값이 뜬다.
+  const coverageDays = currentAvailableStock <= 0 ? 0 : currentAvailableStock / averageDailyDepletion;
   let band: CoverageBand;
   if (coverageDays <= settings.stockoutSoonDays) band = 'STOCKOUT_SOON';
   else if (coverageDays <= settings.manageMaxDays) band = 'NEEDS_MANAGEMENT';
@@ -197,7 +199,9 @@ export function calculateStockoutForecast(
     return { expectedStockoutDays: null, expectedStockoutDate: null, confidence: null, basisWindowDays };
   }
 
-  const expectedStockoutDays = currentAvailableStock / basis.averageDailyDepletion;
+  // 가용재고가 이미 0 이하면 "며칠 뒤 소진 예상"이 아니라 이미 소진된 상태다. 그대로 나누면
+  // 음수가 나와 마지막 관측일보다 "과거" 날짜가 예상 소진일로 표시되는 모순이 생긴다.
+  const expectedStockoutDays = currentAvailableStock <= 0 ? 0 : currentAvailableStock / basis.averageDailyDepletion;
   // 예측은 "실제로 재고를 확인한 마지막 날짜"부터 더해야 한다. asOfDate(조회일)를 기준으로 더하면
   // 새 업로드 없이 조회일만 지나가도 currentAvailableStock을 조회일 시점 값처럼 착각해 예상
   // 소진일이 매일 뒤로 밀린다.

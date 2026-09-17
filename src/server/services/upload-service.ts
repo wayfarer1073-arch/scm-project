@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { Prisma } from '@prisma/client';
 import { parseInventoryWorkbook } from '@/domain/excel/parser';
 import { validateAgainstPreviousSnapshot } from '@/domain/excel/validator';
 import type { ParsedInventoryRow, ValidationIssue } from '@/domain/excel/types';
@@ -97,15 +98,36 @@ export async function processUpload(request: UploadRequest): Promise<UploadResul
   const previousProductCodes = previousSnapshot ? await getSnapshotProductCodes(previousSnapshot.id) : null;
   const crossCheck = validateAgainstPreviousSnapshot(parseResult.rows, previousProductCodes);
 
-  const snapshot = await createSnapshot({
-    warehouseId: request.warehouseId,
-    snapshotDate: request.snapshotDate,
-    sourceFileName: request.fileName,
-    fileHash: contentSignature,
-    uploadedById: request.uploadedById,
-    isMock: request.isMock ?? false,
-    rows: parseResult.rows,
-  });
+  // findActiveSnapshot으로 본 "충돌 없음" 판단과 createSnapshot의 실제 쓰기 사이에는 시간차가 있어
+  // 같은 (창고, 기준일)에 동시에 두 건이 업로드되면 경쟁이 생길 수 있다. 그 경우 DB의
+  // @@unique([warehouseId, snapshotDate, version]) 제약이 둘째 요청을 막아주므로 데이터는 깨지지
+  // 않지만, 원인이 불명확한 500 에러 대신 재시도를 안내하는 명확한 에러로 바꿔준다.
+  let snapshot;
+  try {
+    snapshot = await createSnapshot({
+      warehouseId: request.warehouseId,
+      snapshotDate: request.snapshotDate,
+      sourceFileName: request.fileName,
+      fileHash: contentSignature,
+      uploadedById: request.uploadedById,
+      isMock: request.isMock ?? false,
+      rows: parseResult.rows,
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return {
+        status: 'ERROR',
+        issues: [
+          {
+            level: 'ERROR',
+            code: 'CONCURRENT_UPLOAD_CONFLICT',
+            message: '다른 업로드가 같은 창고·기준일에 동시에 처리되어 충돌했습니다. 잠시 후 다시 시도해주세요.',
+          },
+        ],
+      };
+    }
+    throw err;
+  }
 
   return {
     status: 'SUCCESS',

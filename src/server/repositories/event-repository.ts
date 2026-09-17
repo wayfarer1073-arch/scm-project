@@ -51,9 +51,13 @@ export async function updateEvent(
   changedById: string,
   patch: { eventType?: EventType; quantity?: number | null; note?: string; eventDate?: Date },
 ) {
-  const existing = await prisma.inventoryEvent.findUniqueOrThrow({ where: { id } });
-  return prisma.$transaction([
-    prisma.eventHistory.create({
+  return prisma.$transaction(async (tx) => {
+    // FOR UPDATE로 행을 잠가, 동시에 같은 이벤트를 수정하는 두 요청이 같은 "수정 전" 값으로
+    // 감사이력(EventHistory)을 중복 기록하지 않도록 한다 (두 번째 요청은 첫 번째가 커밋된 뒤의
+    // 최신 값을 previousData로 읽게 된다).
+    await tx.$executeRaw`SELECT id FROM inventory_events WHERE id = ${id} FOR UPDATE`;
+    const existing = await tx.inventoryEvent.findUniqueOrThrow({ where: { id } });
+    await tx.eventHistory.create({
       data: {
         eventId: id,
         changeType: 'UPDATE',
@@ -65,15 +69,16 @@ export async function updateEvent(
         },
         changedById,
       },
-    }),
-    prisma.inventoryEvent.update({ where: { id }, data: patch }),
-  ]);
+    });
+    return tx.inventoryEvent.update({ where: { id }, data: patch });
+  });
 }
 
 export async function softDeleteEvent(id: string, changedById: string) {
-  const existing = await prisma.inventoryEvent.findUniqueOrThrow({ where: { id } });
-  return prisma.$transaction([
-    prisma.eventHistory.create({
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT id FROM inventory_events WHERE id = ${id} FOR UPDATE`;
+    const existing = await tx.inventoryEvent.findUniqueOrThrow({ where: { id } });
+    await tx.eventHistory.create({
       data: {
         eventId: id,
         changeType: 'DELETE',
@@ -86,7 +91,7 @@ export async function softDeleteEvent(id: string, changedById: string) {
         },
         changedById,
       },
-    }),
-    prisma.inventoryEvent.update({ where: { id }, data: { isDeleted: true } }),
-  ]);
+    });
+    return tx.inventoryEvent.update({ where: { id }, data: { isDeleted: true } });
+  });
 }

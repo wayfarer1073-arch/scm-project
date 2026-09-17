@@ -25,6 +25,8 @@ function stripHtmlTags(value: string): string {
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/gi, ' ')
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec: string) => String.fromCodePoint(parseInt(dec, 10)))
     .replace(/&amp;/gi, '&')
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
@@ -80,6 +82,27 @@ function normalizeNumber(value: string): number | null {
   const parsed = Number(cleaned);
   return Number.isFinite(parsed) ? parsed : null;
 }
+
+/** DB에 정수(Int) 컬럼으로 저장되는 필드. 소수는 허용하지 않는다. */
+const INTEGER_FIELDS: CanonicalField[] = [
+  'normalStock',
+  'availableStock',
+  'incomingStock',
+  'defectiveStock',
+  'warningQty',
+  'dangerQty',
+];
+
+// PostgreSQL Int(4바이트)의 표현 범위. 초과 값은 DB insert 시점에 에러가 나므로 파싱 단계에서 먼저 막는다.
+const INT32_MIN = -2147483648;
+const INT32_MAX = 2147483647;
+
+// unitCost 등 Decimal(14,2) 컬럼의 표현 범위 (정수부 최대 12자리).
+const DECIMAL_14_2_MAX = 10 ** 12 - 0.01;
+const DECIMAL_14_2_MIN = -DECIMAL_14_2_MAX;
+
+/** canonical 필드로는 인식되지만 ParsedInventoryRow에 전용 컬럼이 없는 필드 (InventoryItem.extra에 보존) */
+const FIELDS_WITHOUT_DEDICATED_COLUMN: CanonicalField[] = ['supplierName', 'salePrice', 'supplyPrice', 'marketPrice'];
 
 function buildHeaderMap(headerRow: string[]): Partial<Record<CanonicalField, string>> {
   const normalizedHeaders = headerRow.map(normalizeHeaderCell);
@@ -197,9 +220,32 @@ export function parseInventoryWorkbook(buffer: Buffer): ParseResult {
           column: field,
         });
         hasParseFailure = true;
-      } else {
-        numericValues[field] = parsed;
+        continue;
       }
+      if (INTEGER_FIELDS.includes(field) && !Number.isInteger(parsed)) {
+        issues.push({
+          level: 'ERROR',
+          code: 'NUMBER_NOT_INTEGER',
+          message: `${rowNumber}행: '${HEADER_ALIASES[field][0]}' 값 '${raw}'은(는) 소수가 아닌 정수여야 합니다.`,
+          rowNumber,
+          column: field,
+        });
+        hasParseFailure = true;
+        continue;
+      }
+      const [rangeMin, rangeMax] = INTEGER_FIELDS.includes(field) ? [INT32_MIN, INT32_MAX] : [DECIMAL_14_2_MIN, DECIMAL_14_2_MAX];
+      if (parsed < rangeMin || parsed > rangeMax) {
+        issues.push({
+          level: 'ERROR',
+          code: 'NUMBER_OUT_OF_RANGE',
+          message: `${rowNumber}행: '${HEADER_ALIASES[field][0]}' 값 '${raw}'이(가) 처리 가능한 범위를 벗어났습니다.`,
+          rowNumber,
+          column: field,
+        });
+        hasParseFailure = true;
+        continue;
+      }
+      numericValues[field] = parsed;
     }
     if (hasParseFailure) return;
 
@@ -220,11 +266,14 @@ export function parseInventoryWorkbook(buffer: Buffer): ParseResult {
     const extra: Record<string, string> = {};
     headerRow.forEach((h, idx) => {
       const normalizedH = normalizeHeaderCell(h);
-      const isMapped = CANONICAL_FIELDS.some((f) => headerMap[f] === h);
-      if (!isMapped && normalizedH !== '') {
-        const value = normalizeString(rawRow[idx]);
-        if (value !== '') extra[h] = value;
-      }
+      if (normalizedH === '') return;
+      const mappedField = CANONICAL_FIELDS.find((f) => headerMap[f] === h);
+      // supplierName/salePrice/supplyPrice/marketPrice는 canonical 필드로 인식은 되지만
+      // ParsedInventoryRow에 전용 컬럼이 없다. 인식됐다는 이유로 버리지 않고 extra에 보존한다.
+      const hasDedicatedColumn = mappedField !== undefined && !FIELDS_WITHOUT_DEDICATED_COLUMN.includes(mappedField);
+      if (hasDedicatedColumn) return;
+      const value = normalizeString(rawRow[idx]);
+      if (value !== '') extra[h] = value;
     });
 
     rows.push({

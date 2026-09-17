@@ -101,6 +101,45 @@ describe('parseInventoryWorkbook - 검증 규칙', () => {
     expect(result.rows).toHaveLength(1);
     expect(result.issues.some((i) => i.code === 'NEGATIVE_STOCK' && i.level === 'WARNING')).toBe(true);
   });
+
+  it('정수 컬럼(재고/임계값)에 소수가 들어오면 ERROR로 표시되고 행은 제외된다(회귀 테스트)', () => {
+    const rows = [HEADER, ['00001', '상품A', '', '', '1000', '10.5', '10', '0', '0', '0', '0', '']];
+    const buffer = buildXlsxBuffer(rows);
+    const result = parseInventoryWorkbook(buffer);
+    expect(result.rows).toHaveLength(0);
+    expect(result.issues.some((i) => i.code === 'NUMBER_NOT_INTEGER' && i.column === 'normalStock')).toBe(true);
+  });
+
+  it('원가처럼 소수 허용 컬럼은 소수를 그대로 받아들인다', () => {
+    const rows = [HEADER, ['00001', '상품A', '', '', '1000.55', '10', '10', '0', '0', '0', '0', '']];
+    const buffer = buildXlsxBuffer(rows);
+    const result = parseInventoryWorkbook(buffer);
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].unitCost).toBe(1000.55);
+  });
+
+  it('정수 컬럼이 Postgres Int 범위를 초과하면 ERROR로 표시되고 행은 제외된다(회귀 테스트)', () => {
+    const rows = [HEADER, ['00001', '상품A', '', '', '1000', '99999999999', '10', '0', '0', '0', '0', '']];
+    const buffer = buildXlsxBuffer(rows);
+    const result = parseInventoryWorkbook(buffer);
+    expect(result.rows).toHaveLength(0);
+    expect(result.issues.some((i) => i.code === 'NUMBER_OUT_OF_RANGE' && i.column === 'normalStock')).toBe(true);
+  });
+});
+
+describe('parseInventoryWorkbook - 전용 컬럼 없는 canonical 필드', () => {
+  it('공급처/판매가/공급가/시중가는 인식되지만 전용 컬럼이 없으므로 extra에 보존된다(회귀 테스트)', () => {
+    const headerWithPrices = [...HEADER, '공급처', '판매가', '공급가', '시중가'];
+    const rows = [headerWithPrices, ['00001', '상품A', '', '', '1000', '10', '10', '0', '0', '0', '0', '', '거래처X', '5000', '3000', '5500']];
+    const buffer = buildXlsxBuffer(rows);
+    const result = parseInventoryWorkbook(buffer);
+    expect(result.issues.filter((i) => i.level === 'ERROR')).toHaveLength(0);
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].extra['공급처']).toBe('거래처X');
+    expect(result.rows[0].extra['판매가']).toBe('5000');
+    expect(result.rows[0].extra['공급가']).toBe('3000');
+    expect(result.rows[0].extra['시중가']).toBe('5500');
+  });
 });
 
 describe('parseInventoryWorkbook - HTML 기반 유사-xls 파일', () => {
@@ -121,5 +160,18 @@ describe('parseInventoryWorkbook - HTML 기반 유사-xls 파일', () => {
     expect(result.rows[0].availableStock).toBe(420);
     expect(result.rows[0].unitCost).toBe(1200);
     expect(result.rows[0].productName).toBe('(MH)포켓몬 츄잉팝스 젤리 70g');
+  });
+
+  it('숫자 HTML 엔티티(십진/16진)를 문자로 디코딩한다(회귀 테스트)', () => {
+    const html = `
+      <html><body><table border=1>
+      <tr><td>상품코드</td><td>상품명</td><td>옵션</td><td>바코드</td><td>원가</td><td>정상재고</td><td>가용재고</td><td>입고대기</td><td>불량재고</td><td>경고수량</td><td>위험수량</td><td>로케이션</td></tr>
+      <tr><td>00001</td><td>A&#40;special&#x29; item</td><td></td><td></td><td>100</td><td>1</td><td>1</td><td>0</td><td>0</td><td>0</td><td>0</td><td></td></tr>
+      </table></body></html>
+    `;
+    const buffer = Buffer.from(html, 'utf-8');
+    const result = parseInventoryWorkbook(buffer);
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].productName).toBe('A(special) item');
   });
 });

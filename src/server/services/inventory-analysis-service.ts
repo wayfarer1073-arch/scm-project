@@ -31,7 +31,7 @@ export async function getInventoryRows(options: { warehouseId?: string; asOfDate
 
 export async function getSkuDetail(skuId: string, asOfDate: string, settings?: RiskThresholdSettings) {
   const resolvedSettings = settings ?? (await getSettings());
-  const result = await loadSkuWithSeries(skuId);
+  const result = await loadSkuWithSeries(skuId, asOfDate);
   if (!result) return null;
   const analysis = analyzeSku(result.observations, asOfDate, resolvedSettings);
   if (!analysis) return null;
@@ -54,6 +54,8 @@ export function calculateCompanyKpis(rows: InventoryRow[], stagnantDaysThreshold
   let totalIncrease = 0;
   let forecastReadyCount = 0;
   let overstockCandidateValue = 0;
+  let sumOfPerSkuDailyDecreaseRates = 0;
+  let skusWithPeriodRate = 0;
 
   for (const row of rows) {
     totalAvailableStock += row.analysis.latest.availableStock;
@@ -73,6 +75,13 @@ export function calculateCompanyKpis(rows: InventoryRow[], stagnantDaysThreshold
     if (row.periodComparison) {
       totalDecrease += row.periodComparison.totalDepletion;
       totalIncrease += row.periodComparison.totalIncrease;
+      // "기간 일평균 감소"는 SKU마다 실제 관측 기간(observedDays)이 다를 수 있으므로, 전체
+      // 합계를 하나의 (요청된) 기간 일수로 나누지 않는다. 대신 SKU별로 자기 자신의 관측 기간에
+      // 맞춰 계산한 일평균을 먼저 구하고, 그 값들의 평균을 낸다.
+      if (row.periodComparison.observedDays > 0) {
+        sumOfPerSkuDailyDecreaseRates += row.periodComparison.totalDepletion / row.periodComparison.observedDays;
+        skusWithPeriodRate += 1;
+      }
     } else if (row.analysis.dailyChange !== null) {
       totalDecrease += Math.max(-row.analysis.dailyChange, 0);
       totalIncrease += Math.max(row.analysis.dailyChange, 0);
@@ -85,6 +94,7 @@ export function calculateCompanyKpis(rows: InventoryRow[], stagnantDaysThreshold
     totalInventoryValue,
     netChangeVsYesterday: hasAnyDayOverDay ? netChangeVsYesterday : null,
     totalDepletion7d,
+    averageDailyDecreasePerSku: skusWithPeriodRate > 0 ? sumOfPerSkuDailyDecreaseRates / skusWithPeriodRate : null,
     dangerSkuCount,
     stockoutSoon30dCount,
     stagnantValue,

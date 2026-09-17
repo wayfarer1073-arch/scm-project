@@ -11,7 +11,6 @@ interface KpiCardsProps {
 
 export function KpiCards({ kpis, fromDate, asOfDate }: KpiCardsProps) {
   const periodLabel = fromDate ? `${fromDate.slice(5)} — ${asOfDate.slice(5)}` : '직전 관측 대비';
-  const periodDays = fromDate ? Math.max(1, Math.round((Date.parse(`${asOfDate}T00:00:00Z`) - Date.parse(`${fromDate}T00:00:00Z`)) / 86_400_000)) : null;
   const primary = [
     { label: '총 재고자산', value: formatCurrency(kpis.totalInventoryValue), detail: '정상재고 × 원가', icon: CircleDollarSign, tone: 'bg-primary text-primary-foreground' },
     { label: '총 가용재고', value: `${formatNumber(kpis.totalAvailableStock)}개`, detail: `${formatNumber(kpis.totalSkuCount)}개 SKU`, icon: Boxes, tone: 'bg-status-increase-bg text-status-increase' },
@@ -47,8 +46,12 @@ export function KpiCards({ kpis, fromDate, asOfDate }: KpiCardsProps) {
       <div className="mt-3 grid grid-cols-2 divide-x rounded-xl border bg-card px-2 py-3 sm:grid-cols-4">
         <SmallMetric label="위험 SKU" value={`${formatNumber(kpis.dangerSkuCount)}개`} emphasis="danger" />
         <SmallMetric label="30일 내 소진 예상" value={`${formatNumber(kpis.stockoutSoon30dCount)}개`} emphasis="warning" />
-        {periodDays ? (
-          <SmallMetric label="기간 일평균 관측 감소" value={`${formatNumber((kpis.totalDecrease ?? 0) / periodDays)}개/일`} />
+        {fromDate ? (
+          kpis.averageDailyDecreasePerSku !== null && kpis.averageDailyDecreasePerSku !== undefined ? (
+            <SmallMetric label="기간 일평균 관측 감소 (SKU 평균)" value={`${formatNumber(kpis.averageDailyDecreasePerSku)}개/일`} />
+          ) : (
+            <SmallMetric label="기간 일평균 관측 감소" value="비교 가능한 SKU 없음" />
+          )
         ) : (
           <SmallMetric label="예측 가능 SKU" value={`${formatNumber(kpis.forecastReadyCount ?? 0)} / ${formatNumber(kpis.totalSkuCount)}`} />
         )}

@@ -123,6 +123,9 @@ export interface CompanyKpis {
   totalInventoryValue: number;
   netChangeVsYesterday: number | null;
   totalDepletion7d: number;
+  /** 기간 비교 모드에서 SKU별 실제 관측 기간에 맞춰 계산한 일평균 감소량의 평균 (SKU마다 관측 기간이
+   * 다를 수 있어 전체 합계를 단일 기간일수로 나누지 않는다). 비교 가능한 SKU가 없으면 null. */
+  averageDailyDecreasePerSku?: number | null;
   dangerSkuCount: number;
   stockoutSoon30dCount: number;
   stagnantValue: number;

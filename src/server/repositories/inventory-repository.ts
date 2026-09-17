@@ -85,6 +85,10 @@ export async function loadActiveSkusWithSeries(
   });
 
   const observationsBySku = new Map<string, StockObservation[]>();
+  // items가 snapshotDate asc로 정렬되어 있으므로, 마지막에 덮어써지는 값이 asOfDate 시점 기준
+  // "가장 최근" 관측치의 상품 속성이 된다. sku.current*는 asOfDate와 무관하게 항상 "지금" 값이라
+  // 과거 조회에 미래 변경 사항이 섞여 보이므로 쓰지 않는다.
+  const latestAttrsBySku = new Map<string, { productName: string; option: string | null; barcode: string | null; location: string | null }>();
   for (const item of items) {
     const list = observationsBySku.get(item.skuId) ?? [];
     list.push({
@@ -98,22 +102,26 @@ export async function loadActiveSkusWithSeries(
       dangerQty: item.dangerQty,
     });
     observationsBySku.set(item.skuId, list);
+    latestAttrsBySku.set(item.skuId, { productName: item.productName, option: item.option, barcode: item.barcode, location: item.location });
   }
 
-  return skus.map((sku) => ({
-    descriptor: {
-      skuId: sku.id,
-      warehouseId: sku.warehouseId,
-      warehouseCode: sku.warehouse.code,
-      warehouseName: sku.warehouse.name,
-      productCode: sku.productCode,
-      productName: sku.currentProductName,
-      option: sku.currentOption,
-      barcode: sku.currentBarcode,
-      location: sku.currentLocation,
-    },
-    observations: observationsBySku.get(sku.id) ?? [],
-  }));
+  return skus.map((sku) => {
+    const attrs = latestAttrsBySku.get(sku.id);
+    return {
+      descriptor: {
+        skuId: sku.id,
+        warehouseId: sku.warehouseId,
+        warehouseCode: sku.warehouse.code,
+        warehouseName: sku.warehouse.name,
+        productCode: sku.productCode,
+        productName: attrs?.productName ?? sku.currentProductName,
+        option: attrs ? attrs.option : sku.currentOption,
+        barcode: attrs ? attrs.barcode : sku.currentBarcode,
+        location: attrs ? attrs.location : sku.currentLocation,
+      },
+      observations: observationsBySku.get(sku.id) ?? [],
+    };
+  });
 }
 
 export interface DailyWarehouseTotal {
@@ -148,13 +156,23 @@ export async function loadDailyWarehouseTotals(): Promise<DailyWarehouseTotal[]>
   return [...map.values()].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 }
 
-export async function loadSkuWithSeries(skuId: string): Promise<{ descriptor: SkuDescriptor; observations: StockObservation[] } | null> {
+export async function loadSkuWithSeries(
+  skuId: string,
+  asOfDate?: string,
+): Promise<{ descriptor: SkuDescriptor; observations: StockObservation[] } | null> {
   const sku = await prisma.sku.findUnique({ where: { id: skuId }, include: { warehouse: { select: { id: true, code: true, name: true } } } });
   if (!sku) return null;
 
   const mockFilter = await resolveMockFilter(sku.warehouseId);
   const items = await prisma.inventoryItem.findMany({
-    where: { skuId, snapshot: { status: 'ACTIVE', ...mockFilter } },
+    where: {
+      skuId,
+      snapshot: {
+        status: 'ACTIVE',
+        ...(asOfDate ? { snapshotDate: { lte: new Date(`${asOfDate}T00:00:00.000Z`) } } : {}),
+        ...mockFilter,
+      },
+    },
     include: { snapshot: { select: { snapshotDate: true } } },
     orderBy: { snapshot: { snapshotDate: 'asc' } },
   });
@@ -170,6 +188,9 @@ export async function loadSkuWithSeries(skuId: string): Promise<{ descriptor: Sk
     dangerQty: item.dangerQty,
   }));
 
+  // asOfDate 시점 기준 가장 최근 관측치의 상품 속성을 쓴다(과거 조회에 이후 변경분이 섞이지 않도록).
+  const latestItem = items.at(-1);
+
   return {
     descriptor: {
       skuId: sku.id,
@@ -177,10 +198,10 @@ export async function loadSkuWithSeries(skuId: string): Promise<{ descriptor: Sk
       warehouseCode: sku.warehouse.code,
       warehouseName: sku.warehouse.name,
       productCode: sku.productCode,
-      productName: sku.currentProductName,
-      option: sku.currentOption,
-      barcode: sku.currentBarcode,
-      location: sku.currentLocation,
+      productName: latestItem?.productName ?? sku.currentProductName,
+      option: latestItem ? latestItem.option : sku.currentOption,
+      barcode: latestItem ? latestItem.barcode : sku.currentBarcode,
+      location: latestItem ? latestItem.location : sku.currentLocation,
     },
     observations,
   };

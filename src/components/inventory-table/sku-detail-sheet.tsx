@@ -96,10 +96,11 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, onOpenChange }: SkuD
     if (chartData.length === 0) return [];
     const dates = new Set(chartData.map((d) => d.date));
     return events
-      .filter((e) => dates.has(e.eventDate.slice(0, 10)))
+      .filter((e) => dates.has(formatKstDate(e.eventDate)))
       .map((e) => {
-        const point = chartData.find((d) => d.date === e.eventDate.slice(0, 10));
-        return point ? { date: e.eventDate.slice(0, 10), availableStock: point.availableStock, note: e.note, eventType: e.eventType } : null;
+        const eventKstDate = formatKstDate(e.eventDate);
+        const point = chartData.find((d) => d.date === eventKstDate);
+        return point ? { date: eventKstDate, availableStock: point.availableStock, note: e.note, eventType: e.eventType } : null;
       })
       .filter((v): v is { date: string; availableStock: number; note: string; eventType: string } => v !== null);
   }, [chartData, events]);
@@ -110,7 +111,7 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, onOpenChange }: SkuD
     const deltas = buildDailyDeltas(sorted);
     return deltas
       .filter((d) => d.increase > 0)
-      .filter((d) => !events.some((e) => e.eventDate.slice(0, 10) >= d.fromDate && e.eventDate.slice(0, 10) <= d.toDate))
+      .filter((d) => !events.some((e) => formatKstDate(e.eventDate) >= d.fromDate && formatKstDate(e.eventDate) <= d.toDate))
       .slice(-3)
       .reverse();
   }, [detail, events]);

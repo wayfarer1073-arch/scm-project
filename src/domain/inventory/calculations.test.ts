@@ -105,6 +105,12 @@ describe('calculateCoverage', () => {
     expect(result.band).toBeNull();
   });
 
+  it('가용재고가 마이너스여도 음수 Coverage 대신 0일로 처리한다(회귀 테스트)', () => {
+    const result = calculateCoverage(-5, 10);
+    expect(result.coverageDays).toBe(0);
+    expect(result.band).toBe('STOCKOUT_SOON');
+  });
+
   it('coverage band 경계값 처리', () => {
     const settings = { stockoutSoonDays: 7, manageMaxDays: 30, overstockCoverageDays: 90, stagnantDays: 30 };
     expect(calculateCoverage(70, 10, settings).band).toBe('STOCKOUT_SOON'); // 7일
@@ -159,6 +165,18 @@ describe('calculateStockoutForecast', () => {
     const forecast = calculateStockoutForecast(300, '2026-01-08', maturity, w7, w14, w30);
     expect(forecast.expectedStockoutDays).toBeCloseTo(3);
     expect(forecast.expectedStockoutDate).toBe('2026-01-11');
+  });
+
+  it('가용재고가 마이너스면 과거 날짜 대신 마지막 관측일을 예상 소진일로 반환한다(회귀 테스트)', () => {
+    const observations = sortObservations([obs('2026-01-01', 1000), obs('2026-01-08', -20)]);
+    const deltas = buildDailyDeltas(observations);
+    const maturity = calculateDataMaturity(observations, '2026-01-08');
+    const w7 = calculateWindowDepletion(deltas, '2026-01-08', 7);
+    const w14 = calculateWindowDepletion(deltas, '2026-01-08', 14);
+    const w30 = calculateWindowDepletion(deltas, '2026-01-08', 30);
+    const forecast = calculateStockoutForecast(-20, '2026-01-08', maturity, w7, w14, w30);
+    expect(forecast.expectedStockoutDays).toBe(0);
+    expect(forecast.expectedStockoutDate).toBe('2026-01-08');
   });
 });
 
