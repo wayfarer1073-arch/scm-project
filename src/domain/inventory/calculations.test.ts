@@ -15,6 +15,7 @@ import {
   dailyDepletion,
   dailyIncrease,
   isNewlyAtRisk,
+  resolveEffectiveThresholds,
   sortObservations,
 } from './calculations';
 import type { StockObservation } from './types';
@@ -248,6 +249,53 @@ describe('calculateThresholdRisk', () => {
     const result = calculateThresholdRisk(obs('2026-01-01', 50, { dangerQty: 10, warningQty: 20 }));
     expect(result.level).toBe('NORMAL');
     expect(result.reason).toBeNull();
+  });
+});
+
+describe('resolveEffectiveThresholds', () => {
+  const settings = { stockoutSoonDays: 7, manageMaxDays: 30, overstockCoverageDays: 90, stagnantDays: 30 };
+
+  it('수동 설정값이 있으면 최우선 적용한다', () => {
+    const result = resolveEffectiveThresholds({ dangerQty: 5, warningQty: 8 }, { dangerQty: 50, warningQty: 100 }, 10, settings);
+    expect(result).toEqual({ dangerQty: 50, warningQty: 100, source: 'manual' });
+  });
+
+  it('수동 설정 중 한 필드만 있어도(0은 "설정 안 함"이 아님) manual로 판정한다', () => {
+    const result = resolveEffectiveThresholds({ dangerQty: 0, warningQty: 0 }, { dangerQty: 0, warningQty: null }, 10, settings);
+    expect(result).toEqual({ dangerQty: 0, warningQty: 0, source: 'manual' });
+  });
+
+  it('수동 설정이 없고 업로드(레거시) 값이 0 초과면 그 값을 쓴다', () => {
+    const result = resolveEffectiveThresholds({ dangerQty: 10, warningQty: 20 }, null, 5, settings);
+    expect(result).toEqual({ dangerQty: 10, warningQty: 20, source: 'legacy' });
+  });
+
+  it('수동·레거시 값이 모두 없으면(최소 업로드 양식) 최근 소진 속도 × 기준일수로 자동계산한다(회귀 테스트: 이게 없으면 모든 SKU가 영구히 정상으로만 표시됨)', () => {
+    const result = resolveEffectiveThresholds({ dangerQty: 0, warningQty: 0 }, null, 10, settings);
+    expect(result).toEqual({ dangerQty: 70, warningQty: 300, source: 'auto' }); // 10개/일 × 7일 / 10개/일 × 30일
+  });
+
+  it('소진 속도 데이터도 없으면 위험 판정을 하지 않는다(0/0, none)', () => {
+    const result = resolveEffectiveThresholds({ dangerQty: 0, warningQty: 0 }, null, null, settings);
+    expect(result).toEqual({ dangerQty: 0, warningQty: 0, source: 'none' });
+  });
+});
+
+describe('analyzeSku - 위험수량/경고수량 자동계산 통합', () => {
+  it('경고/위험수량이 없어도(최소 업로드 양식) 소진 속도 기반으로 위험 상태를 판정한다(회귀 테스트)', () => {
+    // 7일간 100 -> 30으로 일평균 10개 소진. 기본 설정상 위험수량(자동)=70, 경고수량(자동)=300이므로
+    // 가용재고 30은 위험수량 70 이하라 DANGER가 나와야 한다.
+    const observations = [obs('2026-01-01', 100, { dangerQty: 0, warningQty: 0 }), obs('2026-01-08', 30, { dangerQty: 0, warningQty: 0 })];
+    const analysis = analyzeSku(observations, '2026-01-08')!;
+    expect(analysis.riskThresholds).toEqual({ dangerQty: 70, warningQty: 300, source: 'auto' });
+    expect(analysis.thresholdRisk.level).toBe('DANGER');
+  });
+
+  it('관리자가 직접 설정한 값이 자동계산보다 우선한다', () => {
+    const observations = [obs('2026-01-01', 100, { dangerQty: 0, warningQty: 0 }), obs('2026-01-08', 30, { dangerQty: 0, warningQty: 0 })];
+    const analysis = analyzeSku(observations, '2026-01-08', undefined, { dangerQty: 10, warningQty: 20 })!;
+    expect(analysis.riskThresholds).toEqual({ dangerQty: 10, warningQty: 20, source: 'manual' });
+    expect(analysis.thresholdRisk.level).toBe('NORMAL'); // 30 > 20(경고수량)
   });
 });
 

@@ -6,7 +6,9 @@ import type {
   DailyDelta,
   DataMaturity,
   DepletionAcceleration,
+  EffectiveRiskThresholds,
   InventoryValueBreakdown,
+  ManualRiskThresholds,
   OverstockCandidateInfo,
   PeriodComparison,
   RiskThresholdSettings,
@@ -271,6 +273,39 @@ export function calculateAcceleration(maturity: DataMaturity, deltas: DailyDelta
   return { recent7AvgDepletion: recentAvg, previous7AvgDepletion: prevAvg, accelerationRatePercent: rate, trend };
 }
 
+/**
+ * 위험/경고수량의 유효값을 우선순위에 따라 해석한다: 관리자가 SKU 상세에서 직접 지정한 값
+ * (manual) > 업로드가 제공한 스냅샷 값(legacy, 0 초과일 때만) > 최근 7일 평균 소진량을
+ * 설정된 기준일수로 역산한 자동계산(auto) 순. 아무 근거도 없으면 위험 판정을 하지 않는다(none).
+ *
+ * "최소 업로드 양식"으로 전환되면서 Excel이 더 이상 경고수량/위험수량을 제공하지 않아
+ * legacy 값이 항상 0이 되고, 자동계산 없이는 모든 SKU가 영구히 "정상"으로만 표시되는
+ * 문제가 있었다 — auto 단계가 바로 그 문제를 메꾼다.
+ */
+export function resolveEffectiveThresholds(
+  latest: Pick<StockObservation, 'dangerQty' | 'warningQty'>,
+  manual: ManualRiskThresholds | null | undefined,
+  avgDailyDepletion: number | null,
+  settings: RiskThresholdSettings = DEFAULT_RISK_SETTINGS,
+): EffectiveRiskThresholds {
+  const manualDangerQty = manual?.dangerQty ?? null;
+  const manualWarningQty = manual?.warningQty ?? null;
+  if (manualDangerQty !== null || manualWarningQty !== null) {
+    return { dangerQty: manualDangerQty ?? 0, warningQty: manualWarningQty ?? 0, source: 'manual' };
+  }
+  if (latest.dangerQty > 0 || latest.warningQty > 0) {
+    return { dangerQty: latest.dangerQty, warningQty: latest.warningQty, source: 'legacy' };
+  }
+  if (avgDailyDepletion !== null && avgDailyDepletion > 0) {
+    return {
+      dangerQty: Math.round(avgDailyDepletion * settings.stockoutSoonDays),
+      warningQty: Math.round(avgDailyDepletion * settings.manageMaxDays),
+      source: 'auto',
+    };
+  }
+  return { dangerQty: 0, warningQty: 0, source: 'none' };
+}
+
 /** Excel의 위험수량/경고수량을 우선 적용하는 기본 위험 판정 */
 export function calculateThresholdRisk(observation: StockObservation): ThresholdRisk {
   if (observation.dangerQty > 0 && observation.availableStock <= observation.dangerQty) {
@@ -336,6 +371,7 @@ export function analyzeSku(
   observations: StockObservation[],
   asOfDate: string,
   settings: RiskThresholdSettings = DEFAULT_RISK_SETTINGS,
+  manualThresholds?: ManualRiskThresholds | null,
 ): SkuAnalysis | null {
   const sorted = sortObservations(observations.filter((o) => o.date <= asOfDate));
   if (sorted.length === 0) return null;
@@ -354,7 +390,9 @@ export function analyzeSku(
     : { coverageDays: null, band: null };
   const forecast = calculateStockoutForecast(latest.availableStock, latest.date, maturity, window7, window14, window30);
   const acceleration = calculateAcceleration(maturity, deltas, asOfDate);
-  const thresholdRisk = calculateThresholdRisk(latest);
+  const riskThresholds = resolveEffectiveThresholds(latest, manualThresholds, window7.averageDailyDepletion, settings);
+  const effectiveLatest = { ...latest, dangerQty: riskThresholds.dangerQty, warningQty: riskThresholds.warningQty };
+  const thresholdRisk = calculateThresholdRisk(effectiveLatest);
   const stagnation = calculateStagnation(sorted, deltas, asOfDate, maturity);
   const overstock = calculateOverstockCandidate(latest.availableStock, window30, maturity, settings);
 
@@ -381,7 +419,10 @@ export function analyzeSku(
   if (overstock.isCandidate) tags.push('[과잉재고 후보]');
   if ((latest.inboundQuantity ?? 0) > 0) tags.push(`[입고 ${latest.inboundQuantity}개 반영]`);
   if (stockIncreasedToday) tags.push('[재고 증가 감지]');
-  const previousThresholdRisk = previous ? calculateThresholdRisk(previous) : null;
+  // 전일 위험도는 과거 시점의 소진 속도를 다시 역산하지 않고, 오늘과 동일한 유효 임계값을
+  // 전일 가용재고에 적용해 비교한다(임계값이 하루 사이 크게 바뀌지 않는다는 전제로 충분히 정확하고,
+  // 매 비교마다 과거 시점 window를 다시 계산하는 비용을 피한다).
+  const previousThresholdRisk = previous ? calculateThresholdRisk({ ...previous, dangerQty: riskThresholds.dangerQty, warningQty: riskThresholds.warningQty }) : null;
   const newlyAtRisk = previousThresholdRisk !== null && RISK_RANK[thresholdRisk.level] > RISK_RANK[previousThresholdRisk.level];
   if (newlyAtRisk) tags.push('[신규 위험]');
 
@@ -398,18 +439,18 @@ export function analyzeSku(
     forecast,
     acceleration,
     thresholdRisk,
+    riskThresholds,
     stagnation,
     overstock,
     tags,
     stockIncreasedToday,
+    newlyAtRisk,
   };
 }
 
 /** 오늘 새롭게 위험/주의 단계로 악화된 SKU인지("어제 정상 → 오늘 주의/위험" 등). tags에도 '[신규 위험]'으로 반영됨 */
 export function isNewlyAtRisk(analysis: SkuAnalysis): boolean {
-  if (!analysis.previous) return false;
-  const prevRisk = calculateThresholdRisk(analysis.previous).level;
-  return RISK_RANK[analysis.thresholdRisk.level] > RISK_RANK[prevRisk];
+  return analysis.newlyAtRisk;
 }
 
 /** 업로드 원가합을 우선하고, 없으면 정상재고 × 유효 단위원가를 사용한다. */

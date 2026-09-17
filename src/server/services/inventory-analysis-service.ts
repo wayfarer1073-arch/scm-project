@@ -18,7 +18,7 @@ export async function getInventoryRows(options: { warehouseId?: string; asOfDate
 
   const rows: InventoryRow[] = [];
   for (const { descriptor, observations } of skusWithSeries) {
-    const analysis = analyzeSku(observations, options.asOfDate, settings);
+    const analysis = analyzeSku(observations, options.asOfDate, settings, { dangerQty: descriptor.manualDangerQty, warningQty: descriptor.manualWarningQty });
     if (!analysis) continue; // asOfDate 이전 관측치가 없는 SKU(예: 미래 등록)는 제외
     const valueBreakdown = calculateInventoryValueBreakdown(analysis.latest);
     const periodComparison = options.compareFromDate
@@ -33,7 +33,10 @@ export async function getSkuDetail(skuId: string, asOfDate: string, settings?: R
   const resolvedSettings = settings ?? (await getSettings());
   const result = await loadSkuWithSeries(skuId, asOfDate);
   if (!result) return null;
-  const analysis = analyzeSku(result.observations, asOfDate, resolvedSettings);
+  const analysis = analyzeSku(result.observations, asOfDate, resolvedSettings, {
+    dangerQty: result.descriptor.manualDangerQty,
+    warningQty: result.descriptor.manualWarningQty,
+  });
   if (!analysis) return null;
   const valueBreakdown = calculateInventoryValueBreakdown(analysis.latest);
   return { descriptor: result.descriptor, analysis, valueBreakdown, observations: result.observations };

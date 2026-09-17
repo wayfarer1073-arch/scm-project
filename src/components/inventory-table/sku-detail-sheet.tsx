@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Plus, Trash2 } from 'lucide-react';
+import { Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -40,16 +41,21 @@ interface SkuDetailSheetProps {
   skuId: string | null;
   asOfDate: string;
   fromDate: string | null;
+  isAdmin: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function SkuDetailSheet({ skuId, asOfDate, fromDate, onOpenChange }: SkuDetailSheetProps) {
+export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, onOpenChange }: SkuDetailSheetProps) {
   const [detail, setDetail] = useState<SkuDetailResponse | null>(null);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [rangeDays, setRangeDays] = useState<30 | 60 | 90>(30);
   const [formOpen, setFormOpen] = useState(false);
   const [formPrefill, setFormPrefill] = useState<{ quantity?: number; date?: string }>({});
+  const [editingThresholds, setEditingThresholds] = useState(false);
+  const [dangerInput, setDangerInput] = useState('');
+  const [warningInput, setWarningInput] = useState('');
+  const [savingThresholds, setSavingThresholds] = useState(false);
 
   async function reload() {
     if (!skuId) return;
@@ -116,6 +122,59 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, onOpenChange }: SkuD
       .reverse();
   }, [detail, events]);
 
+  function startEditingThresholds() {
+    if (!detail) return;
+    setDangerInput(String(detail.analysis.riskThresholds.dangerQty));
+    setWarningInput(String(detail.analysis.riskThresholds.warningQty));
+    setEditingThresholds(true);
+  }
+
+  async function saveThresholds() {
+    if (!skuId) return;
+    const dangerQty = Number(dangerInput);
+    const warningQty = Number(warningInput);
+    if (!Number.isInteger(dangerQty) || dangerQty < 0 || !Number.isInteger(warningQty) || warningQty < 0) {
+      toast.error('0 이상의 정수만 입력할 수 있습니다.');
+      return;
+    }
+    setSavingThresholds(true);
+    try {
+      const res = await fetch(`/api/sku/${skuId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ manualDangerQty: dangerQty, manualWarningQty: warningQty }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success('위험/경고수량을 저장했습니다.');
+      setEditingThresholds(false);
+      reload();
+    } catch {
+      toast.error('저장에 실패했습니다.');
+    } finally {
+      setSavingThresholds(false);
+    }
+  }
+
+  async function resetThresholds() {
+    if (!skuId) return;
+    setSavingThresholds(true);
+    try {
+      const res = await fetch(`/api/sku/${skuId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ manualDangerQty: null, manualWarningQty: null }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success('자동계산으로 되돌렸습니다.');
+      setEditingThresholds(false);
+      reload();
+    } catch {
+      toast.error('되돌리기에 실패했습니다.');
+    } finally {
+      setSavingThresholds(false);
+    }
+  }
+
   async function handleDeleteEvent(id: string) {
     if (!confirm('이 이벤트를 삭제할까요? (이력은 보존됩니다)')) return;
     const res = await fetch(`/api/events/${id}`, { method: 'DELETE' });
@@ -181,6 +240,46 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, onOpenChange }: SkuD
                   label="예상 소진일"
                   value={detail.analysis.forecast.expectedStockoutDate ? formatKstDate(detail.analysis.forecast.expectedStockoutDate) : '데이터 축적 중'}
                 />
+              </section>
+
+              <section className="rounded-xl border bg-muted/30 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="text-xs font-semibold">위험/경고수량 기준</h3>
+                  {isAdmin && !editingThresholds && (
+                    <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={startEditingThresholds}>
+                      <Pencil className="size-3" /> 수정
+                    </Button>
+                  )}
+                </div>
+                {editingThresholds ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs">
+                      <label htmlFor="danger-qty-input" className="w-16 text-muted-foreground">위험수량</label>
+                      <Input id="danger-qty-input" value={dangerInput} onChange={(e) => setDangerInput(e.target.value)} inputMode="numeric" className="h-8 text-xs" />
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <label htmlFor="warning-qty-input" className="w-16 text-muted-foreground">경고수량</label>
+                      <Input id="warning-qty-input" value={warningInput} onChange={(e) => setWarningInput(e.target.value)} inputMode="numeric" className="h-8 text-xs" />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <Button size="sm" className="h-7 text-xs" onClick={saveThresholds} disabled={savingThresholds}>
+                        저장
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={resetThresholds} disabled={savingThresholds}>
+                        <RotateCcw className="size-3" /> 자동으로 되돌리기
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingThresholds(false)} disabled={savingThresholds}>
+                        취소
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                    <Field label="위험수량" value={`${formatNumber(detail.analysis.riskThresholds.dangerQty)}개`} />
+                    <Field label="경고수량" value={`${formatNumber(detail.analysis.riskThresholds.warningQty)}개`} />
+                  </div>
+                )}
+                {!editingThresholds && <p className="mt-2 text-[11px] text-muted-foreground">{thresholdSourceLabel(detail.analysis.riskThresholds.source)}</p>}
               </section>
 
               {fromDate && (
@@ -377,4 +476,11 @@ function confidenceLabel(confidence: SkuAnalysis['forecast']['confidence']): str
   if (confidence === 'MEDIUM') return '보통';
   if (confidence === 'LOW') return '낮음';
   return '-';
+}
+
+function thresholdSourceLabel(source: SkuAnalysis['riskThresholds']['source']): string {
+  if (source === 'manual') return '관리자가 직접 설정한 값입니다.';
+  if (source === 'legacy') return '업로드 파일이 제공한 값입니다.';
+  if (source === 'auto') return '최근 7일 소진 속도를 기준으로 자동 계산된 값입니다.';
+  return '소진 이력이 부족해 위험 판정을 할 수 없습니다(데이터 축적 중).';
 }

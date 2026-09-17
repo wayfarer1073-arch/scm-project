@@ -31,9 +31,10 @@ interface DashboardClientProps {
   rows: InventoryRow[];
   dailyTotals: DailyWarehouseTotal[];
   latestUploads: LatestUpload[];
+  isAdmin: boolean;
 }
 
-export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows, dailyTotals, latestUploads }: DashboardClientProps) {
+export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows, dailyTotals, latestUploads, isAdmin }: DashboardClientProps) {
   const [warehouseFilter, setWarehouseFilter] = useState<string | 'ALL'>('ALL');
   const [tableTab, setTableTab] = useState<TableTab>('ALL');
   const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
@@ -118,7 +119,7 @@ export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows
           fromDate={fromDate}
         />
       </div>
-      <SkuDetailSheet skuId={selectedSkuId} asOfDate={asOfDate} fromDate={fromDate} onOpenChange={(open) => !open && setSelectedSkuId(null)} />
+      <SkuDetailSheet skuId={selectedSkuId} asOfDate={asOfDate} fromDate={fromDate} isAdmin={isAdmin} onOpenChange={(open) => !open && setSelectedSkuId(null)} />
     </div>
   );
 }

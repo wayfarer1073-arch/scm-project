@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { auth } from '@/server/auth';
 import { getSkuDetail } from '@/server/services/inventory-analysis-service';
 import { getSettings } from '@/server/repositories/settings-repository';
-import { setSkuHiddenFromDashboard } from '@/server/repositories/inventory-repository';
+import { setSkuHiddenFromDashboard, setSkuManualThresholds } from '@/server/repositories/inventory-repository';
 import { todayKstDateString } from '@/lib/date';
 
 export async function GET(request: Request, { params }: { params: Promise<{ skuId: string }> }) {
@@ -21,7 +21,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ skuI
   return NextResponse.json(detail);
 }
 
-const patchSchema = z.object({ isHiddenFromDashboard: z.boolean() });
+// manualDangerQty/manualWarningQty는 항상 함께 보내야 한다 — 한쪽만 보내면 다른 쪽은 null(자동계산)로
+// 간주되어 기존 설정을 덮어쓴다. UI는 이 두 필드를 하나의 폼으로 묶어 항상 같이 전송한다.
+const patchSchema = z
+  .object({
+    isHiddenFromDashboard: z.boolean().optional(),
+    manualDangerQty: z.number().int().min(0).nullable().optional(),
+    manualWarningQty: z.number().int().min(0).nullable().optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, { message: '변경할 값이 없습니다.' });
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ skuId: string }> }) {
   const session = await auth();
@@ -34,8 +42,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sk
   if (!parsed.success) return NextResponse.json({ error: '입력값이 올바르지 않습니다.' }, { status: 400 });
 
   try {
-    const sku = await setSkuHiddenFromDashboard(skuId, parsed.data.isHiddenFromDashboard);
-    return NextResponse.json({ skuId: sku.id, isHiddenFromDashboard: sku.isHiddenFromDashboard });
+    if (parsed.data.isHiddenFromDashboard !== undefined) {
+      const sku = await setSkuHiddenFromDashboard(skuId, parsed.data.isHiddenFromDashboard);
+      return NextResponse.json({ skuId: sku.id, isHiddenFromDashboard: sku.isHiddenFromDashboard });
+    }
+    const sku = await setSkuManualThresholds(skuId, {
+      dangerQty: parsed.data.manualDangerQty ?? null,
+      warningQty: parsed.data.manualWarningQty ?? null,
+    });
+    return NextResponse.json({ skuId: sku.id, manualDangerQty: sku.manualDangerQty, manualWarningQty: sku.manualWarningQty });
   } catch {
     return NextResponse.json({ error: 'SKU를 찾을 수 없습니다.' }, { status: 404 });
   }

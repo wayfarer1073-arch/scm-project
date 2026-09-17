@@ -80,6 +80,27 @@ export interface ThresholdRisk {
   reason: '위험수량 이하' | '경고수량 이하' | null;
 }
 
+/**
+ * 위험/경고수량의 출처.
+ * - manual: SKU 상세에서 관리자가 직접 지정
+ * - legacy: 업로드(Excel 등)가 제공한 스냅샷 값(0 초과)
+ * - auto: 최근 소진 속도(7일 평균) × 설정된 기준일수로 역산
+ * - none: 위 어느 것도 없어 위험 판정을 할 수 없음(항상 정상)
+ */
+export type RiskThresholdSource = 'manual' | 'legacy' | 'auto' | 'none';
+
+export interface EffectiveRiskThresholds {
+  dangerQty: number;
+  warningQty: number;
+  source: RiskThresholdSource;
+}
+
+/** SKU 상세에서 관리자가 직접 지정한 값. 필드별로 null이면 그 필드만 자동계산으로 대체된다. */
+export interface ManualRiskThresholds {
+  dangerQty: number | null;
+  warningQty: number | null;
+}
+
 export type CoverageBand = 'STOCKOUT_SOON' | 'NEEDS_MANAGEMENT' | 'HEALTHY' | null;
 
 export interface CoverageAssessment {
@@ -184,9 +205,13 @@ export interface SkuAnalysis {
   forecast: StockoutForecast;
   acceleration: DepletionAcceleration;
   thresholdRisk: ThresholdRisk;
+  /** thresholdRisk 판정에 실제로 쓰인 위험/경고수량과 그 출처(수동/레거시/자동/없음) */
+  riskThresholds: EffectiveRiskThresholds;
   stagnation: StagnationInfo;
   overstock: OverstockCandidateInfo;
   /** 화면에 그대로 표시할 수 있는 근거 태그 목록 (예: "[위험수량 이하]", "[12일분 남음]") */
   tags: string[];
   stockIncreasedToday: boolean;
+  /** 오늘 새롭게 위험/주의 단계로 악화됐는지(어제 정상 → 오늘 주의/위험 등) */
+  newlyAtRisk: boolean;
 }

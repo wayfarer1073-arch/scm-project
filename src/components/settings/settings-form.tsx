@@ -118,7 +118,8 @@ export function SettingsForm({ isAdmin, warehouses, settings, users: initialUser
         <CardHeader>
           <CardTitle>위험 / 정체 판단 기준</CardTitle>
           <CardDescription>
-            SKU별 경고수량·위험수량이 Excel에 있으면 그 값이 우선 적용됩니다. 아래 기준은 Coverage(예상 소진일수) 기반 보조 판단과 정체·과잉재고 판정에 쓰입니다.
+            SKU별 위험/경고수량은 SKU 상세에서 직접 지정할 수 있고, 지정하지 않으면 아래 &quot;품절 임박 기준&quot;·&quot;관리 필요 경계&quot; 일수를 그
+            SKU의 최근 소진 속도로 환산해 자동 계산합니다. 같은 기준은 Coverage(예상 소진일수) 기반 보조 판단과 정체·과잉재고 판정에도 쓰입니다.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">

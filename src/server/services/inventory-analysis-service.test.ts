@@ -27,7 +27,19 @@ function buildRow(
   const valueBreakdown = calculateInventoryValueBreakdown(analysis.latest);
   const periodComparison = compareFromDate ? calculatePeriodComparison(observations, compareFromDate, asOfDate) : null;
   return {
-    descriptor: { skuId, warehouseId: 'w1', warehouseCode: 'A', warehouseName: '창고 A', productCode: skuId, productName: skuId, option: null, barcode: null, location: null },
+    descriptor: {
+      skuId,
+      warehouseId: 'w1',
+      warehouseCode: 'A',
+      warehouseName: '창고 A',
+      productCode: skuId,
+      productName: skuId,
+      option: null,
+      barcode: null,
+      location: null,
+      manualDangerQty: null,
+      manualWarningQty: null,
+    },
     analysis,
     valueBreakdown,
     periodComparison,

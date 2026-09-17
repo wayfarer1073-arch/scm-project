@@ -51,6 +51,9 @@ export interface SkuDescriptor {
   option: string | null;
   barcode: string | null;
   location: string | null;
+  /** 관리자가 SKU 상세에서 직접 지정한 위험/경고수량. null이면 자동계산을 쓴다. */
+  manualDangerQty: number | null;
+  manualWarningQty: number | null;
 }
 
 /** isActive(최신 스냅샷에 존재) SKU 목록과, 각 SKU의 전체 관측 시계열을 한 번에 로드한다(N+1 방지) */
@@ -158,6 +161,8 @@ export async function loadActiveSkusWithSeries(
         option: attrs ? attrs.option : sku.currentOption,
         barcode: attrs ? attrs.barcode : sku.currentBarcode,
         location: attrs ? attrs.location : sku.currentLocation,
+        manualDangerQty: sku.manualDangerQty,
+        manualWarningQty: sku.manualWarningQty,
       },
       observations: observationsBySku.get(sku.id) ?? [],
     };
@@ -273,6 +278,8 @@ export async function loadSkuWithSeries(
       option: latestItem ? latestItem.option : sku.currentOption,
       barcode: latestItem ? latestItem.barcode : sku.currentBarcode,
       location: latestItem ? latestItem.location : sku.currentLocation,
+      manualDangerQty: sku.manualDangerQty,
+      manualWarningQty: sku.manualWarningQty,
     },
     observations,
   };
@@ -310,6 +317,11 @@ export async function listAllSkusForVisibilityAdmin(): Promise<SkuVisibilityRow[
 
 export async function setSkuHiddenFromDashboard(skuId: string, hidden: boolean) {
   return prisma.sku.update({ where: { id: skuId }, data: { isHiddenFromDashboard: hidden } });
+}
+
+/** 위험/경고수량 직접 설정. 필드별로 null을 넘기면 그 필드만 자동계산으로 되돌린다. */
+export async function setSkuManualThresholds(skuId: string, input: { dangerQty: number | null; warningQty: number | null }) {
+  return prisma.sku.update({ where: { id: skuId }, data: { manualDangerQty: input.dangerQty, manualWarningQty: input.warningQty } });
 }
 
 export interface SkuSearchResult {
