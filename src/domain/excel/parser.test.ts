@@ -63,27 +63,43 @@ describe('parseInventoryWorkbook - 검증 규칙', () => {
     expect(result.issues.some((i) => i.code === 'NO_DATA_ROWS' && i.level === 'ERROR')).toBe(true);
   });
 
-  it('상품코드 누락 행은 ERROR로 표시되고 제외된다', () => {
+  it('상품코드 누락 행은 WARNING으로 표시되고 그 행만 제외된다(회귀 테스트: 한 행 문제로 파일 전체가 막히면 안 됨)', () => {
     const rows = [HEADER, ['', '상품A', '', '', '1000', '10', '10', '0', '0', '0', '0', '']];
     const buffer = buildXlsxBuffer(rows);
     const result = parseInventoryWorkbook(buffer);
     expect(result.rows).toHaveLength(0);
-    expect(result.issues.some((i) => i.code === 'MISSING_PRODUCT_CODE')).toBe(true);
+    expect(result.issues.some((i) => i.code === 'MISSING_PRODUCT_CODE' && i.level === 'WARNING')).toBe(true);
   });
 
-  it('상품코드 중복은 ERROR로 표시된다', () => {
+  it('상품코드 중복은 WARNING으로 표시되고 중복 행만 제외된다', () => {
     const rows = [HEADER, ['00001', '상품A', '', '', '1000', '10', '10', '0', '0', '0', '0', ''], ['00001', '상품A2', '', '', '1000', '5', '5', '0', '0', '0', '0', '']];
     const buffer = buildXlsxBuffer(rows);
     const result = parseInventoryWorkbook(buffer);
-    expect(result.issues.some((i) => i.code === 'DUPLICATE_PRODUCT_CODE')).toBe(true);
+    expect(result.issues.some((i) => i.code === 'DUPLICATE_PRODUCT_CODE' && i.level === 'WARNING')).toBe(true);
   });
 
-  it('숫자로 파싱할 수 없는 값은 ERROR로 표시되고 해당 행은 제외된다', () => {
+  it('숫자로 파싱할 수 없는 값은 WARNING으로 표시되고 해당 행만 제외된다', () => {
     const rows = [HEADER, ['00001', '상품A', '', '', '원가없음', '10', '10', '0', '0', '0', '0', '']];
     const buffer = buildXlsxBuffer(rows);
     const result = parseInventoryWorkbook(buffer);
     expect(result.rows).toHaveLength(0);
-    expect(result.issues.some((i) => i.code === 'NUMBER_PARSE_FAILED')).toBe(true);
+    expect(result.issues.some((i) => i.code === 'NUMBER_PARSE_FAILED' && i.level === 'WARNING')).toBe(true);
+  });
+
+  it('여러 행 중 한 행에만 문제가 있어도 나머지 정상 행은 전부 저장된다(핵심 회귀 테스트)', () => {
+    const rows = [
+      HEADER,
+      ['00001', '아크바 실론티', '', '', '1000', '10', '10', '0', '0', '0', '0', ''],
+      ['', '상품코드누락', '', '', '1000', '10', '10', '0', '0', '0', '0', ''],
+      ['00002', '드럼스틱', '', '', '1000', '원가아님', '10', '0', '0', '0', '0', ''],
+      ['00003', '나나콘', '', '', '1000', '10', '10', '0', '0', '0', '0', ''],
+    ];
+    const buffer = buildXlsxBuffer(rows);
+    const result = parseInventoryWorkbook(buffer);
+    expect(result.rows).toHaveLength(2);
+    expect(result.rows.map((r) => r.productCode).sort()).toEqual(['00001', '00003']);
+    expect(result.issues.filter((i) => i.level === 'ERROR')).toHaveLength(0);
+    expect(result.issues.filter((i) => i.level === 'WARNING')).toHaveLength(2);
   });
 
   it('원가 누락은 WARNING이며 행은 저장된다', () => {
@@ -102,12 +118,12 @@ describe('parseInventoryWorkbook - 검증 규칙', () => {
     expect(result.issues.some((i) => i.code === 'NEGATIVE_STOCK' && i.level === 'WARNING')).toBe(true);
   });
 
-  it('정수 컬럼(재고/임계값)에 소수가 들어오면 ERROR로 표시되고 행은 제외된다(회귀 테스트)', () => {
+  it('정수 컬럼(재고/임계값)에 소수가 들어오면 WARNING으로 표시되고 그 행만 제외된다(회귀 테스트)', () => {
     const rows = [HEADER, ['00001', '상품A', '', '', '1000', '10.5', '10', '0', '0', '0', '0', '']];
     const buffer = buildXlsxBuffer(rows);
     const result = parseInventoryWorkbook(buffer);
     expect(result.rows).toHaveLength(0);
-    expect(result.issues.some((i) => i.code === 'NUMBER_NOT_INTEGER' && i.column === 'normalStock')).toBe(true);
+    expect(result.issues.some((i) => i.code === 'NUMBER_NOT_INTEGER' && i.column === 'normalStock' && i.level === 'WARNING')).toBe(true);
   });
 
   it('원가처럼 소수 허용 컬럼은 소수를 그대로 받아들인다', () => {
@@ -118,12 +134,12 @@ describe('parseInventoryWorkbook - 검증 규칙', () => {
     expect(result.rows[0].unitCost).toBe(1000.55);
   });
 
-  it('정수 컬럼이 Postgres Int 범위를 초과하면 ERROR로 표시되고 행은 제외된다(회귀 테스트)', () => {
+  it('정수 컬럼이 Postgres Int 범위를 초과하면 WARNING으로 표시되고 그 행만 제외된다(회귀 테스트)', () => {
     const rows = [HEADER, ['00001', '상품A', '', '', '1000', '99999999999', '10', '0', '0', '0', '0', '']];
     const buffer = buildXlsxBuffer(rows);
     const result = parseInventoryWorkbook(buffer);
     expect(result.rows).toHaveLength(0);
-    expect(result.issues.some((i) => i.code === 'NUMBER_OUT_OF_RANGE' && i.column === 'normalStock')).toBe(true);
+    expect(result.issues.some((i) => i.code === 'NUMBER_OUT_OF_RANGE' && i.column === 'normalStock' && i.level === 'WARNING')).toBe(true);
   });
 });
 

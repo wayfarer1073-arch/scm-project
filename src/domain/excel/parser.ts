@@ -105,14 +105,16 @@ export function parseInventoryWorkbook(buffer: Buffer): ParseResult {
 
     const productCode = get('productCode');
     if (productCode === '') {
-      issues.push({ level: 'ERROR', code: 'MISSING_PRODUCT_CODE', message: `${rowNumber}행: 상품코드가 비어 있습니다.`, rowNumber, column: 'productCode' });
+      // 이 행 하나만 제외하고 나머지 정상 행은 그대로 저장한다 — 파일 전체를 막으면 수백 개
+      // 정상 상품이 상품코드 오탈자 한 줄 때문에 통째로 사라진다.
+      issues.push({ level: 'WARNING', code: 'MISSING_PRODUCT_CODE', message: `${rowNumber}행: 상품코드가 비어 있어 이 행은 건너뜁니다.`, rowNumber, column: 'productCode' });
       return;
     }
     if (seenProductCodes.has(productCode)) {
       issues.push({
-        level: 'ERROR',
+        level: 'WARNING',
         code: 'DUPLICATE_PRODUCT_CODE',
-        message: `${rowNumber}행: 상품코드 '${productCode}'가 ${seenProductCodes.get(productCode)}행과 중복됩니다.`,
+        message: `${rowNumber}행: 상품코드 '${productCode}'가 ${seenProductCodes.get(productCode)}행과 중복되어 이 행은 건너뜁니다.`,
         rowNumber,
         column: 'productCode',
       });
@@ -130,10 +132,12 @@ export function parseInventoryWorkbook(buffer: Buffer): ParseResult {
       }
       const parsed = normalizeNumber(raw);
       if (parsed === null) {
+        // 이 필드가 있는 행 하나만 건너뛴다 — 아래 세 case 모두 동일한 이유(파일 전체를
+        // 막으면 한 셀의 오타 때문에 수백 개 정상 상품이 통째로 사라짐).
         issues.push({
-          level: 'ERROR',
+          level: 'WARNING',
           code: 'NUMBER_PARSE_FAILED',
-          message: `${rowNumber}행: '${HEADER_ALIASES[field][0]}' 값 '${raw}'을(를) 숫자로 해석할 수 없습니다.`,
+          message: `${rowNumber}행: '${HEADER_ALIASES[field][0]}' 값 '${raw}'을(를) 숫자로 해석할 수 없어 이 행은 건너뜁니다.`,
           rowNumber,
           column: field,
         });
@@ -142,9 +146,9 @@ export function parseInventoryWorkbook(buffer: Buffer): ParseResult {
       }
       if (INTEGER_FIELDS.includes(field) && !Number.isInteger(parsed)) {
         issues.push({
-          level: 'ERROR',
+          level: 'WARNING',
           code: 'NUMBER_NOT_INTEGER',
-          message: `${rowNumber}행: '${HEADER_ALIASES[field][0]}' 값 '${raw}'은(는) 소수가 아닌 정수여야 합니다.`,
+          message: `${rowNumber}행: '${HEADER_ALIASES[field][0]}' 값 '${raw}'은(는) 소수가 아닌 정수여야 해서 이 행은 건너뜁니다.`,
           rowNumber,
           column: field,
         });
@@ -154,9 +158,9 @@ export function parseInventoryWorkbook(buffer: Buffer): ParseResult {
       const [rangeMin, rangeMax] = INTEGER_FIELDS.includes(field) ? [INT32_MIN, INT32_MAX] : [DECIMAL_14_2_MIN, DECIMAL_14_2_MAX];
       if (parsed < rangeMin || parsed > rangeMax) {
         issues.push({
-          level: 'ERROR',
+          level: 'WARNING',
           code: 'NUMBER_OUT_OF_RANGE',
-          message: `${rowNumber}행: '${HEADER_ALIASES[field][0]}' 값 '${raw}'이(가) 처리 가능한 범위를 벗어났습니다.`,
+          message: `${rowNumber}행: '${HEADER_ALIASES[field][0]}' 값 '${raw}'이(가) 처리 가능한 범위를 벗어나 이 행은 건너뜁니다.`,
           rowNumber,
           column: field,
         });

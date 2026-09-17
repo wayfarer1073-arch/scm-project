@@ -270,17 +270,31 @@ export interface SkuSearchResult {
   productName: string;
 }
 
-/** 입고 특이사항 등록용 SKU 드롭다운 검색 — 자유 텍스트 매칭 대신 실제 SKU를 골라 선택하게 한다. */
+/**
+ * 입고 특이사항 등록용 SKU 드롭다운 검색 — 자유 텍스트 매칭 대신 실제 SKU를 골라 선택하게 한다.
+ *
+ * DB의 `contains`는 공백을 그대로 비교하는데, 실제 상품명은 월별 업로드마다 "750g 레몬" /
+ * "750g  레몬"처럼 공백 개수가 들쭉날쭉한 경우가 흔하다. 검색어와 상품명 양쪽에서 공백을
+ * 전부 제거하고 비교해, 검색창에 입력한 공백 형태가 DB에 저장된 형태와 정확히 일치하지
+ * 않아도(예: "레몬 750g" vs "레몬750g") 같은 상품으로 찾아지도록 한다. 창고 하나의 SKU
+ * 수는 수백 건 수준이라 전체를 불러와 메모리에서 비교해도 비용이 크지 않다.
+ */
 export async function searchSkusInWarehouse(warehouseId: string, query: string, limit = 20): Promise<SkuSearchResult[]> {
   const q = query.trim();
   if (q === '') return [];
+  const normalizedQuery = q.replace(/\s+/g, '').toLowerCase();
+
   const skus = await prisma.sku.findMany({
-    where: {
-      warehouseId,
-      OR: [{ productCode: { contains: q, mode: 'insensitive' } }, { currentProductName: { contains: q, mode: 'insensitive' } }],
-    },
+    where: { warehouseId },
+    select: { id: true, productCode: true, currentProductName: true },
     orderBy: { productCode: 'asc' },
-    take: limit,
   });
-  return skus.map((sku) => ({ skuId: sku.id, productCode: sku.productCode, productName: sku.currentProductName }));
+
+  const matches = skus.filter((sku) => {
+    const normalizedCode = sku.productCode.replace(/\s+/g, '').toLowerCase();
+    const normalizedName = sku.currentProductName.replace(/\s+/g, '').toLowerCase();
+    return normalizedCode.includes(normalizedQuery) || normalizedName.includes(normalizedQuery);
+  });
+
+  return matches.slice(0, limit).map((sku) => ({ skuId: sku.id, productCode: sku.productCode, productName: sku.currentProductName }));
 }
