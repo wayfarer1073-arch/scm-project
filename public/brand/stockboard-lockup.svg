@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 180" role="img" aria-labelledby="title desc">
+  <title id="title">StockBoard Logo</title>
+  <desc id="desc">StockBoard inventory management logo lockup.</desc>
+  <g transform="translate(18,18) scale(.56)">
+    <path d="M48 74 L128 34 L208 74 L128 114 Z" fill="#0F1F33"/>
+    <path d="M48 118 L128 78 L208 118 L128 158 Z" fill="#334155"/>
+    <path d="M48 162 L128 122 L208 162 L128 202 Z" fill="#64748B"/>
+    <circle cx="174" cy="72" r="13" fill="#2DD4BF" stroke="#FFFFFF" stroke-width="6"/>
+  </g>
+  <text x="178" y="105" fill="#0F1F33" font-size="68" font-family="Inter, Pretendard, Arial, sans-serif" font-weight="700" letter-spacing="-2">StockBoard</text>
+</svg>
