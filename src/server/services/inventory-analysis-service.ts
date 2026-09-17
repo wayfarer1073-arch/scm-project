@@ -62,7 +62,10 @@ export function calculateCompanyKpis(rows: InventoryRow[], stagnantDaysThreshold
     totalInventoryValue += row.valueBreakdown.normalStockValue;
     totalDepletion7d += row.analysis.window7.totalDepletion;
     if (row.analysis.thresholdRisk.level === 'DANGER') dangerSkuCount += 1;
-    if (row.analysis.coverage.coverageDays !== null && row.analysis.coverage.coverageDays <= 30) stockoutSoon30dCount += 1;
+    // "30일 내 소진 예상"은 설정 페이지의 "관리 필요/정상 경계"(manageMaxDays, 기본 30일) 임계값을
+    // 그대로 따라야 한다. coverageDays를 30으로 재하드코딩하면 admin이 이 기준을 바꿔도(예: 45일)
+    // 이 KPI만 조용히 어긋난다 — band는 이미 그 설정으로 계산돼 있으므로 재사용한다.
+    if (row.analysis.coverage.band === 'STOCKOUT_SOON' || row.analysis.coverage.band === 'NEEDS_MANAGEMENT') stockoutSoon30dCount += 1;
     if (row.analysis.forecast.expectedStockoutDays !== null) forecastReadyCount += 1;
     if (row.analysis.overstock.isCandidate) overstockCandidateValue += row.valueBreakdown.normalStockValue;
     if (row.analysis.stagnation.isMeaningful && row.analysis.stagnation.stagnantDays >= stagnantDaysThreshold) {
@@ -117,7 +120,7 @@ export function calculateWarehouseSummaries(rows: InventoryRow[], stagnantDaysTh
     const skuCount = whRows.length;
     const inventoryValue = whRows.reduce((sum, r) => sum + r.valueBreakdown.normalStockValue, 0);
     const dangerSkuCount = whRows.filter((r) => r.analysis.thresholdRisk.level === 'DANGER').length;
-    const stockoutSoonCount = whRows.filter((r) => r.analysis.coverage.coverageDays !== null && r.analysis.coverage.coverageDays <= 30).length;
+    const stockoutSoonCount = whRows.filter((r) => r.analysis.coverage.band === 'STOCKOUT_SOON' || r.analysis.coverage.band === 'NEEDS_MANAGEMENT').length;
     const stagnantCount = whRows.filter((r) => r.analysis.stagnation.isMeaningful && r.analysis.stagnation.stagnantDays >= stagnantDaysThreshold).length;
     const overstockCount = whRows.filter((r) => r.analysis.overstock.isCandidate).length;
 

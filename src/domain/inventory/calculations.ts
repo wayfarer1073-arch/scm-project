@@ -314,7 +314,8 @@ export function calculateOverstockCandidate(
   if (!maturity.hasThirtyDayData || window30.averageDailyDepletion === null || window30.averageDailyDepletion <= 0) {
     return { isCandidate: false, coverageDays: null, thresholdDays: settings.overstockCoverageDays };
   }
-  const coverageDays = currentAvailableStock / window30.averageDailyDepletion;
+  // Coverage와 동일한 이유로 음수 가용재고를 방어한다 — 그대로 나누면 음수 coverageDays가 나온다.
+  const coverageDays = currentAvailableStock <= 0 ? 0 : currentAvailableStock / window30.averageDailyDepletion;
   return {
     isCandidate: coverageDays >= settings.overstockCoverageDays,
     coverageDays,

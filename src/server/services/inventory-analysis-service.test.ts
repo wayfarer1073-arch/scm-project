@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeSku, calculateInventoryValueBreakdown, calculatePeriodComparison } from '@/domain/inventory/calculations';
-import type { StockObservation } from '@/domain/inventory/types';
+import { DEFAULT_RISK_SETTINGS, type RiskThresholdSettings, type StockObservation } from '@/domain/inventory/types';
 import { calculateCompanyKpis, type InventoryRow } from './inventory-analysis-service';
 
 function observation(date: string, availableStock: number): StockObservation {
@@ -16,8 +16,14 @@ function observation(date: string, availableStock: number): StockObservation {
   };
 }
 
-function buildRow(skuId: string, observations: StockObservation[], asOfDate: string, compareFromDate: string | null): InventoryRow {
-  const analysis = analyzeSku(observations, asOfDate)!;
+function buildRow(
+  skuId: string,
+  observations: StockObservation[],
+  asOfDate: string,
+  compareFromDate: string | null,
+  settings: RiskThresholdSettings = DEFAULT_RISK_SETTINGS,
+): InventoryRow {
+  const analysis = analyzeSku(observations, asOfDate, settings)!;
   const valueBreakdown = calculateInventoryValueBreakdown(analysis.latest);
   const periodComparison = compareFromDate ? calculatePeriodComparison(observations, compareFromDate, asOfDate) : null;
   return {
@@ -75,5 +81,22 @@ describe('calculateCompanyKpis - averageDailyDecreasePerSku', () => {
     const row2 = buildRow('sku-2', [observation('2026-09-03', 50), observation('2026-09-04', 46)], '2026-09-04', '2026-09-03');
     const kpis = calculateCompanyKpis([row1, row2], 30);
     expect(kpis.averageDailyDecreasePerSku).toBeCloseTo(7);
+  });
+});
+
+describe('calculateCompanyKpis - stockoutSoon30dCount', () => {
+  it('30일을 하드코딩하지 않고 설정된 manageMaxDays 임계값을 따른다(회귀 테스트)', () => {
+    // 7일간 70개 감소(일평균 10개), 가용재고 350 -> coverageDays = 35일.
+    // 기본 manageMaxDays(30일) 기준으로는 HEALTHY라 집계되면 안 되고,
+    // manageMaxDays를 45일로 바꾸면 NEEDS_MANAGEMENT로 집계돼야 한다.
+    const observations = [observation('2026-09-01', 420), observation('2026-09-08', 350)];
+
+    const rowDefault = buildRow('sku-1', observations, '2026-09-08', null);
+    expect(rowDefault.analysis.coverage.coverageDays).toBeCloseTo(35);
+    expect(calculateCompanyKpis([rowDefault], 30).stockoutSoon30dCount).toBe(0);
+
+    const looseSettings: RiskThresholdSettings = { ...DEFAULT_RISK_SETTINGS, manageMaxDays: 45 };
+    const rowCustom = buildRow('sku-1', observations, '2026-09-08', null, looseSettings);
+    expect(calculateCompanyKpis([rowCustom], 30).stockoutSoon30dCount).toBe(1);
   });
 });

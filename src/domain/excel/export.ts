@@ -51,7 +51,9 @@ export function buildSummarySheetRows(kpis: CompanyKpis, warehouseSummaries: War
     { 항목: '관리 SKU 수', 값: kpis.totalSkuCount },
     { 항목: '총 가용재고', 값: kpis.totalAvailableStock },
     { 항목: '총 재고자산', 값: kpis.totalInventoryValue },
-    { 항목: '전일 대비 순재고 증감', 값: kpis.netChangeVsYesterday ?? '데이터축적중' },
+    // 여러 창고를 합산할 때 창고마다 최근 업로드일이 달라 "전일"이 아니라 "각 SKU의 직전 관측치
+    // 대비" 값일 수 있다 — 대시보드 KPI 카드(periodLabel)와 동일하게 날짜 수에 대해 정직한 라벨을 쓴다.
+    { 항목: '직전 관측 대비 순재고 증감', 값: kpis.netChangeVsYesterday ?? '데이터축적중' },
     { 항목: '최근 7일 추정 소진량', 값: kpis.totalDepletion7d },
     { 항목: '위험 SKU 수', 값: kpis.dangerSkuCount },
     { 항목: '30일 내 소진 예상 SKU 수', 값: kpis.stockoutSoon30dCount },

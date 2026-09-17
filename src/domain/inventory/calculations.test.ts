@@ -306,6 +306,23 @@ describe('calculateOverstockCandidate', () => {
     expect(result.coverageDays).toBe(9000);
     expect(result.isCandidate).toBe(true);
   });
+
+  it('가용재고가 0 이하면 coverageDays를 음수로 계산하지 않는다(회귀 테스트, calculateCoverage와 동일한 가드)', () => {
+    const maturity = {
+      firstObservedDate: '2026-01-01',
+      lastObservedDate: '2026-01-31',
+      snapshotCount: 2,
+      daysSinceFirstObservation: 30,
+      hasDayOverDayData: true,
+      hasSevenDayData: true,
+      hasFourteenDayData: true,
+      hasThirtyDayData: true,
+    };
+    const w30 = { windowDays: 30, totalDepletion: 30, observedIntervalDays: 30, averageDailyDepletion: 1 };
+    const result = calculateOverstockCandidate(-5, w30, maturity);
+    expect(result.coverageDays).toBe(0);
+    expect(result.isCandidate).toBe(false);
+  });
 });
 
 describe('calculateInventoryValueBreakdown', () => {
