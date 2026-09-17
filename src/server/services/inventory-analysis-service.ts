@@ -151,7 +151,7 @@ export function calculateWarehouseSummaries(rows: InventoryRow[], stagnantDaysTh
   });
 }
 
-export type ActionCenterCategory = 'NEW_DANGER' | 'STOCKOUT_SOON' | 'ACCELERATING' | 'STOCK_INCREASE' | 'STAGNANT' | 'OVERSTOCK_CANDIDATE' | 'EXPIRATION_RISK';
+export type ActionCenterCategory = 'NEW_DANGER' | 'STOCKOUT_SOON' | 'ACCELERATING' | 'STAGNANT' | 'OVERSTOCK_CANDIDATE' | 'EXPIRATION_RISK';
 
 export interface ActionCenterCard {
   category: ActionCenterCategory;
@@ -164,7 +164,6 @@ export function buildActionCenterCards(rows: InventoryRow[], stagnantDaysThresho
   const newDanger = rows.filter((r) => isNewlyAtRisk(r.analysis));
   const stockoutSoon = rows.filter((r) => r.analysis.coverage.band === 'STOCKOUT_SOON');
   const accelerating = rows.filter((r) => r.analysis.acceleration.trend === 'ACCELERATING');
-  const stockIncrease = rows.filter((r) => r.analysis.stockIncreasedToday);
   const stagnant = rows.filter((r) => r.analysis.stagnation.isMeaningful && r.analysis.stagnation.stagnantDays >= stagnantDaysThreshold);
   const overstock = rows.filter((r) => r.analysis.overstock.isCandidate);
   const expirationRisk = rows.filter((r) => r.analysis.expirationRisk.isAtRisk);
@@ -196,12 +195,6 @@ export function buildActionCenterCards(rows: InventoryRow[], stagnantDaysThresho
       title: '소진 가속 SKU',
       count: accelerating.length,
       sampleSkus: toSample(accelerating, (r) => `소진속도 +${Math.round(r.analysis.acceleration.accelerationRatePercent ?? 0)}%`),
-    },
-    {
-      category: 'STOCK_INCREASE',
-      title: '재고 증가 감지 SKU',
-      count: stockIncrease.length,
-      sampleSkus: toSample(stockIncrease, (r) => `+${r.analysis.dailyChange ?? 0}`),
     },
     {
       category: 'STAGNANT',

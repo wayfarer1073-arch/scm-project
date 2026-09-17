@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertOctagon, Clock, Flame, TrendingUp, PauseCircle, PackageOpen, CalendarClock } from 'lucide-react';
+import { AlertOctagon, Clock, Flame, PauseCircle, PackageOpen, CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ActionCenterCard, ActionCenterCategory } from '@/server/services/inventory-analysis-service';
 import type { QuickFilter, TableTab } from '@/lib/inventory-filters';
@@ -9,7 +9,6 @@ const CARD_META: Record<ActionCenterCategory, { icon: React.ElementType; tone: s
   NEW_DANGER: { icon: AlertOctagon, tone: 'text-status-danger bg-status-danger-bg', tab: 'ALL', quickFilter: 'NEW_DANGER' },
   STOCKOUT_SOON: { icon: Clock, tone: 'text-status-danger bg-status-danger-bg', tab: 'STOCKOUT_RISK', quickFilter: 'STOCKOUT_SOON_ONLY' },
   ACCELERATING: { icon: Flame, tone: 'text-status-warning bg-status-warning-bg', tab: 'ACCELERATING', quickFilter: null },
-  STOCK_INCREASE: { icon: TrendingUp, tone: 'text-status-increase bg-status-increase-bg', tab: 'STOCK_INCREASE', quickFilter: null },
   STAGNANT: { icon: PauseCircle, tone: 'text-status-stagnant bg-status-stagnant-bg', tab: 'STAGNANT', quickFilter: null },
   OVERSTOCK_CANDIDATE: { icon: PackageOpen, tone: 'text-status-stagnant bg-status-stagnant-bg', tab: 'OVERSTOCK_CANDIDATE', quickFilter: null },
   EXPIRATION_RISK: { icon: CalendarClock, tone: 'text-status-warning bg-status-warning-bg', tab: 'EXPIRATION_RISK', quickFilter: null },
@@ -30,7 +29,7 @@ export function ActionCenter({ cards, onSelect }: ActionCenterProps) {
         </div>
         <p className="hidden text-xs text-muted-foreground sm:block">항목을 누르면 전체 재고 목록에 바로 적용됩니다.</p>
       </div>
-      <div className="grid grid-cols-2 divide-x divide-y sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 xl:divide-y-0">
+      <div className="grid grid-cols-2 divide-x divide-y sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
         {cards.map((card) => {
           const meta = CARD_META[card.category];
           const Icon = meta.icon;
