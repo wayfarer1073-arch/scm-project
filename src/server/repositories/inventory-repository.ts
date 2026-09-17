@@ -90,7 +90,7 @@ export async function loadActiveSkusWithSeries(
   const activeSkuIds = [...new Set(latestItems.map((item) => item.skuId))];
 
   const skus = await prisma.sku.findMany({
-    where: { id: { in: activeSkuIds }, ...(warehouseId ? { warehouseId } : {}) },
+    where: { id: { in: activeSkuIds }, isHiddenFromDashboard: false, ...(warehouseId ? { warehouseId } : {}) },
     include: { warehouse: { select: { id: true, code: true, name: true } } },
   });
   if (skus.length === 0) return [];
@@ -158,11 +158,11 @@ export interface DailyWarehouseTotal {
   totalInventoryValue: number;
 }
 
-/** 차트용 일자별 창고별 합계(재고수량/재고자산). ACTIVE 스냅샷만 집계한다. */
+/** 차트용 일자별 창고별 합계(재고수량/재고자산). ACTIVE 스냅샷만 집계하며, 숨김 처리된 SKU는 제외한다. */
 export async function loadDailyWarehouseTotals(): Promise<DailyWarehouseTotal[]> {
   const mockFilter = await resolveMockFilter();
   const items = await prisma.inventoryItem.findMany({
-    where: { snapshot: { status: 'ACTIVE', ...mockFilter } },
+    where: { snapshot: { status: 'ACTIVE', ...mockFilter }, sku: { isHiddenFromDashboard: false } },
     select: {
       availableStock: true,
       normalStock: true,
@@ -187,7 +187,7 @@ export async function loadSkuWithSeries(
   asOfDate?: string,
 ): Promise<{ descriptor: SkuDescriptor; observations: StockObservation[] } | null> {
   const sku = await prisma.sku.findUnique({ where: { id: skuId }, include: { warehouse: { select: { id: true, code: true, name: true } } } });
-  if (!sku) return null;
+  if (!sku || sku.isHiddenFromDashboard) return null;
 
   const mockFilter = await resolveMockFilter(sku.warehouseId);
   const items = await prisma.inventoryItem.findMany({
@@ -233,4 +233,37 @@ export async function loadSkuWithSeries(
     },
     observations,
   };
+}
+
+export interface SkuVisibilityRow {
+  skuId: string;
+  warehouseId: string;
+  warehouseCode: string;
+  warehouseName: string;
+  productCode: string;
+  productName: string;
+  isActive: boolean;
+  isHiddenFromDashboard: boolean;
+}
+
+/** 설정 화면의 "SKU 숨기기" 관리용 — 숨김 여부와 무관하게 전체 SKU를 창고명·코드 순으로 나열한다. */
+export async function listAllSkusForVisibilityAdmin(): Promise<SkuVisibilityRow[]> {
+  const skus = await prisma.sku.findMany({
+    include: { warehouse: { select: { code: true, name: true } } },
+    orderBy: [{ warehouse: { sortOrder: 'asc' } }, { productCode: 'asc' }],
+  });
+  return skus.map((sku) => ({
+    skuId: sku.id,
+    warehouseId: sku.warehouseId,
+    warehouseCode: sku.warehouse.code,
+    warehouseName: sku.warehouse.name,
+    productCode: sku.productCode,
+    productName: sku.currentProductName,
+    isActive: sku.isActive,
+    isHiddenFromDashboard: sku.isHiddenFromDashboard,
+  }));
+}
+
+export async function setSkuHiddenFromDashboard(skuId: string, hidden: boolean) {
+  return prisma.sku.update({ where: { id: skuId }, data: { isHiddenFromDashboard: hidden } });
 }

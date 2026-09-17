@@ -96,6 +96,10 @@ model Sku {
   lastSeenDate  DateTime @db.Date
   isActive      Boolean  @default(true) // 가장 최근 활성 스냅샷에 존재하는지 (사라진 SKU 판별)
 
+  // true면 대시보드(KPI/차트/재고 테이블/Action Center/리포트)에서 이 SKU를 완전히 제외한다.
+  // 데이터 자체는 계속 쌓이며 설정 화면에서 언제든 다시 노출로 되돌릴 수 있다.
+  isHiddenFromDashboard Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

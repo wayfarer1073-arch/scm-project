@@ -1,24 +1,37 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import type { RiskThresholdSettings } from '@/domain/inventory/types';
+
+interface SkuVisibilityRow {
+  skuId: string;
+  warehouseId: string;
+  warehouseCode: string;
+  warehouseName: string;
+  productCode: string;
+  productName: string;
+  isActive: boolean;
+  isHiddenFromDashboard: boolean;
+}
 
 interface SettingsFormProps {
   isAdmin: boolean;
   warehouses: { id: string; code: string; name: string }[];
   settings: RiskThresholdSettings;
   users: { id: string; email: string; name: string; role: 'MEMBER' | 'ADMIN'; createdAt: string }[];
+  skus: SkuVisibilityRow[];
 }
 
-export function SettingsForm({ isAdmin, warehouses, settings, users: initialUsers }: SettingsFormProps) {
+export function SettingsForm({ isAdmin, warehouses, settings, users: initialUsers, skus }: SettingsFormProps) {
   const [warehouseNames, setWarehouseNames] = useState(Object.fromEntries(warehouses.map((w) => [w.id, w.name])));
   const [thresholds, setThresholds] = useState(settings);
   const [users, setUsers] = useState(initialUsers);
@@ -131,6 +144,8 @@ export function SettingsForm({ isAdmin, warehouses, settings, users: initialUser
         )}
       </Card>
 
+      <SkuVisibilityManagement isAdmin={isAdmin} initialSkus={skus} />
+
       {isAdmin && <UserManagement users={users} onUsersChange={setUsers} />}
     </div>
   );
@@ -142,6 +157,120 @@ function ThresholdField({ label, value, onChange, disabled }: { label: string; v
     <div className="space-y-1.5">
       <Label htmlFor={id}>{label}</Label>
       <Input id={id} type="number" min={1} value={value} onChange={(e) => onChange(Number(e.target.value))} disabled={disabled} />
+    </div>
+  );
+}
+
+function SkuVisibilityManagement({ isAdmin, initialSkus }: { isAdmin: boolean; initialSkus: SkuVisibilityRow[] }) {
+  const [skus, setSkus] = useState(initialSkus);
+  const [search, setSearch] = useState('');
+  const [updatingSkuId, setUpdatingSkuId] = useState<string | null>(null);
+
+  const hiddenSkus = useMemo(
+    () => skus.filter((s) => s.isHiddenFromDashboard).sort((a, b) => a.warehouseCode.localeCompare(b.warehouseCode) || a.productCode.localeCompare(b.productCode)),
+    [skus],
+  );
+
+  const searchResults = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    return skus.filter((s) => !s.isHiddenFromDashboard && (s.productCode.toLowerCase().includes(q) || s.productName.toLowerCase().includes(q))).slice(0, 20);
+  }, [skus, search]);
+
+  async function setHidden(skuId: string, hidden: boolean) {
+    setUpdatingSkuId(skuId);
+    try {
+      const res = await fetch(`/api/sku/${skuId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isHiddenFromDashboard: hidden }),
+      });
+      if (!res.ok) throw new Error();
+      setSkus((prev) => prev.map((s) => (s.skuId === skuId ? { ...s, isHiddenFromDashboard: hidden } : s)));
+      toast.success(hidden ? '대시보드에서 숨겼습니다.' : '대시보드에 다시 표시합니다.');
+    } catch {
+      toast.error('변경에 실패했습니다.');
+    } finally {
+      setUpdatingSkuId(null);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>SKU 대시보드 노출 관리</CardTitle>
+        <CardDescription>
+          특정 상품을 대시보드(KPI·차트·재고 테이블·Action Center·리포트)에서 제외합니다. 업로드 데이터 자체는 계속 쌓이며 언제든 다시 표시할 수 있습니다.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label>숨김 처리된 SKU {hiddenSkus.length > 0 && `(${hiddenSkus.length})`}</Label>
+          {hiddenSkus.length === 0 ? (
+            <p className="text-xs text-muted-foreground">숨김 처리된 SKU가 없습니다.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {hiddenSkus.map((sku) => (
+                <SkuVisibilityItem key={sku.skuId} sku={sku} isAdmin={isAdmin} updating={updatingSkuId === sku.skuId} onToggle={(hidden) => setHidden(sku.skuId, hidden)} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {isAdmin && (
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <Label htmlFor="sku-visibility-search">상품코드 또는 상품명으로 검색해서 숨기기</Label>
+              <Input id="sku-visibility-search" placeholder="예: 00001 또는 상품명 일부" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
+              {search.trim() !== '' && (
+                <div className="space-y-1.5">
+                  {searchResults.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">일치하는 SKU가 없습니다.</p>
+                  ) : (
+                    searchResults.map((sku) => (
+                      <SkuVisibilityItem key={sku.skuId} sku={sku} isAdmin={isAdmin} updating={updatingSkuId === sku.skuId} onToggle={(hidden) => setHidden(sku.skuId, hidden)} />
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SkuVisibilityItem({
+  sku,
+  isAdmin,
+  updating,
+  onToggle,
+}: {
+  sku: SkuVisibilityRow;
+  isAdmin: boolean;
+  updating: boolean;
+  onToggle: (hidden: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5">
+          <Badge variant="outline" className="shrink-0 text-[11px]">
+            {sku.warehouseCode}
+          </Badge>
+          <span className="truncate font-medium">{sku.productName}</span>
+        </div>
+        <div className="mt-0.5 text-xs text-muted-foreground">
+          {sku.productCode}
+          {!sku.isActive && ' · 최신 스냅샷에 없음'}
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <span className="text-xs text-muted-foreground">{sku.isHiddenFromDashboard ? '숨김' : '표시 중'}</span>
+        <Switch checked={sku.isHiddenFromDashboard} onCheckedChange={onToggle} disabled={!isAdmin || updating} aria-label={`${sku.productName} 대시보드 숨김`} />
+      </div>
     </div>
   );
 }

@@ -2,13 +2,19 @@ import { auth } from '@/server/auth';
 import { listWarehouses } from '@/server/repositories/warehouse-repository';
 import { getSettings } from '@/server/repositories/settings-repository';
 import { listUsers } from '@/server/repositories/user-repository';
+import { listAllSkusForVisibilityAdmin } from '@/server/repositories/inventory-repository';
 import { SettingsForm } from '@/components/settings/settings-form';
 
 export default async function SettingsPage() {
   const session = await auth();
   const isAdmin = session?.user.role === 'ADMIN';
 
-  const [warehouses, settings, users] = await Promise.all([listWarehouses(), getSettings(), isAdmin ? listUsers() : Promise.resolve([])]);
+  const [warehouses, settings, users, skus] = await Promise.all([
+    listWarehouses(),
+    getSettings(),
+    isAdmin ? listUsers() : Promise.resolve([]),
+    listAllSkusForVisibilityAdmin(),
+  ]);
 
   return (
     <div className="max-w-3xl space-y-8">
@@ -21,6 +27,7 @@ export default async function SettingsPage() {
         warehouses={warehouses.map((w) => ({ id: w.id, code: w.code, name: w.name }))}
         settings={settings}
         users={users.map((u) => ({ ...u, createdAt: u.createdAt.toISOString() }))}
+        skus={skus}
       />
     </div>
   );
