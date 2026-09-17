@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 const NAV_ITEMS = [
   { href: '/', label: '대시보드' },
   { href: '/upload', label: '업로드' },
+  { href: '/board', label: '게시판' },
   { href: '/settings', label: '설정' },
 ];
 

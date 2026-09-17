@@ -39,6 +39,12 @@ enum EventChangeType {
   DELETE
 }
 
+enum PostTag {
+  ISSUE  // 이슈
+  NOTICE // 공지
+  CHAT   // 잡담
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -51,6 +57,7 @@ model User {
   uploadedSnapshots InventorySnapshot[]
   events            InventoryEvent[]
   eventHistories    EventHistory[]
+  posts             Post[]
 
   @@map("users")
 }
@@ -190,6 +197,21 @@ model EventHistory {
   changedAt    DateTime        @default(now())
 
   @@map("event_histories")
+}
+
+model Post {
+  id       String  @id @default(cuid())
+  tag      PostTag
+  title    String  @db.VarChar(50)
+  body     String  @db.VarChar(200)
+  authorId String
+  author   User    @relation(fields: [authorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+  @@map("posts")
 }
 
 model Settings {
