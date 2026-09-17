@@ -87,7 +87,7 @@ export async function loadActiveSkusWithSeries(
   const activeSkuIds = [...new Set(latestItems.map((item) => item.skuId))];
 
   const skus = await prisma.sku.findMany({
-    where: { id: { in: activeSkuIds }, isHiddenFromDashboard: false, ...(warehouseId ? { warehouseId } : {}) },
+    where: { id: { in: activeSkuIds }, isActive: true, isHiddenFromDashboard: false, ...(warehouseId ? { warehouseId } : {}) },
     include: { warehouse: { select: { id: true, code: true, name: true } } },
   });
   if (skus.length === 0) return [];
@@ -175,7 +175,7 @@ export interface DailyWarehouseTotal {
 export async function loadDailyWarehouseTotals(): Promise<DailyWarehouseTotal[]> {
   const mockFilter = await resolveMockFilter();
   const items = await prisma.inventoryItem.findMany({
-    where: { snapshot: { status: 'ACTIVE', ...mockFilter }, sku: { isHiddenFromDashboard: false } },
+    where: { snapshot: { status: 'ACTIVE', ...mockFilter }, sku: { isActive: true, isHiddenFromDashboard: false } },
     select: {
       skuId: true,
       normalStock: true,
@@ -216,7 +216,7 @@ export async function loadSkuWithSeries(
   asOfDate?: string,
 ): Promise<{ descriptor: SkuDescriptor; observations: StockObservation[] } | null> {
   const sku = await prisma.sku.findUnique({ where: { id: skuId }, include: { warehouse: { select: { id: true, code: true, name: true } } } });
-  if (!sku || sku.isHiddenFromDashboard) return null;
+  if (!sku || !sku.isActive || sku.isHiddenFromDashboard) return null;
 
   const mockFilter = await resolveMockFilter(sku.warehouseId);
   const items = await prisma.inventoryItem.findMany({
@@ -289,9 +289,10 @@ export interface SkuVisibilityRow {
   isHiddenFromDashboard: boolean;
 }
 
-/** 설정 화면의 "SKU 숨기기" 관리용 — 숨김 여부와 무관하게 전체 SKU를 창고명·코드 순으로 나열한다. */
+/** 설정 화면의 "SKU 숨기기" 관리용 — 최신 업로드에 남아 있는 SKU만 나열한다. */
 export async function listAllSkusForVisibilityAdmin(): Promise<SkuVisibilityRow[]> {
   const skus = await prisma.sku.findMany({
+    where: { isActive: true },
     include: { warehouse: { select: { code: true, name: true } } },
     orderBy: [{ warehouse: { sortOrder: 'asc' } }, { productCode: 'asc' }],
   });
@@ -324,6 +325,7 @@ export async function searchSkusInWarehouse(warehouseId: string, query: string, 
   const skus = await prisma.sku.findMany({
     where: {
       warehouseId,
+      isActive: true,
       OR: [{ productCode: { contains: q, mode: 'insensitive' } }, { currentProductName: { contains: q, mode: 'insensitive' } }],
     },
     orderBy: { productCode: 'asc' },

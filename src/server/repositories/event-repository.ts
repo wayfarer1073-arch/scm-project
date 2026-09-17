@@ -18,7 +18,7 @@ export function createEvent(input: CreateEventInput) {
 
 export function listEventsForSku(skuId: string) {
   return prisma.inventoryEvent.findMany({
-    where: { skuId, isDeleted: false },
+    where: { skuId, isDeleted: false, sku: { is: { isActive: true } } },
     orderBy: { eventDate: 'desc' },
     include: { createdBy: { select: { name: true } } },
   });
@@ -26,7 +26,7 @@ export function listEventsForSku(skuId: string) {
 
 export function listAllEvents(limit = 2000) {
   return prisma.inventoryEvent.findMany({
-    where: { isDeleted: false },
+    where: { isDeleted: false, OR: [{ skuId: null }, { sku: { is: { isActive: true } } }] },
     orderBy: { eventDate: 'desc' },
     take: limit,
     include: {
@@ -39,7 +39,7 @@ export function listAllEvents(limit = 2000) {
 
 export function listEventsForWarehouse(warehouseId: string, limit = 50) {
   return prisma.inventoryEvent.findMany({
-    where: { warehouseId, isDeleted: false },
+    where: { warehouseId, isDeleted: false, OR: [{ skuId: null }, { sku: { is: { isActive: true } } }] },
     orderBy: { eventDate: 'desc' },
     take: limit,
     include: { createdBy: { select: { name: true } }, sku: { select: { currentProductName: true, productCode: true } } },

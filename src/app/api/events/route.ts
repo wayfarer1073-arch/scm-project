@@ -43,9 +43,9 @@ export async function POST(request: Request) {
   }
 
   if (parsed.data.skuId) {
-    const sku = await prisma.sku.findUnique({ where: { id: parsed.data.skuId }, select: { warehouseId: true } });
-    if (!sku || sku.warehouseId !== parsed.data.warehouseId) {
-      return NextResponse.json({ error: '해당 SKU는 지정한 창고에 속하지 않습니다.' }, { status: 400 });
+    const sku = await prisma.sku.findUnique({ where: { id: parsed.data.skuId }, select: { warehouseId: true, isActive: true } });
+    if (!sku || !sku.isActive || sku.warehouseId !== parsed.data.warehouseId) {
+      return NextResponse.json({ error: '현재 관리 중인 SKU가 아니거나 지정한 창고에 속하지 않습니다.' }, { status: 400 });
     }
   }
 

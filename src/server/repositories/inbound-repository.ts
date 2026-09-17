@@ -12,7 +12,7 @@ export interface InboundEntryRow {
 /** 특정 창고·날짜에 기록된 입고 특이사항 목록. 스냅샷 버전과 무관하게 (SKU, 날짜) 자체로 조회한다. */
 export function listInboundEntriesForDate(warehouseId: string, date: string): Promise<InboundEntryRow[]> {
   return prisma.snapshotInbound.findMany({
-    where: { snapshotDate: new Date(`${date}T00:00:00.000Z`), sku: { warehouseId } },
+    where: { snapshotDate: new Date(`${date}T00:00:00.000Z`), sku: { warehouseId, isActive: true } },
     orderBy: { productCode: 'asc' },
   });
 }
@@ -20,6 +20,7 @@ export function listInboundEntriesForDate(warehouseId: string, date: string): Pr
 /** 업로드 캘린더의 창고별 "입고 특이사항 N건" 뱃지용 — 전체 창고·날짜별 건수를 한 번에 로드한다(N+1 방지). */
 export async function listInboundCountsByWarehouseAndDate(): Promise<Map<string, number>> {
   const entries = await prisma.snapshotInbound.findMany({
+    where: { sku: { isActive: true } },
     select: { snapshotDate: true, sku: { select: { warehouseId: true } } },
   });
   const map = new Map<string, number>();
@@ -44,8 +45,8 @@ export type AddInboundEntryResult = { ok: true; entry: InboundEntryRow } | { ok:
 /** 같은 (SKU, 날짜)에 이미 기록이 있으면 수량을 더한다(하루에 여러 번 나눠 입고된 경우를 그대로 반영). */
 export async function addInboundEntry(input: AddInboundEntryInput): Promise<AddInboundEntryResult> {
   const sku = await prisma.sku.findUnique({ where: { id: input.skuId } });
-  if (!sku || sku.warehouseId !== input.warehouseId) {
-    return { ok: false, error: '해당 SKU는 지정한 창고에 속하지 않습니다.' };
+  if (!sku || !sku.isActive || sku.warehouseId !== input.warehouseId) {
+    return { ok: false, error: '현재 관리 중인 SKU가 아니거나 지정한 창고에 속하지 않습니다.' };
   }
 
   const snapshotDate = new Date(`${input.date}T00:00:00.000Z`);

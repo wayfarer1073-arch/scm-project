@@ -16,10 +16,10 @@ function toDateOnly(dateStr: string): Date {
   return new Date(`${dateStr}T00:00:00.000Z`);
 }
 
-/** 소비기한이 등록된 SKU만, 가장 임박한 순으로 나열한다. 숨김(isHiddenFromDashboard) 여부와는 무관하다. */
+/** 최신 업로드에 남아 있고 소비기한이 등록된 SKU만, 가장 임박한 순으로 나열한다. */
 export async function listExpirations(): Promise<ExpirationRow[]> {
   const skus = await prisma.sku.findMany({
-    where: { expirationDate: { not: null } },
+    where: { isActive: true, expirationDate: { not: null } },
     include: { warehouse: { select: { code: true, name: true } } },
     orderBy: { expirationDate: 'asc' },
   });
@@ -47,7 +47,7 @@ export async function applyExpirationRows(warehouseId: string, rows: ParsedExpir
   if (rows.length === 0) return { updatedCount: 0, unmatchedProductCodes: [] };
 
   const skus = await prisma.sku.findMany({
-    where: { warehouseId, productCode: { in: rows.map((r) => r.productCode) } },
+    where: { warehouseId, isActive: true, productCode: { in: rows.map((r) => r.productCode) } },
     select: { id: true, productCode: true },
   });
   const skuIdByCode = new Map(skus.map((s) => [s.productCode, s.id]));
@@ -67,10 +67,9 @@ export async function applyExpirationRows(warehouseId: string, rows: ParsedExpir
 }
 
 export async function setExpirationDate(skuId: string, date: string | null): Promise<boolean> {
-  try {
-    await prisma.sku.update({ where: { id: skuId }, data: { expirationDate: date ? toDateOnly(date) : null } });
-    return true;
-  } catch {
-    return false;
-  }
+  const result = await prisma.sku.updateMany({
+    where: { id: skuId, isActive: true },
+    data: { expirationDate: date ? toDateOnly(date) : null },
+  });
+  return result.count > 0;
 }
