@@ -312,7 +312,7 @@ function InboundManager({ warehouseId, date }: { warehouseId: string; date: stri
   return (
     <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
       <div>
-        <Label>&lt;입고 특이사항&gt;</Label>
+        <Label>입고 특이사항</Label>
         <p className="mt-0.5 text-xs text-muted-foreground">
           이 날짜까지 입고된 상품과 수량을 기록하면 추정 소진량에서 입고분을 보정합니다. Excel 업로드와 별개로 저장되며, 자료를 교체해도 지워지지
           않고 아래 삭제 버튼을 눌러야만 없어집니다.
