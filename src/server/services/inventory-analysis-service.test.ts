@@ -39,6 +39,8 @@ function buildRow(
       location: null,
       manualDangerQty: null,
       manualWarningQty: null,
+      expirationDate: null,
+      expirationRiskDays: null,
     },
     analysis,
     valueBreakdown,

@@ -1,6 +1,6 @@
 import type { SkuAnalysis } from '@/domain/inventory/types';
 
-export type TableTab = 'ALL' | 'STOCKOUT_RISK' | 'ACCELERATING' | 'OVERSTOCK_CANDIDATE' | 'STAGNANT' | 'STOCK_INCREASE';
+export type TableTab = 'ALL' | 'STOCKOUT_RISK' | 'ACCELERATING' | 'OVERSTOCK_CANDIDATE' | 'STAGNANT' | 'STOCK_INCREASE' | 'EXPIRATION_RISK';
 
 export const TABLE_TABS: { value: TableTab; label: string }[] = [
   { value: 'ALL', label: '전체' },
@@ -9,6 +9,7 @@ export const TABLE_TABS: { value: TableTab; label: string }[] = [
   { value: 'OVERSTOCK_CANDIDATE', label: '과잉 후보' },
   { value: 'STAGNANT', label: '장기 정체' },
   { value: 'STOCK_INCREASE', label: '재고 증가' },
+  { value: 'EXPIRATION_RISK', label: '소비기한 임박' },
 ];
 
 export function matchesTab(analysis: SkuAnalysis, tab: TableTab): boolean {
@@ -25,6 +26,8 @@ export function matchesTab(analysis: SkuAnalysis, tab: TableTab): boolean {
       return analysis.tags.some((t) => t.startsWith('[재고 정체'));
     case 'STOCK_INCREASE':
       return analysis.stockIncreasedToday;
+    case 'EXPIRATION_RISK':
+      return analysis.expirationRisk.isAtRisk;
     default:
       return true;
   }

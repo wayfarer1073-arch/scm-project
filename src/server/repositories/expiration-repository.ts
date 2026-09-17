@@ -10,6 +10,8 @@ export interface ExpirationRow {
   productCode: string;
   productName: string;
   expirationDate: string; // yyyy-MM-dd
+  /** 소비기한 위험 판정 일수. null이면 앱 기본값(DEFAULT_EXPIRATION_RISK_DAYS)을 쓴다. */
+  expirationRiskDays: number | null;
 }
 
 function toDateOnly(dateStr: string): Date {
@@ -31,6 +33,7 @@ export async function listExpirations(): Promise<ExpirationRow[]> {
     productCode: sku.productCode,
     productName: sku.currentProductName,
     expirationDate: dateOnlyToString(sku.expirationDate!),
+    expirationRiskDays: sku.expirationRiskDays,
   }));
 }
 
@@ -72,4 +75,23 @@ export async function setExpirationDate(skuId: string, date: string | null): Pro
     data: { expirationDate: date ? toDateOnly(date) : null },
   });
   return result.count > 0;
+}
+
+/** null을 넘기면 앱 기본값(자동계산)으로 되돌린다. */
+export async function setExpirationRiskDays(skuId: string, riskDays: number | null): Promise<boolean> {
+  const result = await prisma.sku.updateMany({
+    where: { id: skuId, isActive: true },
+    data: { expirationRiskDays: riskDays },
+  });
+  return result.count > 0;
+}
+
+/** 체크박스로 선택한 여러 SKU에 같은 위험 판정 일수를 한 번에 적용한다. */
+export async function setExpirationRiskDaysBulk(skuIds: string[], riskDays: number): Promise<number> {
+  if (skuIds.length === 0) return 0;
+  const result = await prisma.sku.updateMany({
+    where: { id: { in: skuIds }, isActive: true },
+    data: { expirationRiskDays: riskDays },
+  });
+  return result.count;
 }

@@ -9,6 +9,7 @@ import {
   calculateOverstockCandidate,
   calculateStagnation,
   calculateStockoutForecast,
+  calculateExpirationRisk,
   calculateThresholdRisk,
   calculateWindowDepletion,
   dailyChange,
@@ -299,6 +300,24 @@ describe('analyzeSku - 위험수량/경고수량 자동계산 통합', () => {
   });
 });
 
+describe('analyzeSku - 소비기한 임박 위험 통합', () => {
+  it('소비기한 설정을 넘기면 태그와 expirationRisk에 반영된다', () => {
+    // 7일간 100 -> 30, 일평균 10개 소진 -> Coverage 3일(30/10). 소비기한 1/9(내일), riskDays=0 ->
+    // 위험판정일까지 1일. Coverage 3일 > 1일이므로 위험.
+    const observations = [obs('2026-01-01', 100), obs('2026-01-08', 30)];
+    const analysis = analyzeSku(observations, '2026-01-08', undefined, null, { expirationDate: '2026-01-09', expirationRiskDays: 0 })!;
+    expect(analysis.expirationRisk.isAtRisk).toBe(true);
+    expect(analysis.tags).toContain('[소비기한 임박 위험]');
+  });
+
+  it('소비기한 설정이 없으면 판정하지 않는다', () => {
+    const observations = [obs('2026-01-01', 100), obs('2026-01-08', 30)];
+    const analysis = analyzeSku(observations, '2026-01-08')!;
+    expect(analysis.expirationRisk.isAtRisk).toBe(false);
+    expect(analysis.tags).not.toContain('[소비기한 임박 위험]');
+  });
+});
+
 describe('calculateStagnation', () => {
   it('30일 미만이면 isMeaningful=false', () => {
     const observations = sortObservations([obs('2026-01-01', 100), obs('2026-01-10', 100)]);
@@ -370,6 +389,36 @@ describe('calculateOverstockCandidate', () => {
     const result = calculateOverstockCandidate(-5, w30, maturity);
     expect(result.coverageDays).toBe(0);
     expect(result.isCandidate).toBe(false);
+  });
+});
+
+describe('calculateExpirationRisk', () => {
+  it('소비기한이 없으면 판정하지 않는다', () => {
+    const result = calculateExpirationRisk(null, 14, 20, '2026-01-01');
+    expect(result.isAtRisk).toBe(false);
+    expect(result.daysUntilExpiration).toBeNull();
+  });
+
+  it('riskDays를 지정하지 않으면 기본값(14일)을 쓴다', () => {
+    // 소비기한 2/1, 오늘 1/1 -> 31일 남음. 위험판정일(2/1-14일=1/18)까지 17일. Coverage 10일 <= 17일이라 안전.
+    const result = calculateExpirationRisk('2026-02-01', null, 10, '2026-01-01');
+    expect(result.riskDays).toBe(14);
+    expect(result.daysUntilExpiration).toBe(31);
+    expect(result.daysUntilRiskDate).toBe(17);
+    expect(result.isAtRisk).toBe(false);
+  });
+
+  it('Coverage가 위험판정일까지 남은 일수보다 길면 위험(소비기한 안에 다 못 판다)', () => {
+    // 소비기한 1/20, 오늘 1/1 -> 19일 남음. riskDays=7 -> 위험판정일까지 12일.
+    // Coverage 20일은 12일보다 기므로 위험판정일 시점에도 재고가 남아있다는 뜻 -> 위험.
+    const result = calculateExpirationRisk('2026-01-20', 7, 20, '2026-01-01');
+    expect(result.daysUntilRiskDate).toBe(12);
+    expect(result.isAtRisk).toBe(true);
+  });
+
+  it('Coverage가 null(소진 데이터 없음)이면 판정하지 않는다(과잉 오탐 방지)', () => {
+    const result = calculateExpirationRisk('2026-01-20', 7, null, '2026-01-01');
+    expect(result.isAtRisk).toBe(false);
   });
 });
 

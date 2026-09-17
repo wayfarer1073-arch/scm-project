@@ -32,6 +32,7 @@ interface ExpirationRow {
   productCode: string;
   productName: string;
   expirationDate: string;
+  expirationRiskDays: number | null;
 }
 
 interface SettingsFormProps {

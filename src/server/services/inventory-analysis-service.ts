@@ -18,7 +18,13 @@ export async function getInventoryRows(options: { warehouseId?: string; asOfDate
 
   const rows: InventoryRow[] = [];
   for (const { descriptor, observations } of skusWithSeries) {
-    const analysis = analyzeSku(observations, options.asOfDate, settings, { dangerQty: descriptor.manualDangerQty, warningQty: descriptor.manualWarningQty });
+    const analysis = analyzeSku(
+      observations,
+      options.asOfDate,
+      settings,
+      { dangerQty: descriptor.manualDangerQty, warningQty: descriptor.manualWarningQty },
+      { expirationDate: descriptor.expirationDate, expirationRiskDays: descriptor.expirationRiskDays },
+    );
     if (!analysis) continue; // asOfDate 이전 관측치가 없는 SKU(예: 미래 등록)는 제외
     const valueBreakdown = calculateInventoryValueBreakdown(analysis.latest);
     const periodComparison = options.compareFromDate
@@ -33,10 +39,13 @@ export async function getSkuDetail(skuId: string, asOfDate: string, settings?: R
   const resolvedSettings = settings ?? (await getSettings());
   const result = await loadSkuWithSeries(skuId, asOfDate);
   if (!result) return null;
-  const analysis = analyzeSku(result.observations, asOfDate, resolvedSettings, {
-    dangerQty: result.descriptor.manualDangerQty,
-    warningQty: result.descriptor.manualWarningQty,
-  });
+  const analysis = analyzeSku(
+    result.observations,
+    asOfDate,
+    resolvedSettings,
+    { dangerQty: result.descriptor.manualDangerQty, warningQty: result.descriptor.manualWarningQty },
+    { expirationDate: result.descriptor.expirationDate, expirationRiskDays: result.descriptor.expirationRiskDays },
+  );
   if (!analysis) return null;
   const valueBreakdown = calculateInventoryValueBreakdown(analysis.latest);
   return { descriptor: result.descriptor, analysis, valueBreakdown, observations: result.observations };
@@ -142,7 +151,7 @@ export function calculateWarehouseSummaries(rows: InventoryRow[], stagnantDaysTh
   });
 }
 
-export type ActionCenterCategory = 'NEW_DANGER' | 'STOCKOUT_SOON' | 'ACCELERATING' | 'STOCK_INCREASE' | 'STAGNANT' | 'OVERSTOCK_CANDIDATE';
+export type ActionCenterCategory = 'NEW_DANGER' | 'STOCKOUT_SOON' | 'ACCELERATING' | 'STOCK_INCREASE' | 'STAGNANT' | 'OVERSTOCK_CANDIDATE' | 'EXPIRATION_RISK';
 
 export interface ActionCenterCard {
   category: ActionCenterCategory;
@@ -158,6 +167,7 @@ export function buildActionCenterCards(rows: InventoryRow[], stagnantDaysThresho
   const stockIncrease = rows.filter((r) => r.analysis.stockIncreasedToday);
   const stagnant = rows.filter((r) => r.analysis.stagnation.isMeaningful && r.analysis.stagnation.stagnantDays >= stagnantDaysThreshold);
   const overstock = rows.filter((r) => r.analysis.overstock.isCandidate);
+  const expirationRisk = rows.filter((r) => r.analysis.expirationRisk.isAtRisk);
 
   const toSample = (list: InventoryRow[], detailFn: (r: InventoryRow) => string) =>
     list.slice(0, 3).map((r) => ({
@@ -204,6 +214,12 @@ export function buildActionCenterCards(rows: InventoryRow[], stagnantDaysThresho
       title: '과잉재고 후보',
       count: overstock.length,
       sampleSkus: toSample(overstock, (r) => `${Math.floor(r.analysis.overstock.coverageDays ?? 0)}일분 재고`),
+    },
+    {
+      category: 'EXPIRATION_RISK',
+      title: '소비기한 임박 위험',
+      count: expirationRisk.length,
+      sampleSkus: toSample(expirationRisk, (r) => `소비기한 D-${r.analysis.expirationRisk.daysUntilExpiration} · 재고 ${Math.floor(r.analysis.coverage.coverageDays ?? 0)}일분`),
     },
   ];
 }

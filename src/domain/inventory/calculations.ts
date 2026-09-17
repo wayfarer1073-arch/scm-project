@@ -7,6 +7,7 @@ import type {
   DataMaturity,
   DepletionAcceleration,
   EffectiveRiskThresholds,
+  ExpirationRiskAssessment,
   InventoryValueBreakdown,
   ManualRiskThresholds,
   OverstockCandidateInfo,
@@ -19,7 +20,7 @@ import type {
   ThresholdRisk,
   WindowDepletion,
 } from './types';
-import { DEFAULT_RISK_SETTINGS } from './types';
+import { DEFAULT_EXPIRATION_RISK_DAYS, DEFAULT_RISK_SETTINGS } from './types';
 
 /**
  * 이 모듈은 "재고 Snapshot"만으로 계산 가능한 지표만 다룬다.
@@ -358,6 +359,27 @@ export function calculateOverstockCandidate(
   };
 }
 
+/**
+ * 소비기한과 Coverage(예상 소진일수)를 비교해 "다 팔기 전에 소비기한을 넘길 위험"을 판정한다.
+ * "위험 판정일" = 소비기한 - riskDays로 안전 여유를 두고, 그날까지 남은 일수보다 Coverage가
+ * 더 길면(=지금 속도로는 그 안에 다 못 판다는 뜻) 위험으로 본다.
+ */
+export function calculateExpirationRisk(
+  expirationDate: string | null,
+  riskDays: number | null,
+  coverageDays: number | null,
+  asOfDate: string,
+): ExpirationRiskAssessment {
+  if (!expirationDate) {
+    return { expirationDate: null, riskDays: null, daysUntilExpiration: null, daysUntilRiskDate: null, isAtRisk: false };
+  }
+  const effectiveRiskDays = riskDays ?? DEFAULT_EXPIRATION_RISK_DAYS;
+  const daysUntilExpiration = differenceInCalendarDays(toDate(expirationDate), toDate(asOfDate));
+  const daysUntilRiskDate = daysUntilExpiration - effectiveRiskDays;
+  const isAtRisk = coverageDays !== null && coverageDays > daysUntilRiskDate;
+  return { expirationDate, riskDays: effectiveRiskDays, daysUntilExpiration, daysUntilRiskDate, isAtRisk };
+}
+
 const RISK_RANK = { NORMAL: 0, WARNING: 1, DANGER: 2 } as const;
 
 function coverageBandLabel(band: CoverageBand): string | null {
@@ -372,6 +394,7 @@ export function analyzeSku(
   asOfDate: string,
   settings: RiskThresholdSettings = DEFAULT_RISK_SETTINGS,
   manualThresholds?: ManualRiskThresholds | null,
+  expirationConfig?: { expirationDate: string | null; expirationRiskDays: number | null } | null,
 ): SkuAnalysis | null {
   const sorted = sortObservations(observations.filter((o) => o.date <= asOfDate));
   if (sorted.length === 0) return null;
@@ -395,6 +418,12 @@ export function analyzeSku(
   const thresholdRisk = calculateThresholdRisk(effectiveLatest);
   const stagnation = calculateStagnation(sorted, deltas, asOfDate, maturity);
   const overstock = calculateOverstockCandidate(latest.availableStock, window30, maturity, settings);
+  const expirationRisk = calculateExpirationRisk(
+    expirationConfig?.expirationDate ?? null,
+    expirationConfig?.expirationRiskDays ?? null,
+    coverage.coverageDays,
+    asOfDate,
+  );
 
   const dailyChangeValue = previous ? dailyChange(latest, previous) : null;
   const latestDelta = deltas.at(-1);
@@ -416,6 +445,7 @@ export function analyzeSku(
   if (stagnation.isMeaningful && stagnation.stagnantDays >= settings.stagnantDays) {
     tags.push(`[재고 정체 ${stagnation.stagnantDays}일]`);
   }
+  if (expirationRisk.isAtRisk) tags.push('[소비기한 임박 위험]');
   if (overstock.isCandidate) tags.push('[과잉재고 후보]');
   if ((latest.inboundQuantity ?? 0) > 0) tags.push(`[입고 ${latest.inboundQuantity}개 반영]`);
   if (stockIncreasedToday) tags.push('[재고 증가 감지]');
@@ -440,6 +470,7 @@ export function analyzeSku(
     acceleration,
     thresholdRisk,
     riskThresholds,
+    expirationRisk,
     stagnation,
     overstock,
     tags,

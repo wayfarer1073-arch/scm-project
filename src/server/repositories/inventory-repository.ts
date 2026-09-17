@@ -54,6 +54,9 @@ export interface SkuDescriptor {
   /** 관리자가 SKU 상세에서 직접 지정한 위험/경고수량. null이면 자동계산을 쓴다. */
   manualDangerQty: number | null;
   manualWarningQty: number | null;
+  expirationDate: string | null;
+  /** 소비기한 위험 판정 일수. null이면 앱의 기본값(DEFAULT_EXPIRATION_RISK_DAYS)을 쓴다. */
+  expirationRiskDays: number | null;
 }
 
 /** isActive(최신 스냅샷에 존재) SKU 목록과, 각 SKU의 전체 관측 시계열을 한 번에 로드한다(N+1 방지) */
@@ -163,6 +166,8 @@ export async function loadActiveSkusWithSeries(
         location: attrs ? attrs.location : sku.currentLocation,
         manualDangerQty: sku.manualDangerQty,
         manualWarningQty: sku.manualWarningQty,
+        expirationDate: sku.expirationDate ? dateOnlyToString(sku.expirationDate) : null,
+        expirationRiskDays: sku.expirationRiskDays,
       },
       observations: observationsBySku.get(sku.id) ?? [],
     };
@@ -280,6 +285,8 @@ export async function loadSkuWithSeries(
       location: latestItem ? latestItem.location : sku.currentLocation,
       manualDangerQty: sku.manualDangerQty,
       manualWarningQty: sku.manualWarningQty,
+      expirationDate: sku.expirationDate ? dateOnlyToString(sku.expirationDate) : null,
+      expirationRiskDays: sku.expirationRiskDays,
     },
     observations,
   };

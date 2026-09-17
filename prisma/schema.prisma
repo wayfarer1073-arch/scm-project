@@ -110,6 +110,10 @@ model Sku {
   // SKU 자체에 붙는 값이라, 이 상품을 다시 업로드해도 지워지지 않는다.
   expirationDate DateTime? @db.Date
 
+  // 소비기한까지 남은 일수가 이 값 이하로 들어오면 "임박"으로 본다. null이면 앱의 기본값을 쓴다.
+  // 소비기한 관리 화면에서 항목별로, 또는 여러 항목을 선택해 한 번에 설정할 수 있다.
+  expirationRiskDays Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

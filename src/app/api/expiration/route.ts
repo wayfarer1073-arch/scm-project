@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { auth } from '@/server/auth';
 import { parseExpirationWorkbook } from '@/domain/excel/expiration-parser';
-import { listExpirations, applyExpirationRows } from '@/server/repositories/expiration-repository';
+import { listExpirations, applyExpirationRows, setExpirationRiskDaysBulk } from '@/server/repositories/expiration-repository';
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
@@ -43,4 +44,20 @@ export async function POST(request: Request) {
     unmatchedProductCodes: applyResult.unmatchedProductCodes,
     issues: parseResult.issues,
   });
+}
+
+const bulkPatchSchema = z.object({ skuIds: z.array(z.string()).min(1), expirationRiskDays: z.number().int().min(0) });
+
+/** 체크박스로 선택한 여러 SKU의 소비기한 위험 판정 일수를 한 번에 같은 값으로 설정한다. */
+export async function PATCH(request: Request) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 });
+  if (session.user.role !== 'ADMIN') return NextResponse.json({ error: '관리자만 변경할 수 있습니다.' }, { status: 403 });
+
+  const body = await request.json();
+  const parsed = bulkPatchSchema.safeParse(body);
+  if (!parsed.success) return NextResponse.json({ error: '입력값이 올바르지 않습니다.' }, { status: 400 });
+
+  const updatedCount = await setExpirationRiskDaysBulk(parsed.data.skuIds, parsed.data.expirationRiskDays);
+  return NextResponse.json({ updatedCount });
 }

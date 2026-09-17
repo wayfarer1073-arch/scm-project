@@ -101,6 +101,23 @@ export interface ManualRiskThresholds {
   warningQty: number | null;
 }
 
+/** SKU별 소비기한 위험 판정 일수를 따로 지정하지 않았을 때 쓰는 기본값 */
+export const DEFAULT_EXPIRATION_RISK_DAYS = 14;
+
+/**
+ * 소비기한과 Coverage(예상 소진일수)를 비교한 결과. "위험 판정일"(=소비기한 - riskDays)까지
+ * 남은 일수보다 Coverage가 더 길면, 그 시점까지 다 팔지 못하고 소비기한을 넘길 위험이 있다고 본다.
+ */
+export interface ExpirationRiskAssessment {
+  expirationDate: string | null;
+  /** 실제로 판정에 쓰인 값(SKU 설정이 없으면 DEFAULT_EXPIRATION_RISK_DAYS) */
+  riskDays: number | null;
+  daysUntilExpiration: number | null;
+  /** 소비기한 - riskDays 시점까지 남은 일수. 이미 지났으면 음수 */
+  daysUntilRiskDate: number | null;
+  isAtRisk: boolean;
+}
+
 export type CoverageBand = 'STOCKOUT_SOON' | 'NEEDS_MANAGEMENT' | 'HEALTHY' | null;
 
 export interface CoverageAssessment {
@@ -207,6 +224,8 @@ export interface SkuAnalysis {
   thresholdRisk: ThresholdRisk;
   /** thresholdRisk 판정에 실제로 쓰인 위험/경고수량과 그 출처(수동/레거시/자동/없음) */
   riskThresholds: EffectiveRiskThresholds;
+  /** 소비기한 안에 다 팔지 못할 위험(Coverage와 소비기한 갭 비교) */
+  expirationRisk: ExpirationRiskAssessment;
   stagnation: StagnationInfo;
   overstock: OverstockCandidateInfo;
   /** 화면에 그대로 표시할 수 있는 근거 태그 목록 (예: "[위험수량 이하]", "[12일분 남음]") */
