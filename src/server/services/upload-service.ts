@@ -8,6 +8,7 @@ import {
   findActiveSnapshot,
   getLatestActiveSnapshotBefore,
   getSnapshotProductCodes,
+  SnapshotConflictError,
 } from '@/server/repositories/snapshot-repository';
 
 export interface UploadRequest {
@@ -99,10 +100,8 @@ export async function processUpload(request: UploadRequest): Promise<UploadResul
   const previousProductCodes = previousSnapshot ? await getSnapshotProductCodes(previousSnapshot.id) : null;
   const crossCheck = validateAgainstPreviousSnapshot(parseResult.rows, previousProductCodes);
 
-  // findActiveSnapshot으로 본 "충돌 없음" 판단과 createSnapshot의 실제 쓰기 사이에는 시간차가 있어
-  // 같은 (창고, 기준일)에 동시에 두 건이 업로드되면 경쟁이 생길 수 있다. 그 경우 DB의
-  // @@unique([warehouseId, snapshotDate, version]) 제약이 둘째 요청을 막아주므로 데이터는 깨지지
-  // 않지만, 원인이 불명확한 500 에러 대신 재시도를 안내하는 명확한 에러로 바꿔준다.
+  // 사전 확인 이후 다른 요청이 저장했을 수 있으므로, 창고 잠금 안에서 교체 허용 여부를
+  // 다시 확인한다. 잠금을 사용하지 않는 외부 쓰기의 unique 충돌도 명시적인 오류로 돌려준다.
   let snapshot;
   try {
     snapshot = await createSnapshot({
@@ -113,8 +112,23 @@ export async function processUpload(request: UploadRequest): Promise<UploadResul
       uploadedById: request.uploadedById,
       isMock: request.isMock ?? false,
       rows: parseResult.rows,
+      replaceExisting: request.replaceExisting,
     });
   } catch (err) {
+    if (err instanceof SnapshotConflictError) {
+      const existing = await findActiveSnapshot(request.warehouseId, request.snapshotDate);
+      if (!existing) throw err;
+      if (existing.fileHash === contentSignature) {
+        return { status: 'DUPLICATE', existing: {
+          snapshotDate: existing.snapshotDate, uploadedAt: existing.uploadedAt,
+          uploadedByName: existing.uploadedBy.name, rowCount: existing.rowCount,
+        } };
+      }
+      return { status: 'CONFLICT', existing: {
+        snapshotId: existing.id, uploadedAt: existing.uploadedAt, uploadedByName: existing.uploadedBy.name,
+        rowCount: existing.rowCount, version: existing.version,
+      } };
+    }
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       return {
         status: 'ERROR',

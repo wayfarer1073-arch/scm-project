@@ -14,7 +14,7 @@ import { riskBadgeVariant, riskLabel } from '@/lib/status';
 import { TABLE_TABS, matchesQuickFilter, matchesTab, type QuickFilter, type TableTab } from '@/lib/inventory-filters';
 import { buildInventorySheetRows, type ExportRowInput } from '@/domain/excel/export';
 import { downloadSheetsAsExcel } from '@/lib/xlsx-download';
-import type { InventoryRow } from '@/server/services/inventory-analysis-service';
+import type { InventoryRow } from '@/domain/inventory/read-model';
 
 interface InventoryTableProps {
   rows: InventoryRow[];

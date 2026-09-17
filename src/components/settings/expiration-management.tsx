@@ -219,6 +219,8 @@ export function ExpirationManagement({ isAdmin, warehouses, initialEntries }: Ex
           창고를 고르고 유통기한 Excel을 올리면 그 창고에서 관리 중인(캘린더 업로드로 인식된) SKU의 소비기한을 반영합니다. 인식되지 않는 상품코드는
           건너뜁니다. 날짜는 Excel 업로드 없이 바로 수정할 수도 있습니다. 위험 판정 일수(소비기한까지 이 일수 이하로 남았을 때 &quot;임박&quot;으로
           볼 기준)는 항목별로 수정하거나, 여러 항목을 체크해 한 번에 같은 값으로 적용할 수 있습니다.
+          상품별 소비기한은 대표값 1개이며, 같은 상품이 여러 행이면 가장 이른 날짜를 사용합니다. 로트별 잔량과 폐기 예상 수량은 계산하지 않습니다.
+          수정한 날짜와 위험 기준은 과거 기준일 조회에도 적용됩니다.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

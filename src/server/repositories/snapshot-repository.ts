@@ -35,6 +35,11 @@ export interface CreateSnapshotInput {
   uploadedById: string;
   isMock?: boolean;
   rows: ParsedInventoryRow[];
+  replaceExisting?: boolean;
+}
+
+export class SnapshotConflictError extends Error {
+  constructor() { super('A snapshot was created before this upload acquired the warehouse lock.'); }
 }
 
 /**
@@ -45,12 +50,16 @@ export interface CreateSnapshotInput {
 export async function createSnapshot(input: CreateSnapshotInput) {
   return prisma.$transaction(
     async (tx) => {
+      // Serialize uploads per warehouse, not just per date: concurrent dates also update
+      // the same current-SKU cache. Holding this parent lock makes version allocation safe.
+      await tx.$queryRaw`SELECT id FROM warehouses WHERE id = ${input.warehouseId} FOR UPDATE`;
       const existing = await tx.inventorySnapshot.findFirst({
         where: { warehouseId: input.warehouseId, snapshotDate: input.snapshotDate, status: 'ACTIVE' },
       });
 
       let version = 1;
       if (existing) {
+        if (input.replaceExisting === false) throw new SnapshotConflictError();
         await tx.inventorySnapshot.update({ where: { id: existing.id }, data: { status: 'REPLACED' } });
         version = existing.version + 1;
       }
@@ -75,30 +84,11 @@ export async function createSnapshot(input: CreateSnapshotInput) {
       });
       const isLatestSnapshot = !latestOther || latestOther.snapshotDate <= input.snapshotDate;
 
+      // Batch inserts and updates avoid two database round trips for every Excel row.
       const touchedSkuIds: string[] = [];
-
-      for (const row of input.rows) {
-        const sku = await tx.sku.upsert({
-          where: { warehouseId_productCode: { warehouseId: input.warehouseId, productCode: row.productCode } },
-          // "현재값" 캐시(current*)는 이 업로드가 해당 창고의 가장 최신 스냅샷일 때만 갱신한다.
-          // 과거 날짜를 뒤늦게 백필하면서 무조건 덮어쓰면, 최신 실제 상품명이 옛 백필 값으로
-          // 되돌아가버린다.
-          update: {
-            ...(isLatestSnapshot
-              ? {
-                  currentProductName: row.productName,
-                  currentOption: row.option,
-                  currentBarcode: row.barcode,
-                  currentLocation: row.location,
-                  ...(!row.costMissing ? { currentUnitCost: row.unitCost } : {}),
-                  currentWarningQty: row.warningQty,
-                  currentDangerQty: row.dangerQty,
-                  lastSeenDate: input.snapshotDate,
-                  isActive: true,
-                }
-              : {}),
-          },
-          create: {
+      for (let offset = 0; offset < input.rows.length; offset += 1000) {
+        const batch = input.rows.slice(offset, offset + 1000);
+        await tx.sku.createMany({ skipDuplicates: true, data: batch.map((row) => ({
             warehouseId: input.warehouseId,
             productCode: row.productCode,
             currentProductName: row.productName,
@@ -110,15 +100,38 @@ export async function createSnapshot(input: CreateSnapshotInput) {
             currentDangerQty: row.dangerQty,
             firstSeenDate: input.snapshotDate,
             lastSeenDate: input.snapshotDate,
-            isActive: true,
-          },
-        });
-        touchedSkuIds.push(sku.id);
+            isActive: isLatestSnapshot,
+        })) });
 
-        await tx.inventoryItem.create({
-          data: {
+        const payload = JSON.stringify(batch);
+        await tx.$executeRaw`
+          UPDATE skus AS s SET
+            "firstSeenDate" = LEAST(s."firstSeenDate", ${input.snapshotDate}::date),
+            "lastSeenDate" = GREATEST(s."lastSeenDate", ${input.snapshotDate}::date),
+            "currentProductName" = CASE WHEN ${isLatestSnapshot} THEN r."productName" ELSE s."currentProductName" END,
+            "currentOption" = CASE WHEN ${isLatestSnapshot} THEN r.option ELSE s."currentOption" END,
+            "currentBarcode" = CASE WHEN ${isLatestSnapshot} THEN r.barcode ELSE s."currentBarcode" END,
+            "currentLocation" = CASE WHEN ${isLatestSnapshot} THEN r.location ELSE s."currentLocation" END,
+            "currentUnitCost" = CASE WHEN ${isLatestSnapshot} AND NOT r."costMissing" THEN r."unitCost" ELSE s."currentUnitCost" END,
+            "currentWarningQty" = CASE WHEN ${isLatestSnapshot} THEN r."warningQty" ELSE s."currentWarningQty" END,
+            "currentDangerQty" = CASE WHEN ${isLatestSnapshot} THEN r."dangerQty" ELSE s."currentDangerQty" END,
+            "isActive" = CASE WHEN ${isLatestSnapshot} THEN true ELSE s."isActive" END,
+            "updatedAt" = NOW()
+          FROM jsonb_to_recordset(${payload}::jsonb) AS r(
+            "productCode" text, "productName" text, option text, barcode text, location text,
+            "costMissing" boolean, "unitCost" numeric, "warningQty" integer, "dangerQty" integer
+          )
+          WHERE s."warehouseId" = ${input.warehouseId} AND s."productCode" = r."productCode"
+        `;
+        const skus = await tx.sku.findMany({
+          where: { warehouseId: input.warehouseId, productCode: { in: batch.map(r => r.productCode) } },
+          select: { id: true, productCode: true },
+        });
+        const skuIdByCode = new Map(skus.map(s => [s.productCode, s.id]));
+        touchedSkuIds.push(...skus.map(s => s.id));
+        await tx.inventoryItem.createMany({ data: batch.map((row) => ({
             snapshotId: snapshot.id,
-            skuId: sku.id,
+            skuId: skuIdByCode.get(row.productCode)!,
             productCode: row.productCode,
             productName: row.productName,
             option: row.option,
@@ -134,8 +147,7 @@ export async function createSnapshot(input: CreateSnapshotInput) {
             incomingStock: row.incomingStock,
             warningQty: row.warningQty,
             dangerQty: row.dangerQty,
-          },
-        });
+        })) });
       }
 
       if (isLatestSnapshot && touchedSkuIds.length > 0) {

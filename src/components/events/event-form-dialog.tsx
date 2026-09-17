@@ -82,6 +82,9 @@ export function EventFormDialog({ open, onOpenChange, warehouseId, skuId, skuLab
           <DialogDescription>{skuLabel ? `대상 상품: ${skuLabel}` : '창고 전체에 대한 메모입니다.'}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            이벤트는 메모로만 저장되며 재고·소진 계산에는 반영되지 않습니다. 실제 입고 수량은 업로드 캘린더의 &quot;입고 특이사항&quot;에 등록하세요.
+          </p>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="event-type">이벤트 유형</Label>
@@ -105,7 +108,7 @@ export function EventFormDialog({ open, onOpenChange, warehouseId, skuId, skuLab
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="event-note">내용</Label>
-            <Textarea id="event-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="예: 발주 입고 150개 반영" rows={3} />
+            <Textarea id="event-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="예: 입고 일정 변경으로 담당자 확인 필요" rows={3} />
           </div>
         </div>
         <DialogFooter>

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeSku, calculateInventoryValueBreakdown, calculatePeriodComparison } from '@/domain/inventory/calculations';
 import { DEFAULT_RISK_SETTINGS, type RiskThresholdSettings, type StockObservation } from '@/domain/inventory/types';
-import { calculateCompanyKpis, type InventoryRow } from './inventory-analysis-service';
+import { calculateCompanyKpis } from '@/domain/inventory/aggregation';
+import type { InventoryRow } from '@/domain/inventory/read-model';
 
 function observation(date: string, availableStock: number): StockObservation {
   return {

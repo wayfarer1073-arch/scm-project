@@ -47,34 +47,42 @@ export type AddInboundEntryResult = { ok: true; entry: InboundEntryRow } | { ok:
 
 /** 같은 (SKU, 날짜)에 이미 기록이 있으면 수량을 더한다(하루에 여러 번 나눠 입고된 경우를 그대로 반영). */
 export async function addInboundEntry(input: AddInboundEntryInput): Promise<AddInboundEntryResult> {
-  const sku = await prisma.sku.findUnique({ where: { id: input.skuId } });
-  // isActive는 검사하지 않는다 — 최근 스냅샷에서 빠진 SKU라도(재고가 바닥나 한동안 업로드
-  // 목록에 없었을 뿐인 경우 등) 새로 들어오는 입고는 기록할 수 있어야 한다.
-  if (!sku || sku.warehouseId !== input.warehouseId) {
-    return { ok: false, error: '해당 창고에 속한 SKU가 아닙니다.' };
+  if (!Number.isInteger(input.quantity) || input.quantity <= 0 || input.quantity > INT32_MAX) {
+    return { ok: false, error: '입고 수량은 허용 범위 안의 양의 정수여야 합니다.' };
   }
+  return prisma.$transaction(async (tx) => {
+    // Lock the parent SKU, including when no inbound row exists yet. The overflow check and
+    // write now see the latest committed total; simultaneous first inserts cannot race either.
+    await tx.$queryRaw`SELECT id FROM skus WHERE id = ${input.skuId} FOR UPDATE`;
+    const sku = await tx.sku.findUnique({ where: { id: input.skuId } });
+    // isActive는 검사하지 않는다 — 최근 스냅샷에서 빠진 SKU라도(재고가 바닥나 한동안 업로드
+    // 목록에 없었을 뿐인 경우 등) 새로 들어오는 입고는 기록할 수 있어야 한다.
+    if (!sku || sku.warehouseId !== input.warehouseId) {
+      return { ok: false, error: '해당 창고에 속한 SKU가 아닙니다.' };
+    }
 
-  const snapshotDate = new Date(`${input.date}T00:00:00.000Z`);
-  const existing = await prisma.snapshotInbound.findUnique({
-    where: { skuId_snapshotDate: { skuId: input.skuId, snapshotDate } },
-  });
-  const nextQuantity = (existing?.quantity ?? 0) + input.quantity;
-  if (nextQuantity > INT32_MAX) {
-    return { ok: false, error: '같은 상품의 입고 수량 합계가 허용 범위를 초과합니다.' };
-  }
+    const snapshotDate = new Date(`${input.date}T00:00:00.000Z`);
+    const existing = await tx.snapshotInbound.findUnique({
+      where: { skuId_snapshotDate: { skuId: input.skuId, snapshotDate } },
+    });
+    const nextQuantity = (existing?.quantity ?? 0) + input.quantity;
+    if (nextQuantity > INT32_MAX) {
+      return { ok: false, error: '같은 상품의 입고 수량 합계가 허용 범위를 초과합니다.' };
+    }
 
-  const entry = await prisma.snapshotInbound.upsert({
-    where: { skuId_snapshotDate: { skuId: input.skuId, snapshotDate } },
-    create: {
-      skuId: input.skuId,
-      snapshotDate,
-      productCode: sku.productCode,
-      productName: sku.currentProductName,
-      quantity: input.quantity,
-    },
-    update: { quantity: nextQuantity, productCode: sku.productCode, productName: sku.currentProductName },
+    const entry = await tx.snapshotInbound.upsert({
+      where: { skuId_snapshotDate: { skuId: input.skuId, snapshotDate } },
+      create: {
+        skuId: input.skuId,
+        snapshotDate,
+        productCode: sku.productCode,
+        productName: sku.currentProductName,
+        quantity: input.quantity,
+      },
+      update: { quantity: { increment: input.quantity }, productCode: sku.productCode, productName: sku.currentProductName },
+    });
+    return { ok: true, entry };
   });
-  return { ok: true, entry };
 }
 
 export async function deleteInboundEntry(id: string): Promise<boolean> {

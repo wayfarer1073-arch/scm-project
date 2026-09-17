@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatNumber, formatPercent } from '@/lib/format';
 import { formatKstDate, formatKstDateTime } from '@/lib/date';
-import type { WarehouseSummary } from '@/server/services/inventory-analysis-service';
+import type { WarehouseSummary } from '@/domain/inventory/types';
 
 interface LatestUpload {
   warehouseId: string;

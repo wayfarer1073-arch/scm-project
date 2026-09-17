@@ -19,12 +19,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const asOfDate = requestedTo > today ? today : requestedTo;
   const requestedFrom = isDateString(params.from) ? params.from : asOfDate;
   const fromDate = requestedFrom > asOfDate ? asOfDate : requestedFrom;
-  const [session, warehouses, settings, rows, dailyTotals] = await Promise.all([
+  const settings = await getSettings();
+  const [session, warehouses, rows, dailyTotals] = await Promise.all([
     auth(),
     listWarehouses(),
-    getSettings(),
-    getInventoryRows({ asOfDate, compareFromDate: mode === 'range' ? fromDate : undefined }),
-    loadDailyWarehouseTotals(),
+    getInventoryRows({ asOfDate, compareFromDate: mode === 'range' ? fromDate : undefined, settings }),
+    loadDailyWarehouseTotals(asOfDate),
   ]);
   const isAdmin = session?.user.role === 'ADMIN';
 
