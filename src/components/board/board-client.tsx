@@ -2,14 +2,16 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { PenSquare, Trash2 } from 'lucide-react';
+import { PenSquare, Trash2, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Pagination } from '@/components/ui/pagination';
 import { PostFormDialog } from '@/components/board/post-form-dialog';
 import { formatKstDateTime } from '@/lib/date';
-import { postTagLabel, postTagBadgeVariant, type PostTagValue } from '@/lib/post-tags';
+import { postTagLabel, postTagBadgeVariant, POST_TAG_OPTIONS, type PostTagValue } from '@/lib/post-tags';
+import { cn } from '@/lib/utils';
 
 export interface BoardPost {
   id: string;
@@ -21,6 +23,13 @@ export interface BoardPost {
   createdAt: string;
 }
 
+export interface BoardFilter {
+  keyword: string;
+  tags: PostTagValue[];
+  fromDate: string;
+  toDate: string;
+}
+
 interface BoardClientProps {
   posts: BoardPost[];
   page: number;
@@ -28,15 +37,51 @@ interface BoardClientProps {
   totalCount: number;
   currentUserId: string;
   currentUserRole: 'MEMBER' | 'ADMIN';
+  filter: BoardFilter;
 }
 
-export function BoardClient({ posts, page, totalPages, totalCount, currentUserId, currentUserRole }: BoardClientProps) {
+function buildBoardUrl(page: number, filter: BoardFilter): string {
+  const query = new URLSearchParams();
+  if (page > 1) query.set('page', String(page));
+  if (filter.keyword.trim() !== '') query.set('q', filter.keyword.trim());
+  if (filter.tags.length > 0) query.set('tags', filter.tags.join(','));
+  if (filter.fromDate) query.set('from', filter.fromDate);
+  if (filter.toDate) query.set('to', filter.toDate);
+  const qs = query.toString();
+  return qs ? `/board?${qs}` : '/board';
+}
+
+const EMPTY_FILTER: BoardFilter = { keyword: '', tags: [], fromDate: '', toDate: '' };
+
+export function BoardClient({ posts, page, totalPages, totalCount, currentUserId, currentUserRole, filter }: BoardClientProps) {
   const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<BoardFilter>(filter);
+
+  const hasActiveFilter = filter.keyword !== '' || filter.tags.length > 0 || filter.fromDate !== '' || filter.toDate !== '';
 
   function goToPage(next: number) {
-    router.push(`/board?page=${next}`);
+    router.push(buildBoardUrl(next, filter));
+  }
+
+  function applyFilter() {
+    // 두 날짜를 거꾸로 골라도(종료일을 시작일보다 이전으로) 바른 순서로 보정한다.
+    const normalized: BoardFilter = {
+      ...draft,
+      fromDate: draft.fromDate && draft.toDate && draft.fromDate > draft.toDate ? draft.toDate : draft.fromDate,
+      toDate: draft.fromDate && draft.toDate && draft.fromDate > draft.toDate ? draft.fromDate : draft.toDate,
+    };
+    router.push(buildBoardUrl(1, normalized));
+  }
+
+  function resetFilter() {
+    setDraft(EMPTY_FILTER);
+    router.push('/board');
+  }
+
+  function toggleDraftTag(tag: PostTagValue) {
+    setDraft((prev) => ({ ...prev, tags: prev.tags.includes(tag) ? prev.tags.filter((t) => t !== tag) : [...prev.tags, tag] }));
   }
 
   async function handleDelete(id: string) {
@@ -63,7 +108,9 @@ export function BoardClient({ posts, page, totalPages, totalCount, currentUserId
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold">게시판</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{totalCount.toLocaleString('ko-KR')}건의 글이 있습니다.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {hasActiveFilter ? `검색 결과 ${totalCount.toLocaleString('ko-KR')}건` : `${totalCount.toLocaleString('ko-KR')}건의 글이 있습니다.`}
+          </p>
         </div>
         <Button onClick={() => setFormOpen(true)}>
           <PenSquare className="size-4" />
@@ -71,10 +118,87 @@ export function BoardClient({ posts, page, totalPages, totalCount, currentUserId
         </Button>
       </div>
 
+      <div className="space-y-3 rounded-2xl border bg-card p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <Input
+              value={draft.keyword}
+              onChange={(e) => setDraft((prev) => ({ ...prev, keyword: e.target.value }))}
+              onKeyDown={(e) => e.key === 'Enter' && applyFilter()}
+              placeholder="제목/내용 키워드 검색"
+              className="pl-8"
+              aria-label="키워드 검색"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <input
+                type="date"
+                value={draft.fromDate}
+                onChange={(e) => setDraft((prev) => ({ ...prev, fromDate: e.target.value }))}
+                aria-label="검색 시작일"
+                className="h-9 rounded-lg border bg-background px-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+              />
+              ~
+              <input
+                type="date"
+                value={draft.toDate}
+                onChange={(e) => setDraft((prev) => ({ ...prev, toDate: e.target.value }))}
+                aria-label="검색 종료일"
+                className="h-9 rounded-lg border bg-background px-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+              />
+            </label>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {POST_TAG_OPTIONS.map((opt) => {
+              const active = draft.tags.includes(opt.value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => toggleDraftTag(opt.value)}
+                  className={cn(
+                    'rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
+                    active ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-1.5">
+            {hasActiveFilter && (
+              <Button variant="ghost" size="sm" onClick={resetFilter}>
+                <X className="size-3.5" />
+                초기화
+              </Button>
+            )}
+            <Button size="sm" onClick={applyFilter}>
+              <Search className="size-3.5" />
+              검색
+            </Button>
+          </div>
+        </div>
+      </div>
+
       {posts.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed bg-card py-16 text-center">
-          <p className="text-sm font-medium">아직 작성된 글이 없습니다</p>
-          <p className="text-xs text-muted-foreground">글쓰기 버튼을 눌러 첫 글을 남겨보세요.</p>
+          {hasActiveFilter ? (
+            <>
+              <p className="text-sm font-medium">검색 결과가 없습니다</p>
+              <p className="text-xs text-muted-foreground">검색어나 필터를 바꿔서 다시 시도해보세요.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-medium">아직 작성된 글이 없습니다</p>
+              <p className="text-xs text-muted-foreground">글쓰기 버튼을 눌러 첫 글을 남겨보세요.</p>
+            </>
+          )}
         </div>
       ) : (
         <ul className="divide-y rounded-2xl border bg-card">

@@ -3,17 +3,19 @@ import { listWarehouses } from '@/server/repositories/warehouse-repository';
 import { getSettings } from '@/server/repositories/settings-repository';
 import { listUsers } from '@/server/repositories/user-repository';
 import { listAllSkusForVisibilityAdmin } from '@/server/repositories/inventory-repository';
+import { listExpirations } from '@/server/repositories/expiration-repository';
 import { SettingsForm } from '@/components/settings/settings-form';
 
 export default async function SettingsPage() {
   const session = await auth();
   const isAdmin = session?.user.role === 'ADMIN';
 
-  const [warehouses, settings, users, skus] = await Promise.all([
+  const [warehouses, settings, users, skus, expirations] = await Promise.all([
     listWarehouses(),
     getSettings(),
     isAdmin ? listUsers() : Promise.resolve([]),
     listAllSkusForVisibilityAdmin(),
+    listExpirations(),
   ]);
 
   return (
@@ -28,6 +30,7 @@ export default async function SettingsPage() {
         settings={settings}
         users={users.map((u) => ({ ...u, createdAt: u.createdAt.toISOString() }))}
         skus={skus}
+        expirations={expirations}
       />
     </div>
   );

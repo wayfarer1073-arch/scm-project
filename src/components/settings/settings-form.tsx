@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { ExpirationManagement } from '@/components/settings/expiration-management';
 import type { RiskThresholdSettings } from '@/domain/inventory/types';
 
 interface SkuVisibilityRow {
@@ -23,15 +24,26 @@ interface SkuVisibilityRow {
   isHiddenFromDashboard: boolean;
 }
 
+interface ExpirationRow {
+  skuId: string;
+  warehouseId: string;
+  warehouseCode: string;
+  warehouseName: string;
+  productCode: string;
+  productName: string;
+  expirationDate: string;
+}
+
 interface SettingsFormProps {
   isAdmin: boolean;
   warehouses: { id: string; code: string; name: string }[];
   settings: RiskThresholdSettings;
   users: { id: string; email: string; name: string; role: 'MEMBER' | 'ADMIN'; createdAt: string }[];
   skus: SkuVisibilityRow[];
+  expirations: ExpirationRow[];
 }
 
-export function SettingsForm({ isAdmin, warehouses, settings, users: initialUsers, skus }: SettingsFormProps) {
+export function SettingsForm({ isAdmin, warehouses, settings, users: initialUsers, skus, expirations }: SettingsFormProps) {
   const [warehouseNames, setWarehouseNames] = useState(Object.fromEntries(warehouses.map((w) => [w.id, w.name])));
   const [thresholds, setThresholds] = useState(settings);
   const [users, setUsers] = useState(initialUsers);
@@ -146,6 +158,8 @@ export function SettingsForm({ isAdmin, warehouses, settings, users: initialUser
 
       <SkuVisibilityManagement isAdmin={isAdmin} initialSkus={skus} />
 
+      <ExpirationManagement isAdmin={isAdmin} warehouses={warehouses} initialEntries={expirations} />
+
       {isAdmin && <UserManagement users={users} onUsersChange={setUsers} />}
     </div>
   );
@@ -163,7 +177,9 @@ function ThresholdField({ label, value, onChange, disabled }: { label: string; v
 
 function SkuVisibilityManagement({ isAdmin, initialSkus }: { isAdmin: boolean; initialSkus: SkuVisibilityRow[] }) {
   const [skus, setSkus] = useState(initialSkus);
-  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selected, setSelected] = useState<SkuVisibilityRow | null>(null);
   const [updatingSkuId, setUpdatingSkuId] = useState<string | null>(null);
 
   const hiddenSkus = useMemo(
@@ -172,10 +188,10 @@ function SkuVisibilityManagement({ isAdmin, initialSkus }: { isAdmin: boolean; i
   );
 
   const searchResults = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = query.trim().toLowerCase();
     if (!q) return [];
     return skus.filter((s) => !s.isHiddenFromDashboard && (s.productCode.toLowerCase().includes(q) || s.productName.toLowerCase().includes(q))).slice(0, 20);
-  }, [skus, search]);
+  }, [skus, query]);
 
   async function setHidden(skuId: string, hidden: boolean) {
     setUpdatingSkuId(skuId);
@@ -188,6 +204,10 @@ function SkuVisibilityManagement({ isAdmin, initialSkus }: { isAdmin: boolean; i
       if (!res.ok) throw new Error();
       setSkus((prev) => prev.map((s) => (s.skuId === skuId ? { ...s, isHiddenFromDashboard: hidden } : s)));
       toast.success(hidden ? '대시보드에서 숨겼습니다.' : '대시보드에 다시 표시합니다.');
+      if (selected?.skuId === skuId) {
+        setSelected(null);
+        setQuery('');
+      }
     } catch {
       toast.error('변경에 실패했습니다.');
     } finally {
@@ -222,18 +242,54 @@ function SkuVisibilityManagement({ isAdmin, initialSkus }: { isAdmin: boolean; i
             <Separator />
             <div className="space-y-2">
               <Label htmlFor="sku-visibility-search">상품코드 또는 상품명으로 검색해서 숨기기</Label>
-              <Input id="sku-visibility-search" placeholder="예: 00001 또는 상품명 일부" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
-              {search.trim() !== '' && (
-                <div className="space-y-1.5">
-                  {searchResults.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">일치하는 SKU가 없습니다.</p>
-                  ) : (
-                    searchResults.map((sku) => (
-                      <SkuVisibilityItem key={sku.skuId} sku={sku} isAdmin={isAdmin} updating={updatingSkuId === sku.skuId} onToggle={(hidden) => setHidden(sku.skuId, hidden)} />
-                    ))
+              <div className="flex max-w-sm items-start gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <Input
+                    id="sku-visibility-search"
+                    placeholder="예: 00001 또는 상품명 일부"
+                    value={selected ? `${selected.warehouseCode} · ${selected.productName} (${selected.productCode})` : query}
+                    onChange={(e) => {
+                      setSelected(null);
+                      setQuery(e.target.value);
+                      setShowDropdown(true);
+                    }}
+                    onFocus={() => setShowDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+                  />
+                  {showDropdown && !selected && query.trim() !== '' && (
+                    <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border bg-popover shadow-md">
+                      {searchResults.length === 0 ? (
+                        <p className="p-2 text-xs text-muted-foreground">일치하는 SKU가 없습니다.</p>
+                      ) : (
+                        searchResults.map((sku) => (
+                          <button
+                            key={sku.skuId}
+                            type="button"
+                            className="block w-full px-2.5 py-1.5 text-left text-xs hover:bg-muted"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setSelected(sku);
+                              setShowDropdown(false);
+                            }}
+                          >
+                            <span className="mr-1 rounded bg-muted px-1 py-0.5 text-[10px] font-medium text-muted-foreground">{sku.warehouseCode}</span>
+                            <span className="font-medium">{sku.productName}</span> <span className="text-muted-foreground">{sku.productCode}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!selected || updatingSkuId === selected?.skuId}
+                  onClick={() => selected && setHidden(selected.skuId, true)}
+                >
+                  숨기기
+                </Button>
+              </div>
             </div>
           </>
         )}

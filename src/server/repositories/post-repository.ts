@@ -1,18 +1,45 @@
 import { prisma } from '@/lib/prisma';
-import type { PostTag, Role } from '@prisma/client';
+import { kstDateStartToUtc, kstDateEndToUtc } from '@/lib/date';
+import type { Prisma, PostTag, Role } from '@prisma/client';
 
 export class PostPermissionError extends Error {}
 
-export async function listPosts(page: number, pageSize: number) {
+export interface ListPostsFilter {
+  keyword?: string;
+  tags?: PostTag[];
+  /** KST 달력 날짜('yyyy-MM-dd'). 같은 날짜를 from/to에 넣으면 그날 하루만 조회된다. */
+  fromDate?: string;
+  toDate?: string;
+}
+
+function buildPostWhere(filter: ListPostsFilter): Prisma.PostWhereInput {
+  const keyword = filter.keyword?.trim();
+  return {
+    ...(filter.tags && filter.tags.length > 0 ? { tag: { in: filter.tags } } : {}),
+    ...(keyword ? { OR: [{ title: { contains: keyword, mode: 'insensitive' } }, { body: { contains: keyword, mode: 'insensitive' } }] } : {}),
+    ...(filter.fromDate || filter.toDate
+      ? {
+          createdAt: {
+            ...(filter.fromDate ? { gte: kstDateStartToUtc(filter.fromDate) } : {}),
+            ...(filter.toDate ? { lte: kstDateEndToUtc(filter.toDate) } : {}),
+          },
+        }
+      : {}),
+  };
+}
+
+export async function listPosts(page: number, pageSize: number, filter: ListPostsFilter = {}) {
   const skip = (page - 1) * pageSize;
+  const where = buildPostWhere(filter);
   const [posts, totalCount] = await Promise.all([
     prisma.post.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       skip,
       take: pageSize,
       include: { author: { select: { id: true, name: true } } },
     }),
-    prisma.post.count(),
+    prisma.post.count({ where }),
   ]);
   return { posts, totalCount };
 }

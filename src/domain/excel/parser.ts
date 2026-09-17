@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import {
   CANONICAL_FIELDS,
   HEADER_ALIASES,
@@ -9,68 +8,7 @@ import {
   type ParsedInventoryRow,
   type ValidationIssue,
 } from './types';
-
-/**
- * 사내 재고 Excel 익스포트 중 상당수가 실제로는 "HTML table을 .xls 확장자로 저장한" 파일이다
- * (사방넷류 ERP의 표준 익스포트 방식). SheetJS가 이를 못 읽는 경우를 대비해 직접 HTML 테이블 파서를
- * fallback으로 둔다.
- */
-function looksLikeHtmlTable(buffer: Buffer): boolean {
-  const head = buffer.subarray(0, 2048).toString('utf-8').toLowerCase();
-  return head.includes('<html') || head.includes('<table');
-}
-
-function stripHtmlTags(value: string): string {
-  return value
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, dec: string) => String.fromCodePoint(parseInt(dec, 10)))
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .trim();
-}
-
-function parseHtmlTableToAoa(text: string): string[][] {
-  const rows: string[][] = [];
-  const rowMatches = text.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) ?? [];
-  for (const rowHtml of rowMatches) {
-    const cellMatches = rowHtml.match(/<t[dh][^>]*>[\s\S]*?<\/t[dh]>/gi) ?? [];
-    if (cellMatches.length === 0) continue;
-    const cells = cellMatches.map((cellHtml) => {
-      const inner = cellHtml.replace(/^<t[dh][^>]*>/i, '').replace(/<\/t[dh]>$/i, '');
-      return stripHtmlTags(inner);
-    });
-    rows.push(cells);
-  }
-  return rows;
-}
-
-function bufferToAoa(buffer: Buffer): string[][] {
-  if (looksLikeHtmlTable(buffer)) {
-    const text = buffer.toString('utf-8');
-    const aoa = parseHtmlTableToAoa(text);
-    if (aoa.length > 0) return aoa;
-  }
-
-  const workbook = XLSX.read(buffer, { type: 'buffer', raw: false, cellText: true });
-  const sheetName = workbook.SheetNames[0];
-  if (!sheetName) return [];
-  const sheet = workbook.Sheets[sheetName];
-  const aoa = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, raw: false, defval: '', blankrows: false });
-  return aoa.map((row) => row.map((cell) => (cell ?? '').toString()));
-}
-
-function normalizeHeaderCell(value: string): string {
-  return value.replace(/\s+/g, '').trim();
-}
-
-function normalizeString(value: string | undefined | null): string {
-  if (value === undefined || value === null) return '';
-  return value.replace(/ /g, ' ').trim().replace(/\s+/g, ' ');
-}
+import { bufferToAoa, normalizeString, normalizeHeaderCell, findHeaderRowIndex, buildHeaderMap } from './aoa-reader';
 
 /** 콤마 천단위 구분자, 공백, 통화기호를 제거하고 숫자로 변환한다. 빈 값/파싱 실패는 null. */
 function normalizeNumber(value: string): number | null {
@@ -104,26 +42,6 @@ const DECIMAL_14_2_MIN = -DECIMAL_14_2_MAX;
 /** canonical 필드로는 인식되지만 ParsedInventoryRow에 전용 컬럼이 없는 필드 (InventoryItem.extra에 보존) */
 const FIELDS_WITHOUT_DEDICATED_COLUMN: CanonicalField[] = ['supplierName', 'salePrice', 'supplyPrice', 'marketPrice'];
 
-function buildHeaderMap(headerRow: string[]): Partial<Record<CanonicalField, string>> {
-  const normalizedHeaders = headerRow.map(normalizeHeaderCell);
-  const map: Partial<Record<CanonicalField, string>> = {};
-  for (const field of CANONICAL_FIELDS) {
-    const aliases = HEADER_ALIASES[field].map(normalizeHeaderCell);
-    const idx = normalizedHeaders.findIndex((h) => aliases.includes(h));
-    if (idx !== -1) map[field] = headerRow[idx];
-  }
-  return map;
-}
-
-function findHeaderRowIndex(aoa: string[][]): number {
-  for (let i = 0; i < Math.min(aoa.length, 10); i++) {
-    const normalized = aoa[i].map(normalizeHeaderCell);
-    const hits = CANONICAL_FIELDS.filter((f) => HEADER_ALIASES[f].some((alias) => normalized.includes(normalizeHeaderCell(alias))));
-    if (hits.length >= 3) return i;
-  }
-  return 0;
-}
-
 const MAX_DATA_ROWS = 50_000; // 실제 창고 품목 수보다 훨씬 넉넉한 상한 (동기 파싱 리소스 보호용)
 
 export function parseInventoryWorkbook(buffer: Buffer): ParseResult {
@@ -135,9 +53,9 @@ export function parseInventoryWorkbook(buffer: Buffer): ParseResult {
     return { rows: [], headerMap: {}, issues };
   }
 
-  const headerRowIdx = findHeaderRowIndex(aoa);
+  const headerRowIdx = findHeaderRowIndex(aoa, HEADER_ALIASES);
   const headerRow = aoa[headerRowIdx];
-  const headerMap = buildHeaderMap(headerRow);
+  const headerMap = buildHeaderMap(headerRow, HEADER_ALIASES, CANONICAL_FIELDS);
 
   const missingRequired = REQUIRED_FIELDS.filter((f) => !headerMap[f]);
   if (missingRequired.length > 0) {
