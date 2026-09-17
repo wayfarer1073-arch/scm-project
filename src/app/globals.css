@@ -52,13 +52,16 @@
   --chart-4: oklch(0.55 0.14 150);
   --chart-5: oklch(0.5 0.02 260);
 
-  /* 창고 식별 색상 — 업로드 캘린더에서 A/B/C를 구분하는 용도로만 사용 (재고 상태 색상과 별개) */
-  --warehouse-a: oklch(0.55 0.15 300);
-  --warehouse-a-bg: oklch(0.96 0.03 300);
-  --warehouse-b: oklch(0.58 0.12 195);
-  --warehouse-b-bg: oklch(0.95 0.03 195);
-  --warehouse-c: oklch(0.62 0.16 40);
-  --warehouse-c-bg: oklch(0.96 0.035 40);
+  /* 창고 식별 색상 — 업로드 캘린더에서 A/B/C를 구분하는 파스텔 톤 (재고 상태 색상과 별개) */
+  --warehouse-a: oklch(0.45 0.1 300);
+  --warehouse-a-bg: oklch(0.89 0.05 300);
+  --warehouse-b: oklch(0.42 0.08 195);
+  --warehouse-b-bg: oklch(0.88 0.05 195);
+  --warehouse-c: oklch(0.45 0.11 40);
+  --warehouse-c-bg: oklch(0.89 0.06 40);
+
+  --today-highlight-bg: oklch(0.94 0.03 250);
+  --today-highlight-border: oklch(0.75 0.08 250);
 }
 
 @theme inline {
@@ -105,6 +108,9 @@
   --color-warehouse-b-bg: var(--warehouse-b-bg);
   --color-warehouse-c: var(--warehouse-c);
   --color-warehouse-c-bg: var(--warehouse-c-bg);
+
+  --color-today-highlight-bg: var(--today-highlight-bg);
+  --color-today-highlight-border: var(--today-highlight-border);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

@@ -1,27 +1,10 @@
 import { listWarehouses } from '@/server/repositories/warehouse-repository';
-import { getLatestActiveSnapshot, listSnapshotsForWarehouse } from '@/server/repositories/snapshot-repository';
-import { WarehouseUploadCard } from '@/components/upload/warehouse-upload-card';
+import { listSnapshotsForWarehouse } from '@/server/repositories/snapshot-repository';
 import { UploadCalendar } from '@/components/upload/upload-calendar';
 import { dateOnlyToString } from '@/lib/date';
 
 export default async function UploadPage() {
   const warehouses = await listWarehouses();
-
-  const cards = await Promise.all(
-    warehouses.map(async (w) => {
-      const latest = await getLatestActiveSnapshot(w.id);
-      return {
-        warehouse: { id: w.id, code: w.code, name: w.name },
-        latestSnapshot: latest
-          ? {
-              snapshotDate: dateOnlyToString(latest.snapshotDate),
-              rowCount: latest.rowCount,
-              uploadedAt: latest.uploadedAt.toISOString(),
-            }
-          : null,
-      };
-    }),
-  );
 
   const calendarEntries = (
     await Promise.all(
@@ -45,15 +28,10 @@ export default async function UploadPage() {
       <div>
         <h1 className="text-lg font-semibold">재고 스냅샷 업로드</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          창고별로 매일 추출한 재고 Excel(.xls, .xlsx)을 업로드하세요. 각 창고는 서로 다른 품목군을 관리하는 독립 재고 Pool입니다.
+          캘린더에서 날짜·창고 칸을 눌러 재고 Excel(.xls, .xlsx)을 업로드하세요. 각 창고는 서로 다른 품목군을 관리하는 독립 재고 Pool입니다.
         </p>
       </div>
       <UploadCalendar warehouses={warehouses.map((w) => ({ id: w.id, code: w.code, name: w.name }))} entries={calendarEntries} />
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {cards.map((c) => (
-          <WarehouseUploadCard key={c.warehouse.id} warehouse={c.warehouse} latestSnapshot={c.latestSnapshot} />
-        ))}
-      </div>
     </div>
   );
 }

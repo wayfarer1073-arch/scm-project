@@ -22,7 +22,7 @@ interface CalendarUploadDialogProps {
   warehouseId: string;
   warehouseName: string;
   date: string;
-  existing: { uploadedByName: string; uploadedAt: string; rowCount: number };
+  existing: { uploadedByName: string; uploadedAt: string; rowCount: number } | null;
 }
 
 type UiState =
@@ -47,13 +47,18 @@ export function CalendarUploadDialog({ open, onOpenChange, warehouseId, warehous
     const formData = new FormData();
     formData.append('warehouseId', warehouseId);
     formData.append('snapshotDate', date);
-    formData.append('replaceExisting', 'true');
+    formData.append('replaceExisting', String(!!existing));
     formData.append('file', file);
 
     try {
       const res = await fetch('/api/upload', { method: 'POST', body: formData });
       const body = await res.json();
 
+      if (res.status === 409) {
+        toast.error('그사이 다른 사람이 자료를 올렸습니다. 새로고침 후 다시 시도해주세요.');
+        setState({ phase: 'idle' });
+        return;
+      }
       if (res.status === 422) {
         setState({ phase: 'error', issues: body.issues });
         return;
@@ -93,17 +98,21 @@ export function CalendarUploadDialog({ open, onOpenChange, warehouseId, warehous
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{warehouseName} · {formatKstDate(date)} 자료 교체</DialogTitle>
-          <DialogDescription>기존에 올라온 자료를 새 파일로 교체합니다.</DialogDescription>
+          <DialogTitle>
+            {warehouseName} · {formatKstDate(date)} 자료 {existing ? '교체' : '업로드'}
+          </DialogTitle>
+          <DialogDescription>{existing ? '기존에 올라온 자료를 새 파일로 교체합니다.' : '해당 일자·창고에 재고 스냅샷을 새로 업로드합니다.'}</DialogDescription>
         </DialogHeader>
 
-        <div role="alert" className="flex items-start gap-1.5 rounded-md border border-status-warning/30 bg-status-warning-bg p-2.5 text-xs text-status-warning">
-          <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-          <span>
-            해당 일자에 업로드된 재고 데이터가 있습니다. 교체하시겠습니까? ({existing.uploadedByName}님이 {formatKstDateTime(existing.uploadedAt)}에 올린{' '}
-            {existing.rowCount.toLocaleString()}건)
-          </span>
-        </div>
+        {existing && (
+          <div role="alert" className="flex items-start gap-1.5 rounded-md border border-status-warning/30 bg-status-warning-bg p-2.5 text-xs text-status-warning">
+            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+            <span>
+              해당 일자에 업로드된 재고 데이터가 있습니다. 교체하시겠습니까? ({existing.uploadedByName}님이 {formatKstDateTime(existing.uploadedAt)}에 올린{' '}
+              {existing.rowCount.toLocaleString()}건)
+            </span>
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <Label htmlFor="calendar-upload-file">Excel 파일 (.xls, .xlsx)</Label>
@@ -125,8 +134,8 @@ export function CalendarUploadDialog({ open, onOpenChange, warehouseId, warehous
         )}
 
         {state.phase === 'duplicate' && (
-          <div className="rounded-md border bg-muted/60 p-3 text-xs text-muted-foreground">
-            <div className="mb-1 flex items-center gap-1.5 font-medium text-foreground">
+          <div role="alert" className="rounded-md border border-destructive/30 bg-status-danger-bg p-3 text-xs text-status-danger">
+            <div className="mb-1 flex items-center gap-1.5 font-medium">
               <Info className="size-3.5" />
               동일한 데이터입니다.
             </div>
@@ -140,7 +149,7 @@ export function CalendarUploadDialog({ open, onOpenChange, warehouseId, warehous
           </Button>
           <Button onClick={submit} disabled={state.phase === 'uploading' || !file}>
             <UploadCloud className="size-4" />
-            {state.phase === 'uploading' ? '업로드 중...' : '교체하기'}
+            {state.phase === 'uploading' ? '업로드 중...' : existing ? '교체하기' : '업로드'}
           </Button>
         </DialogFooter>
       </DialogContent>
