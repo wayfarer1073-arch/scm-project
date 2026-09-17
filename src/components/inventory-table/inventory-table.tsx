@@ -150,12 +150,12 @@ export function InventoryTable({
 
   return (
     <section className="scroll-mt-20 space-y-3 rounded-2xl border bg-card p-4 shadow-[0_18px_50px_-42px_rgba(15,23,42,0.65)] sm:p-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-base font-semibold">전체 재고 현황</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">행을 선택하면 최근 추이와 주요 KPI를 확인할 수 있습니다.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <span className="text-xs text-muted-foreground">{sorted.length.toLocaleString('ko-KR')}건</span>
           <Button variant="outline" size="sm" onClick={downloadCurrentView}>
             <Download className="size-3.5" /> 현재 조회결과 다운로드
