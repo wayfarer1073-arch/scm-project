@@ -33,15 +33,15 @@ interface DashboardClientProps {
   latestUploads: LatestUpload[];
 }
 
-export function DashboardClient({ asOfDate, fromDate, warehouses, rows, dailyTotals, latestUploads }: DashboardClientProps) {
+export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows, dailyTotals, latestUploads }: DashboardClientProps) {
   const [warehouseFilter, setWarehouseFilter] = useState<string | 'ALL'>('ALL');
   const [tableTab, setTableTab] = useState<TableTab>('ALL');
   const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
   const [selectedSkuId, setSelectedSkuId] = useState<string | null>(null);
 
-  const kpis = useMemo(() => calculateCompanyKpis(rows), [rows]);
-  const warehouseSummaries = useMemo(() => calculateWarehouseSummaries(rows), [rows]);
-  const actionCenterCards = useMemo(() => buildActionCenterCards(rows), [rows]);
+  const kpis = useMemo(() => calculateCompanyKpis(rows, settings.stagnantDays), [rows, settings.stagnantDays]);
+  const warehouseSummaries = useMemo(() => calculateWarehouseSummaries(rows, settings.stagnantDays), [rows, settings.stagnantDays]);
+  const actionCenterCards = useMemo(() => buildActionCenterCards(rows, settings.stagnantDays), [rows, settings.stagnantDays]);
 
   function handleActionCenterSelect(tab: TableTab, qf: QuickFilter) {
     setTableTab(tab);

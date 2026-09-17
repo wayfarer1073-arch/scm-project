@@ -101,6 +101,8 @@ function findHeaderRowIndex(aoa: string[][]): number {
   return 0;
 }
 
+const MAX_DATA_ROWS = 50_000; // 실제 창고 품목 수보다 훨씬 넉넉한 상한 (동기 파싱 리소스 보호용)
+
 export function parseInventoryWorkbook(buffer: Buffer): ParseResult {
   const issues: ValidationIssue[] = [];
   const aoa = bufferToAoa(buffer);
@@ -135,6 +137,19 @@ export function parseInventoryWorkbook(buffer: Buffer): ParseResult {
   }
 
   const dataRows = aoa.slice(headerRowIdx + 1).filter((r) => r.some((c) => normalizeString(c) !== ''));
+
+  if (dataRows.length === 0) {
+    issues.push({ level: 'ERROR', code: 'NO_DATA_ROWS', message: '헤더는 있지만 상품 데이터가 한 건도 없습니다.' });
+    return { rows: [], headerMap, issues };
+  }
+  if (dataRows.length > MAX_DATA_ROWS) {
+    issues.push({
+      level: 'ERROR',
+      code: 'TOO_MANY_ROWS',
+      message: `상품 행이 ${dataRows.length.toLocaleString()}건으로 처리 가능한 최대치(${MAX_DATA_ROWS.toLocaleString()}건)를 초과합니다.`,
+    });
+    return { rows: [], headerMap, issues };
+  }
 
   const rows: ParsedInventoryRow[] = [];
   const seenProductCodes = new Map<string, number>(); // productCode -> first rowNumber

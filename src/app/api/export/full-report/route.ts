@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { auth } from '@/server/auth';
 import { getInventoryRows, calculateCompanyKpis, calculateWarehouseSummaries } from '@/server/services/inventory-analysis-service';
 import { listAllEvents } from '@/server/repositories/event-repository';
+import { getSettings } from '@/server/repositories/settings-repository';
 import { buildEventsSheetRows, buildInventorySheetRows, buildRiskSheetRows, buildStagnantSheetRows, buildSummarySheetRows, type ExportRowInput } from '@/domain/excel/export';
 import { formatKstDateTime } from '@/lib/date';
 import { todayKstDateString } from '@/lib/date';
@@ -15,9 +16,9 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const asOfDate = url.searchParams.get('asOf') ?? todayKstDateString();
 
-  const [rows, events] = await Promise.all([getInventoryRows({ asOfDate }), listAllEvents()]);
-  const kpis = calculateCompanyKpis(rows);
-  const warehouseSummaries = calculateWarehouseSummaries(rows);
+  const [rows, events, settings] = await Promise.all([getInventoryRows({ asOfDate }), listAllEvents(), getSettings()]);
+  const kpis = calculateCompanyKpis(rows, settings.stagnantDays);
+  const warehouseSummaries = calculateWarehouseSummaries(rows, settings.stagnantDays);
 
   const exportRows: ExportRowInput[] = rows.map((r) => ({
     productCode: r.descriptor.productCode,

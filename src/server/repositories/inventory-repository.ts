@@ -1,6 +1,23 @@
 import { prisma } from '@/lib/prisma';
 import { dateOnlyToString } from '@/lib/date';
 import type { StockObservation } from '@/domain/inventory/types';
+import type { Prisma } from '@prisma/client';
+
+/**
+ * mock과 실데이터는 절대 같은 시계열에 섞이면 안 된다(README 참고). 창고별로 실데이터가
+ * 하나라도 있으면 그 창고는 "실데이터 모드"로 보고 mock 스냅샷을 전부 제외하고, 아직 실데이터가
+ * 없는 창고(개발/데모 단계)만 mock을 그대로 허용한다.
+ */
+async function resolveMockFilter(warehouseId?: string): Promise<Prisma.InventorySnapshotWhereInput> {
+  const realWarehouses = await prisma.inventorySnapshot.findMany({
+    where: { status: 'ACTIVE', isMock: false, ...(warehouseId ? { warehouseId } : {}) },
+    select: { warehouseId: true },
+    distinct: ['warehouseId'],
+  });
+  const realWarehouseIds = realWarehouses.map((w) => w.warehouseId);
+  if (realWarehouseIds.length === 0) return {};
+  return { OR: [{ isMock: false }, { isMock: true, warehouseId: { notIn: realWarehouseIds } }] };
+}
 
 export interface SkuDescriptor {
   skuId: string;
@@ -19,11 +36,13 @@ export async function loadActiveSkusWithSeries(
   warehouseId?: string,
   asOfDate?: string,
 ): Promise<{ descriptor: SkuDescriptor; observations: StockObservation[] }[]> {
+  const mockFilter = await resolveMockFilter(warehouseId);
   const latestSnapshots = await prisma.inventorySnapshot.findMany({
     where: {
       status: 'ACTIVE',
       ...(warehouseId ? { warehouseId } : {}),
       ...(asOfDate ? { snapshotDate: { lte: new Date(`${asOfDate}T00:00:00.000Z`) } } : {}),
+      ...mockFilter,
     },
     select: { id: true, warehouseId: true },
     orderBy: { snapshotDate: 'desc' },
@@ -58,6 +77,7 @@ export async function loadActiveSkusWithSeries(
       snapshot: {
         status: 'ACTIVE',
         ...(asOfDate ? { snapshotDate: { lte: new Date(`${asOfDate}T00:00:00.000Z`) } } : {}),
+        ...mockFilter,
       },
     },
     include: { snapshot: { select: { snapshotDate: true } } },
@@ -105,8 +125,9 @@ export interface DailyWarehouseTotal {
 
 /** 차트용 일자별 창고별 합계(재고수량/재고자산). ACTIVE 스냅샷만 집계한다. */
 export async function loadDailyWarehouseTotals(): Promise<DailyWarehouseTotal[]> {
+  const mockFilter = await resolveMockFilter();
   const items = await prisma.inventoryItem.findMany({
-    where: { snapshot: { status: 'ACTIVE' } },
+    where: { snapshot: { status: 'ACTIVE', ...mockFilter } },
     select: {
       availableStock: true,
       normalStock: true,
@@ -131,8 +152,9 @@ export async function loadSkuWithSeries(skuId: string): Promise<{ descriptor: Sk
   const sku = await prisma.sku.findUnique({ where: { id: skuId }, include: { warehouse: { select: { id: true, code: true, name: true } } } });
   if (!sku) return null;
 
+  const mockFilter = await resolveMockFilter(sku.warehouseId);
   const items = await prisma.inventoryItem.findMany({
-    where: { skuId, snapshot: { status: 'ACTIVE' } },
+    where: { skuId, snapshot: { status: 'ACTIVE', ...mockFilter } },
     include: { snapshot: { select: { snapshotDate: true } } },
     orderBy: { snapshot: { snapshotDate: 'asc' } },
   });

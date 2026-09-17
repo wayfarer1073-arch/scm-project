@@ -269,8 +269,8 @@ export function InventoryTable({
               <TableHead className="hidden text-right 2xl:table-cell">정상재고</TableHead>
               <SortableHead label={fromDate ? '기간 변화' : '전일 대비'} active={sortKey === 'increaseDesc'} asc={sortAsc} onClick={() => toggleSort('increaseDesc')} />
               <TableHead className="hidden text-right xl:table-cell">7일 소진량</TableHead>
-              <SortableHead label="7일 일평균 소진" active={sortKey === 'depletionRateDesc'} asc={sortAsc} onClick={() => toggleSort('depletionRateDesc')} />
-              <SortableHead className="hidden 2xl:table-cell" label="7일 vs 이전 변화율" active={sortKey === 'accelerationDesc'} asc={sortAsc} onClick={() => toggleSort('accelerationDesc')} />
+              <SortableHead className="hidden 2xl:table-cell" label="7일 일평균 소진" active={sortKey === 'depletionRateDesc'} asc={sortAsc} onClick={() => toggleSort('depletionRateDesc')} />
+              <SortableHead label="7일 vs 이전 변화율" active={sortKey === 'accelerationDesc'} asc={sortAsc} onClick={() => toggleSort('accelerationDesc')} />
               <SortableHead label="Coverage" active={sortKey === 'coverageAsc'} asc={sortAsc} onClick={() => toggleSort('coverageAsc')} />
               <SortableHead label="예상 소진일" active={sortKey === 'stockoutFast'} asc={sortAsc} onClick={() => toggleSort('stockoutFast')} />
               <TableHead className="hidden text-right 2xl:table-cell">단위원가</TableHead>

@@ -80,6 +80,17 @@ describe('calculateWindowDepletion', () => {
     const result = calculateWindowDepletion([], '2026-01-08', 7);
     expect(result.averageDailyDepletion).toBeNull();
   });
+
+  it('window보다 훨씬 긴 delta는 끝만 window 안이어도 제외한다(회귀 테스트)', () => {
+    // 1/1~1/31 30일간 100→70으로 감소한 단 하나의 delta. toDate(1/31)만 7일 window 안에 있고
+    // fromDate(1/1)는 window 밖이므로, 이 delta 전체를 "최근 7일 소진량"으로 잡으면 안 된다.
+    const observations = sortObservations([obs('2026-01-01', 100), obs('2026-01-31', 70)]);
+    const deltas = buildDailyDeltas(observations);
+    const result = calculateWindowDepletion(deltas, '2026-01-31', 7);
+    expect(result.totalDepletion).toBe(0);
+    expect(result.observedIntervalDays).toBe(0);
+    expect(result.averageDailyDepletion).toBeNull();
+  });
 });
 
 describe('calculateCoverage', () => {
@@ -114,6 +125,15 @@ describe('calculateDataMaturity', () => {
     expect(maturityLong.hasSevenDayData).toBe(true);
     expect(maturityLong.hasFourteenDayData).toBe(true);
     expect(maturityLong.hasThirtyDayData).toBe(true);
+  });
+
+  it('마지막 관측 이후 조회일만 지나간 경우를 30일치 데이터로 오판하지 않는다(회귀 테스트)', () => {
+    // 1/1, 1/2 두 건만 관측되고 그 뒤로 업로드가 없는 상태에서 한 달 뒤(2/1)에 조회해도,
+    // 실제 관측 구간은 하루뿐이므로 30일 데이터가 쌓였다고 볼 수 없다.
+    const observations = sortObservations([obs('2026-01-01', 100), obs('2026-01-02', 100)]);
+    const maturity = calculateDataMaturity(observations, '2026-02-01');
+    expect(maturity.hasThirtyDayData).toBe(false);
+    expect(maturity.hasSevenDayData).toBe(false);
   });
 });
 
@@ -311,5 +331,15 @@ describe('analyzeSku 통합', () => {
     const observations = [obs('2026-01-01', 100), obs('2026-01-02', 90), obs('2026-01-05', 10)];
     const analysis = analyzeSku(observations, '2026-01-02');
     expect(analysis!.latest.date).toBe('2026-01-02');
+  });
+
+  it('새 관측 없이 조회일만 지나가도 예상 소진일이 그대로 유지된다(회귀 테스트)', () => {
+    // 실제 마지막 업로드는 1/8뿐이다. 그 다음날(1/9)에 새 데이터 없이 다시 조회해도
+    // "오늘도 그만큼 재고가 있다"고 가정해 예상 소진일을 하루 더 미루면 안 된다.
+    const observations = [obs('2026-01-01', 1000), obs('2026-01-08', 300)];
+    const asOf8 = analyzeSku(observations, '2026-01-08')!;
+    const asOf10 = analyzeSku(observations, '2026-01-10')!;
+    expect(asOf8.forecast.expectedStockoutDate).toBe('2026-01-11');
+    expect(asOf10.forecast.expectedStockoutDate).toBe('2026-01-11');
   });
 });

@@ -41,7 +41,7 @@ export async function getSkuDetail(skuId: string, asOfDate: string, settings?: R
 
 // ---- 집계 ----
 
-export function calculateCompanyKpis(rows: InventoryRow[]): CompanyKpis {
+export function calculateCompanyKpis(rows: InventoryRow[], stagnantDaysThreshold: number): CompanyKpis {
   let totalAvailableStock = 0;
   let totalInventoryValue = 0;
   let netChangeVsYesterday = 0;
@@ -63,7 +63,7 @@ export function calculateCompanyKpis(rows: InventoryRow[]): CompanyKpis {
     if (row.analysis.coverage.coverageDays !== null && row.analysis.coverage.coverageDays <= 30) stockoutSoon30dCount += 1;
     if (row.analysis.forecast.expectedStockoutDays !== null) forecastReadyCount += 1;
     if (row.analysis.overstock.isCandidate) overstockCandidateValue += row.valueBreakdown.normalStockValue;
-    if (row.analysis.stagnation.isMeaningful && row.analysis.stagnation.stagnantDays >= 30) {
+    if (row.analysis.stagnation.isMeaningful && row.analysis.stagnation.stagnantDays >= stagnantDaysThreshold) {
       stagnantValue += row.valueBreakdown.normalStockValue;
     }
     if (row.analysis.dailyChange !== null) {
@@ -95,7 +95,7 @@ export function calculateCompanyKpis(rows: InventoryRow[]): CompanyKpis {
   };
 }
 
-export function calculateWarehouseSummaries(rows: InventoryRow[]): WarehouseSummary[] {
+export function calculateWarehouseSummaries(rows: InventoryRow[], stagnantDaysThreshold: number): WarehouseSummary[] {
   const byWarehouse = new Map<string, InventoryRow[]>();
   for (const row of rows) {
     const list = byWarehouse.get(row.descriptor.warehouseId) ?? [];
@@ -108,7 +108,7 @@ export function calculateWarehouseSummaries(rows: InventoryRow[]): WarehouseSumm
     const inventoryValue = whRows.reduce((sum, r) => sum + r.valueBreakdown.normalStockValue, 0);
     const dangerSkuCount = whRows.filter((r) => r.analysis.thresholdRisk.level === 'DANGER').length;
     const stockoutSoonCount = whRows.filter((r) => r.analysis.coverage.coverageDays !== null && r.analysis.coverage.coverageDays <= 30).length;
-    const stagnantCount = whRows.filter((r) => r.analysis.stagnation.isMeaningful && r.analysis.stagnation.stagnantDays >= 30).length;
+    const stagnantCount = whRows.filter((r) => r.analysis.stagnation.isMeaningful && r.analysis.stagnation.stagnantDays >= stagnantDaysThreshold).length;
     const overstockCount = whRows.filter((r) => r.analysis.overstock.isCandidate).length;
 
     return {
@@ -135,12 +135,12 @@ export interface ActionCenterCard {
   sampleSkus: { skuId: string; productName: string; productCode: string; warehouseName: string; detail: string }[];
 }
 
-export function buildActionCenterCards(rows: InventoryRow[]): ActionCenterCard[] {
+export function buildActionCenterCards(rows: InventoryRow[], stagnantDaysThreshold: number): ActionCenterCard[] {
   const newDanger = rows.filter((r) => isNewlyAtRisk(r.analysis));
   const stockoutSoon = rows.filter((r) => r.analysis.coverage.band === 'STOCKOUT_SOON');
   const accelerating = rows.filter((r) => r.analysis.acceleration.trend === 'ACCELERATING');
   const stockIncrease = rows.filter((r) => r.analysis.stockIncreasedToday);
-  const stagnant = rows.filter((r) => r.analysis.stagnation.isMeaningful && r.analysis.stagnation.stagnantDays >= 30);
+  const stagnant = rows.filter((r) => r.analysis.stagnation.isMeaningful && r.analysis.stagnation.stagnantDays >= stagnantDaysThreshold);
   const overstock = rows.filter((r) => r.analysis.overstock.isCandidate);
 
   const toSample = (list: InventoryRow[], detailFn: (r: InventoryRow) => string) =>

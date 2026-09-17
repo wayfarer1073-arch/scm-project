@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/server/auth';
 import { processUpload } from '@/server/services/upload-service';
 
+const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20MB — 일반적인 재고 Excel보다 훨씬 넉넉한 상한
+
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user) {
@@ -16,6 +18,10 @@ export async function POST(request: Request) {
 
   if (typeof warehouseId !== 'string' || typeof snapshotDateStr !== 'string' || !(file instanceof File)) {
     return NextResponse.json({ error: '필수 항목이 누락되었습니다 (창고, 기준일, 파일).' }, { status: 400 });
+  }
+
+  if (file.size > MAX_FILE_BYTES) {
+    return NextResponse.json({ error: `파일이 너무 큽니다 (최대 ${MAX_FILE_BYTES / 1024 / 1024}MB).` }, { status: 413 });
   }
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(snapshotDateStr)) {

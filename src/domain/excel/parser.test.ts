@@ -55,6 +55,14 @@ describe('parseInventoryWorkbook - 검증 규칙', () => {
     expect(result.issues.some((i) => i.code === 'MISSING_REQUIRED_COLUMN')).toBe(true);
   });
 
+  it('헤더만 있고 상품 데이터가 한 건도 없으면 ERROR를 반환한다(회귀 테스트)', () => {
+    const rows = [HEADER];
+    const buffer = buildXlsxBuffer(rows);
+    const result = parseInventoryWorkbook(buffer);
+    expect(result.rows).toHaveLength(0);
+    expect(result.issues.some((i) => i.code === 'NO_DATA_ROWS' && i.level === 'ERROR')).toBe(true);
+  });
+
   it('상품코드 누락 행은 ERROR로 표시되고 제외된다', () => {
     const rows = [HEADER, ['', '상품A', '', '', '1000', '10', '10', '0', '0', '0', '0', '']];
     const buffer = buildXlsxBuffer(rows);

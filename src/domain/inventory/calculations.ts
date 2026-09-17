@@ -108,8 +108,11 @@ export function calculateWindowDepletion(
 ): WindowDepletion {
   const windowStart = addDays(toDate(asOfDate), -windowDays);
   const relevant = deltas.filter((d) => {
+    const fromD = toDate(d.fromDate);
     const toD = toDate(d.toDate);
-    return toD > windowStart && toD <= toDate(asOfDate);
+    // delta의 끝(toDate)뿐 아니라 시작(fromDate)도 window 안에 있어야 한다. 그렇지 않으면
+    // window보다 훨씬 긴 간격(예: 30일)의 delta가 통째로 "최근 N일" 수치에 섞여 들어간다.
+    return fromD >= windowStart && toD > windowStart && toD <= toDate(asOfDate);
   });
   const totalDepletion = relevant.reduce((sum, d) => sum + d.depletion, 0);
   const observedIntervalDays = relevant.reduce((sum, d) => sum + d.intervalDays, 0);
@@ -136,6 +139,10 @@ export function calculateDataMaturity(sortedObservations: StockObservation[], as
   }
   const first = sortedObservations[0].date;
   const last = sortedObservations[sortedObservations.length - 1].date;
+  // "N일치 데이터가 있다"는 실제 관측 구간(첫 관측~마지막 관측)의 길이로 판단해야 한다.
+  // asOfDate를 기준으로 하면, 마지막 업로드 이후 새 관측 없이 조회일만 흘러가도 관측이 계속
+  // 쌓이고 있는 것처럼 잘못 판정된다(예: 1/1·1/2 두 건만 있는데 2/1에 조회하면 31일치로 오판).
+  const observedSpanDays = differenceInCalendarDays(toDate(last), toDate(first));
   const daysSinceFirstObservation = differenceInCalendarDays(toDate(asOfDate), toDate(first));
   return {
     firstObservedDate: first,
@@ -143,9 +150,9 @@ export function calculateDataMaturity(sortedObservations: StockObservation[], as
     snapshotCount: sortedObservations.length,
     daysSinceFirstObservation,
     hasDayOverDayData: sortedObservations.length >= 2,
-    hasSevenDayData: sortedObservations.length >= 2 && daysSinceFirstObservation >= 7,
-    hasFourteenDayData: sortedObservations.length >= 2 && daysSinceFirstObservation >= 14,
-    hasThirtyDayData: sortedObservations.length >= 2 && daysSinceFirstObservation >= 30,
+    hasSevenDayData: sortedObservations.length >= 2 && observedSpanDays >= 7,
+    hasFourteenDayData: sortedObservations.length >= 2 && observedSpanDays >= 14,
+    hasThirtyDayData: sortedObservations.length >= 2 && observedSpanDays >= 30,
   };
 }
 
@@ -173,7 +180,7 @@ export function calculateCoverage(
  */
 export function calculateStockoutForecast(
   currentAvailableStock: number,
-  asOfDate: string,
+  lastObservedDate: string,
   maturity: DataMaturity,
   window7: WindowDepletion,
   window14: WindowDepletion,
@@ -191,7 +198,10 @@ export function calculateStockoutForecast(
   }
 
   const expectedStockoutDays = currentAvailableStock / basis.averageDailyDepletion;
-  const expectedStockoutDate = format(addDays(toDate(asOfDate), Math.round(expectedStockoutDays)), 'yyyy-MM-dd');
+  // 예측은 "실제로 재고를 확인한 마지막 날짜"부터 더해야 한다. asOfDate(조회일)를 기준으로 더하면
+  // 새 업로드 없이 조회일만 지나가도 currentAvailableStock을 조회일 시점 값처럼 착각해 예상
+  // 소진일이 매일 뒤로 밀린다.
+  const expectedStockoutDate = format(addDays(toDate(lastObservedDate), Math.round(expectedStockoutDays)), 'yyyy-MM-dd');
 
   const confidence = calculateConfidence(maturity, window7, window14);
 
@@ -332,7 +342,7 @@ export function analyzeSku(
   const coverage = maturity.hasSevenDayData
     ? calculateCoverage(latest.availableStock, window7.averageDailyDepletion, settings)
     : { coverageDays: null, band: null };
-  const forecast = calculateStockoutForecast(latest.availableStock, asOfDate, maturity, window7, window14, window30);
+  const forecast = calculateStockoutForecast(latest.availableStock, latest.date, maturity, window7, window14, window30);
   const acceleration = calculateAcceleration(maturity, deltas, asOfDate);
   const thresholdRisk = calculateThresholdRisk(latest);
   const stagnation = calculateStagnation(sorted, deltas, asOfDate, maturity);

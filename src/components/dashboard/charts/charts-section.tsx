@@ -83,12 +83,26 @@ export function ChartsSection({ rows, dailyTotals, warehouses, chartWarehouseId,
 }
 
 function buildDailySeries(dailyTotals: DailyWarehouseTotal[], warehouseId: string | 'ALL', metric: 'totalAvailableStock' | 'totalInventoryValue') {
-  const byDate = new Map<string, number>();
+  if (warehouseId !== 'ALL') {
+    return dailyTotals
+      .filter((t) => t.warehouseId === warehouseId)
+      .map((t) => ({ date: t.date, value: t[metric] }))
+      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  }
+
+  // "전체" 합계는 그 날 실제로 업로드된 창고만 더하면, 일부 창고가 아직 업로드하지 않은 날을
+  // 재고가 줄어든 것처럼 보여준다. 지금까지 한 번이라도 업로드한 적 있는 창고 수를 기준으로,
+  // 모든 창고가 보고를 마친 날짜만 표시한다.
+  const knownWarehouseIds = new Set(dailyTotals.map((t) => t.warehouseId));
+  const byDate = new Map<string, { sum: number; warehouseIds: Set<string> }>();
   for (const t of dailyTotals) {
-    if (warehouseId !== 'ALL' && t.warehouseId !== warehouseId) continue;
-    byDate.set(t.date, (byDate.get(t.date) ?? 0) + t[metric]);
+    const entry = byDate.get(t.date) ?? { sum: 0, warehouseIds: new Set<string>() };
+    entry.sum += t[metric];
+    entry.warehouseIds.add(t.warehouseId);
+    byDate.set(t.date, entry);
   }
   return [...byDate.entries()]
+    .filter(([, entry]) => entry.warehouseIds.size === knownWarehouseIds.size)
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([date, value]) => ({ date, value }));
+    .map(([date, entry]) => ({ date, value: entry.sum }));
 }
