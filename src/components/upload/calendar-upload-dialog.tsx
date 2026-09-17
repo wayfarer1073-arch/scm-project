@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, CheckCircle2, Info, UploadCloud } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Info, Plus, Trash2, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,7 +22,12 @@ interface CalendarUploadDialogProps {
   warehouseId: string;
   warehouseName: string;
   date: string;
-  existing: { uploadedByName: string; uploadedAt: string; rowCount: number } | null;
+  existing: { uploadedByName: string; uploadedAt: string; rowCount: number; inboundEntries: InboundDraft[] } | null;
+}
+
+interface InboundDraft {
+  productIdentifier: string;
+  quantity: string;
 }
 
 type UiState =
@@ -36,6 +41,9 @@ export function CalendarUploadDialog({ open, onOpenChange, warehouseId, warehous
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [state, setState] = useState<UiState>({ phase: 'idle' });
+  const [inboundEntries, setInboundEntries] = useState<InboundDraft[]>(
+    existing?.inboundEntries.length ? existing.inboundEntries : [{ productIdentifier: '', quantity: '' }],
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function submit() {
@@ -43,12 +51,26 @@ export function CalendarUploadDialog({ open, onOpenChange, warehouseId, warehous
       toast.error('업로드할 Excel 파일을 선택하세요.');
       return;
     }
+    const partiallyFilled = inboundEntries.find((entry) => (entry.productIdentifier.trim() === '') !== (entry.quantity.trim() === ''));
+    if (partiallyFilled) {
+      toast.error('입고 특이사항은 상품명/상품코드와 수량을 함께 입력하세요.');
+      return;
+    }
+    const submittedInboundEntries = inboundEntries
+      .filter((entry) => entry.productIdentifier.trim() !== '' && entry.quantity.trim() !== '')
+      .map((entry) => ({ productIdentifier: entry.productIdentifier.trim(), quantity: Number(entry.quantity) }));
+    if (submittedInboundEntries.some((entry) => !Number.isSafeInteger(entry.quantity) || entry.quantity <= 0)) {
+      toast.error('입고 수량은 1 이상의 정수로 입력하세요.');
+      return;
+    }
+
     setState({ phase: 'uploading' });
     const formData = new FormData();
     formData.append('warehouseId', warehouseId);
     formData.append('snapshotDate', date);
     formData.append('replaceExisting', String(!!existing));
     formData.append('file', file);
+    formData.append('inboundEntries', JSON.stringify(submittedInboundEntries));
 
     try {
       const res = await fetch('/api/upload', { method: 'POST', body: formData });
@@ -92,11 +114,12 @@ export function CalendarUploadDialog({ open, onOpenChange, warehouseId, warehous
         if (!next) {
           setFile(null);
           setState({ phase: 'idle' });
+          setInboundEntries(existing?.inboundEntries.length ? existing.inboundEntries : [{ productIdentifier: '', quantity: '' }]);
         }
         onOpenChange(next);
       }}
     >
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
             {warehouseName} · {formatKstDate(date)} 자료 {existing ? '교체' : '업로드'}
@@ -141,11 +164,61 @@ export function CalendarUploadDialog({ open, onOpenChange, warehouseId, warehous
               <Input ref={fileInputRef} id="calendar-upload-file" type="file" accept=".xls,.xlsx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
             </div>
 
+            <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <Label>&lt;입고 특이사항&gt;</Label>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    이 스냅샷까지 입고된 상품과 수량을 입력하면 추정 소진량에서 입고분을 보정합니다.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setInboundEntries((entries) => [...entries, { productIdentifier: '', quantity: '' }])}
+                  disabled={inboundEntries.length >= 100}
+                >
+                  <Plus className="size-3.5" /> 항목 추가
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {inboundEntries.map((entry, index) => (
+                  <div key={index} className="grid grid-cols-[minmax(0,1fr)_7rem_auto] gap-2">
+                    <Input
+                      aria-label={`입고 상품 ${index + 1}`}
+                      placeholder="상품명 또는 상품코드"
+                      value={entry.productIdentifier}
+                      onChange={(event) => setInboundEntries((entries) => entries.map((item, itemIndex) => itemIndex === index ? { ...item, productIdentifier: event.target.value } : item))}
+                    />
+                    <Input
+                      aria-label={`입고 수량 ${index + 1}`}
+                      type="number"
+                      min={1}
+                      step={1}
+                      placeholder="수량"
+                      value={entry.quantity}
+                      onChange={(event) => setInboundEntries((entries) => entries.map((item, itemIndex) => itemIndex === index ? { ...item, quantity: event.target.value } : item))}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`입고 항목 ${index + 1} 삭제`}
+                      onClick={() => setInboundEntries((entries) => entries.length === 1 ? [{ productIdentifier: '', quantity: '' }] : entries.filter((_, itemIndex) => itemIndex !== index))}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {state.phase === 'error' && (
               <div className="rounded-md border border-destructive/30 bg-status-danger-bg p-3 text-xs text-status-danger">
                 <div className="mb-1 flex items-center gap-1.5 font-medium">
                   <AlertTriangle className="size-3.5" />
-                  파일 형식 오류로 저장하지 않았습니다
+                  업로드 내용을 확인해주세요
                 </div>
                 <ul className="list-disc space-y-0.5 pl-4">
                   {errorIssues.slice(0, 8).map((issue, i) => (
@@ -161,7 +234,7 @@ export function CalendarUploadDialog({ open, onOpenChange, warehouseId, warehous
                   <Info className="size-3.5" />
                   동일한 데이터입니다.
                 </div>
-                품목과 재고수량이 기존 자료와 완전히 동일하여 반영하지 않았습니다.
+                품목·재고수량·입고 특이사항이 기존 자료와 완전히 동일하여 반영하지 않았습니다.
               </div>
             )}
 

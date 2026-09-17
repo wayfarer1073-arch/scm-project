@@ -22,6 +22,7 @@ import type { StockObservation } from './types';
 function obs(date: string, availableStock: number, overrides: Partial<StockObservation> = {}): StockObservation {
   return {
     date,
+    inboundQuantity: overrides.inboundQuantity ?? 0,
     availableStock,
     normalStock: overrides.normalStock ?? availableStock,
     defectiveStock: overrides.defectiveStock ?? 0,
@@ -48,6 +49,18 @@ describe('daily change / depletion / increase', () => {
     expect(dailyChange(curr, prev)).toBe(500);
     expect(dailyDepletion(curr, prev)).toBe(0);
     expect(dailyIncrease(curr, prev)).toBe(500);
+  });
+
+  it('입고량을 감안해 소진량과 설명되지 않는 증가량을 계산한다', () => {
+    const prev = obs('2026-01-01', 100);
+    const curr = obs('2026-01-02', 120, { inboundQuantity: 50 });
+    expect(dailyChange(curr, prev)).toBe(20);
+    expect(dailyDepletion(curr, prev)).toBe(30);
+    expect(dailyIncrease(curr, prev)).toBe(0);
+
+    const unexplained = obs('2026-01-03', 190, { inboundQuantity: 50 });
+    expect(dailyDepletion(unexplained, curr)).toBe(0);
+    expect(dailyIncrease(unexplained, curr)).toBe(20);
   });
 });
 
@@ -343,6 +356,20 @@ describe('analyzeSku 통합', () => {
     expect(analysis!.stockIncreasedToday).toBe(true);
     expect(analysis!.tags).toContain('[위험수량 이하]');
     expect(analysis!.tags).toContain('[재고 증가 감지]');
+  });
+
+  it('입고로 설명되는 재고 증가는 미분류 증가로 표시하지 않고 소진량을 보정한다', () => {
+    const observations = [
+      obs('2026-01-01', 100),
+      obs('2026-01-02', 120, { inboundQuantity: 50 }),
+    ];
+    const analysis = analyzeSku(observations, '2026-01-02')!;
+    expect(analysis.dailyChange).toBe(20);
+    expect(analysis.window7.totalDepletion).toBe(30);
+    expect(analysis.window7.totalInboundQuantity).toBe(50);
+    expect(analysis.stockIncreasedToday).toBe(false);
+    expect(analysis.tags).toContain('[입고 50개 반영]');
+    expect(analysis.tags).not.toContain('[재고 증가 감지]');
   });
 
   it('asOfDate 이후 관측치는 무시한다(미래 데이터 유출 방지)', () => {

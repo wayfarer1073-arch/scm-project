@@ -38,11 +38,11 @@ export function dailyChange(current: StockObservation, previous: StockObservatio
 }
 
 export function dailyDepletion(current: StockObservation, previous: StockObservation): number {
-  return Math.max(previous.availableStock - current.availableStock, 0);
+  return Math.max(previous.availableStock + (current.inboundQuantity ?? 0) - current.availableStock, 0);
 }
 
 export function dailyIncrease(current: StockObservation, previous: StockObservation): number {
-  return Math.max(current.availableStock - previous.availableStock, 0);
+  return Math.max(current.availableStock - previous.availableStock - (current.inboundQuantity ?? 0), 0);
 }
 
 /** 정렬된 관측값들로부터 인접 스냅샷 간 delta 목록을 만든다 */
@@ -58,6 +58,7 @@ export function buildDailyDeltas(sortedObservations: StockObservation[]): DailyD
       toDate: curr.date,
       intervalDays,
       change: dailyChange(curr, prev),
+      inboundQuantity: curr.inboundQuantity ?? 0,
       depletion: dailyDepletion(curr, prev),
       increase: dailyIncrease(curr, prev),
     });
@@ -80,6 +81,7 @@ export function calculatePeriodComparison(
   const observedDays = deltas.reduce((sum, delta) => sum + delta.intervalDays, 0);
   const totalDepletion = deltas.reduce((sum, delta) => sum + delta.depletion, 0);
   const totalIncrease = deltas.reduce((sum, delta) => sum + delta.increase, 0);
+  const totalInboundQuantity = deltas.reduce((sum, delta) => sum + delta.inboundQuantity, 0);
 
   return {
     requestedStartDate: startDate,
@@ -91,6 +93,7 @@ export function calculatePeriodComparison(
     netChange: end.availableStock - start.availableStock,
     totalDepletion,
     totalIncrease,
+    totalInboundQuantity,
     observedDays,
     averageDailyDepletion: observedDays > 0 ? totalDepletion / observedDays : null,
   };
@@ -115,10 +118,12 @@ export function calculateWindowDepletion(
     return fromD >= windowStart && toD > windowStart && toD <= toDate(asOfDate);
   });
   const totalDepletion = relevant.reduce((sum, d) => sum + d.depletion, 0);
+  const totalInboundQuantity = relevant.reduce((sum, d) => sum + d.inboundQuantity, 0);
   const observedIntervalDays = relevant.reduce((sum, d) => sum + d.intervalDays, 0);
   return {
     windowDays,
     totalDepletion,
+    totalInboundQuantity,
     observedIntervalDays,
     averageDailyDepletion: observedIntervalDays > 0 ? totalDepletion / observedIntervalDays : null,
   };
@@ -353,7 +358,8 @@ export function analyzeSku(
   const overstock = calculateOverstockCandidate(latest.availableStock, window30, maturity, settings);
 
   const dailyChangeValue = previous ? dailyChange(latest, previous) : null;
-  const stockIncreasedToday = dailyChangeValue !== null && dailyChangeValue > 0;
+  const latestDelta = deltas.at(-1);
+  const stockIncreasedToday = latestDelta?.toDate === latest.date && latestDelta.increase > 0;
 
   const tags: string[] = [];
   if (thresholdRisk.reason) tags.push(`[${thresholdRisk.reason}]`);
@@ -372,6 +378,7 @@ export function analyzeSku(
     tags.push(`[재고 정체 ${stagnation.stagnantDays}일]`);
   }
   if (overstock.isCandidate) tags.push('[과잉재고 후보]');
+  if ((latest.inboundQuantity ?? 0) > 0) tags.push(`[입고 ${latest.inboundQuantity}개 반영]`);
   if (stockIncreasedToday) tags.push('[재고 증가 감지]');
   const previousThresholdRisk = previous ? calculateThresholdRisk(previous) : null;
   const newlyAtRisk = previousThresholdRisk !== null && RISK_RANK[thresholdRisk.level] > RISK_RANK[previousThresholdRisk.level];

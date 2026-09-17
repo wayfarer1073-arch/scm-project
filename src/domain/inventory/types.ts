@@ -3,6 +3,8 @@
 /** 특정 SKU의 특정 기준일 스냅샷 관측값 (날짜는 'YYYY-MM-DD', KST 달력 기준) */
 export interface StockObservation {
   date: string;
+  /** 이전 스냅샷 이후 이 스냅샷까지 실제 입고된 것으로 사용자가 기록한 수량 */
+  inboundQuantity?: number;
   availableStock: number;
   normalStock: number;
   defectiveStock: number;
@@ -18,8 +20,9 @@ export interface DailyDelta {
   toDate: string;
   intervalDays: number;
   change: number; // current - previous (부호 있음)
-  depletion: number; // max(previous - current, 0)
-  increase: number; // max(current - previous, 0)
+  inboundQuantity: number;
+  depletion: number; // max(previous + inbound - current, 0)
+  increase: number; // max(current - previous - inbound, 0): 입고로 설명되지 않는 증가
 }
 
 /** 특정 window(예: 7/14/30일)에 대한 평균 소진량 계산 결과 */
@@ -27,6 +30,8 @@ export interface WindowDepletion {
   windowDays: number;
   /** 총 소진량 합계 */
   totalDepletion: number;
+  /** window 안에서 사용자가 입력한 입고 특이사항 합계 */
+  totalInboundQuantity?: number;
   /** 실제로 관측된 interval의 합계 일수(스냅샷이 매일 올라오지 않을 수 있어 windowDays와 다를 수 있음) */
   observedIntervalDays: number;
   /** totalDepletion / observedIntervalDays. 관측 interval이 없으면 null */
@@ -145,6 +150,7 @@ export interface PeriodComparison {
   netChange: number;
   totalDepletion: number;
   totalIncrease: number;
+  totalInboundQuantity?: number;
   observedDays: number;
   averageDailyDepletion: number | null;
 }

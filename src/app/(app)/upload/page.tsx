@@ -18,6 +18,11 @@ export default async function UploadPage() {
           rowCount: s.rowCount,
           uploadedByName: s.uploadedBy.name,
           uploadedAt: s.uploadedAt.toISOString(),
+          inboundEntries: s.inboundEntries.map((entry) => ({
+            productIdentifier: entry.productCode,
+            productName: entry.productName,
+            quantity: String(entry.quantity),
+          })),
         }));
       }),
     )

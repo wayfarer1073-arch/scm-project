@@ -196,6 +196,7 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, onOpenChange }: SkuD
                       <Field label="순 변화" value={`${formatSigned(periodMetrics.netChange)}개`} />
                       <Field label="관측 감소" value={`${formatNumber(periodMetrics.totalDepletion)}개`} />
                       <Field label="관측 증가" value={`${formatNumber(periodMetrics.totalIncrease)}개`} />
+                      <Field label="입고 반영" value={`${formatNumber(periodMetrics.totalInboundQuantity ?? 0)}개`} />
                       <Field label="기간 일평균 소진" value={fmtRate(periodMetrics.averageDailyDepletion)} />
                     </div>
                   ) : <p className="text-xs text-muted-foreground">두 날짜를 비교할 관측 데이터가 부족합니다.</p>}
@@ -208,6 +209,7 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, onOpenChange }: SkuD
                 <h3 className="mb-2 text-sm font-semibold">추세</h3>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                   <Field label="7일 평균 소진" value={fmtRate(detail.analysis.window7.averageDailyDepletion)} />
+                  <Field label="7일 입고 반영" value={`${formatNumber(detail.analysis.window7.totalInboundQuantity ?? 0)}개`} />
                   <Field label="14일 평균 소진" value={fmtRate(detail.analysis.window14.averageDailyDepletion)} />
                   <Field label="30일 평균 소진" value={fmtRate(detail.analysis.window30.averageDailyDepletion)} />
                   <Field label="소진 가속/둔화" value={accelerationText(detail.analysis)} />

@@ -101,6 +101,7 @@ model Sku {
 
   items  InventoryItem[]
   events InventoryEvent[]
+  snapshotInbounds SnapshotInbound[]
 
   @@unique([warehouseId, productCode])
   @@index([warehouseId])
@@ -123,10 +124,30 @@ model InventorySnapshot {
   uploadedAt     DateTime       @default(now())
 
   items InventoryItem[]
+  inboundEntries SnapshotInbound[]
 
   @@unique([warehouseId, snapshotDate, version])
   @@index([warehouseId, snapshotDate, status])
   @@map("inventory_snapshots")
+}
+
+/// Excel 스냅샷에 함께 기록한 입고 특이사항.
+/// 해당 스냅샷까지의 관측 구간에 실제 입고된 수량으로 간주해 추정 소진량을 보정한다.
+model SnapshotInbound {
+  id         String            @id @default(cuid())
+  snapshotId String
+  snapshot   InventorySnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  skuId      String
+  sku        Sku               @relation(fields: [skuId], references: [id])
+
+  productCode String
+  productName String
+  quantity    Int
+  createdAt   DateTime @default(now())
+
+  @@unique([snapshotId, skuId])
+  @@index([skuId])
+  @@map("snapshot_inbounds")
 }
 
 model InventoryItem {

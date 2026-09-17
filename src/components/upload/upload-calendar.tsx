@@ -18,6 +18,7 @@ export interface CalendarEntry {
   rowCount: number;
   uploadedByName: string;
   uploadedAt: string;
+  inboundEntries: { productIdentifier: string; productName: string; quantity: string }[];
 }
 
 interface UploadCalendarProps {
@@ -29,7 +30,7 @@ interface SelectedSlot {
   warehouseId: string;
   warehouseName: string;
   date: string;
-  existing: { uploadedByName: string; uploadedAt: string; rowCount: number } | null;
+  existing: { uploadedByName: string; uploadedAt: string; rowCount: number; inboundEntries: { productIdentifier: string; quantity: string }[] } | null;
 }
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -121,7 +122,12 @@ export function UploadCalendar({ warehouses, entries }: UploadCalendarProps) {
                                   warehouseId: entry.warehouseId,
                                   warehouseName: entry.warehouseName,
                                   date: entry.date,
-                                  existing: { uploadedByName: entry.uploadedByName, uploadedAt: entry.uploadedAt, rowCount: entry.rowCount },
+                                  existing: {
+                                    uploadedByName: entry.uploadedByName,
+                                    uploadedAt: entry.uploadedAt,
+                                    rowCount: entry.rowCount,
+                                    inboundEntries: entry.inboundEntries.map(({ productIdentifier, quantity }) => ({ productIdentifier, quantity })),
+                                  },
                                 })
                               }
                               className={cn(
@@ -136,6 +142,7 @@ export function UploadCalendar({ warehouses, entries }: UploadCalendarProps) {
                           </TooltipTrigger>
                           <TooltipContent>
                             {entry.warehouseName} · {entry.uploadedByName} 업로드 · {formatKstDateTime(entry.uploadedAt)} · {entry.rowCount.toLocaleString()}건
+                            {entry.inboundEntries.length > 0 ? ` · 입고 특이사항 ${entry.inboundEntries.length}건` : ''}
                           </TooltipContent>
                         </Tooltip>
                       );

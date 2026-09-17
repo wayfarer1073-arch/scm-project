@@ -2,8 +2,13 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/server/auth';
 import { processUpload } from '@/server/services/upload-service';
 import { todayKstDateString } from '@/lib/date';
+import { z } from 'zod';
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20MB — 일반적인 재고 Excel보다 훨씬 넉넉한 상한
+const inboundEntriesSchema = z.array(z.object({
+  productIdentifier: z.string().trim().min(1).max(200),
+  quantity: z.number().int().positive().max(2_147_483_647),
+})).max(100);
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -16,6 +21,7 @@ export async function POST(request: Request) {
   const snapshotDateStr = formData.get('snapshotDate');
   const replaceExisting = formData.get('replaceExisting') === 'true';
   const file = formData.get('file');
+  const inboundEntriesRaw = formData.get('inboundEntries');
 
   if (typeof warehouseId !== 'string' || typeof snapshotDateStr !== 'string' || !(file instanceof File)) {
     return NextResponse.json({ error: '필수 항목이 누락되었습니다 (창고, 기준일, 파일).' }, { status: 400 });
@@ -39,6 +45,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '미래 날짜는 기준일로 선택할 수 없습니다.' }, { status: 400 });
   }
 
+  let inboundEntries: z.infer<typeof inboundEntriesSchema> = [];
+  if (typeof inboundEntriesRaw === 'string' && inboundEntriesRaw !== '') {
+    try {
+      const parsed = inboundEntriesSchema.safeParse(JSON.parse(inboundEntriesRaw));
+      if (!parsed.success) {
+        return NextResponse.json({ error: '입고 특이사항의 상품명/상품코드와 수량을 확인하세요.' }, { status: 400 });
+      }
+      inboundEntries = parsed.data;
+    } catch {
+      return NextResponse.json({ error: '입고 특이사항 형식이 올바르지 않습니다.' }, { status: 400 });
+    }
+  }
+
   const arrayBuffer = await file.arrayBuffer();
   const fileBuffer = Buffer.from(arrayBuffer);
 
@@ -49,6 +68,7 @@ export async function POST(request: Request) {
     fileName: file.name,
     uploadedById: session.user.id,
     replaceExisting,
+    inboundEntries,
   });
 
   if (result.status === 'ERROR') {

@@ -19,6 +19,31 @@ async function resolveMockFilter(warehouseId?: string): Promise<Prisma.Inventory
   return { OR: [{ isMock: false }, { isMock: true, warehouseId: { notIn: realWarehouseIds } }] };
 }
 
+async function loadInboundQuantityBySkuDate(
+  skuIds: string[],
+  mockFilter: Prisma.InventorySnapshotWhereInput,
+  asOfDate?: string,
+): Promise<Map<string, number>> {
+  if (skuIds.length === 0) return new Map();
+  const entries = await prisma.snapshotInbound.findMany({
+    where: {
+      skuId: { in: skuIds },
+      snapshot: {
+        status: 'ACTIVE',
+        ...(asOfDate ? { snapshotDate: { lte: new Date(`${asOfDate}T00:00:00.000Z`) } } : {}),
+        ...mockFilter,
+      },
+    },
+    select: { skuId: true, quantity: true, snapshot: { select: { snapshotDate: true } } },
+  });
+  const result = new Map<string, number>();
+  for (const entry of entries) {
+    const key = `${entry.skuId}|${dateOnlyToString(entry.snapshot.snapshotDate)}`;
+    result.set(key, (result.get(key) ?? 0) + entry.quantity);
+  }
+  return result;
+}
+
 export interface SkuDescriptor {
   skuId: string;
   warehouseId: string;
@@ -83,6 +108,7 @@ export async function loadActiveSkusWithSeries(
     include: { snapshot: { select: { snapshotDate: true } } },
     orderBy: { snapshot: { snapshotDate: 'asc' } },
   });
+  const inboundQuantityBySkuDate = await loadInboundQuantityBySkuDate(skuIds, mockFilter, asOfDate);
 
   const observationsBySku = new Map<string, StockObservation[]>();
   // items가 snapshotDate asc로 정렬되어 있으므로, 마지막에 덮어써지는 값이 asOfDate 시점 기준
@@ -93,6 +119,7 @@ export async function loadActiveSkusWithSeries(
     const list = observationsBySku.get(item.skuId) ?? [];
     list.push({
       date: dateOnlyToString(item.snapshot.snapshotDate),
+      inboundQuantity: inboundQuantityBySkuDate.get(`${item.skuId}|${dateOnlyToString(item.snapshot.snapshotDate)}`) ?? 0,
       availableStock: item.availableStock,
       normalStock: item.normalStock,
       defectiveStock: item.defectiveStock,
@@ -143,7 +170,6 @@ export async function loadDailyWarehouseTotals(): Promise<DailyWarehouseTotal[]>
       snapshot: { select: { warehouseId: true, snapshotDate: true } },
     },
   });
-
   const map = new Map<string, DailyWarehouseTotal>();
   for (const item of items) {
     const date = dateOnlyToString(item.snapshot.snapshotDate);
@@ -176,9 +202,11 @@ export async function loadSkuWithSeries(
     include: { snapshot: { select: { snapshotDate: true } } },
     orderBy: { snapshot: { snapshotDate: 'asc' } },
   });
+  const inboundQuantityBySkuDate = await loadInboundQuantityBySkuDate([skuId], mockFilter, asOfDate);
 
   const observations: StockObservation[] = items.map((item) => ({
     date: dateOnlyToString(item.snapshot.snapshotDate),
+    inboundQuantity: inboundQuantityBySkuDate.get(`${item.skuId}|${dateOnlyToString(item.snapshot.snapshotDate)}`) ?? 0,
     availableStock: item.availableStock,
     normalStock: item.normalStock,
     defectiveStock: item.defectiveStock,
