@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatKstDate, todayKstDateString } from '@/lib/date';
 import { DEFAULT_EXPIRATION_RISK_DAYS } from '@/domain/inventory/types';
 
@@ -56,8 +57,10 @@ export function ExpirationManagement({ isAdmin, warehouses, initialEntries }: Ex
   const [selectedSkuIds, setSelectedSkuIds] = useState<Set<string>>(new Set());
   const [bulkRiskDaysInput, setBulkRiskDaysInput] = useState('');
   const [bulkApplying, setBulkApplying] = useState(false);
+  const [warehouseFilter, setWarehouseFilter] = useState<string>('ALL');
 
-  const allSelected = entries.length > 0 && entries.every((e) => selectedSkuIds.has(e.skuId));
+  const visibleEntries = warehouseFilter === 'ALL' ? entries : entries.filter((e) => e.warehouseId === warehouseFilter);
+  const allSelected = visibleEntries.length > 0 && visibleEntries.every((e) => selectedSkuIds.has(e.skuId));
 
   function toggleSelect(skuId: string, checked: boolean) {
     setSelectedSkuIds((prev) => {
@@ -69,7 +72,14 @@ export function ExpirationManagement({ isAdmin, warehouses, initialEntries }: Ex
   }
 
   function toggleSelectAll(checked: boolean) {
-    setSelectedSkuIds(checked ? new Set(entries.map((e) => e.skuId)) : new Set());
+    setSelectedSkuIds((prev) => {
+      const next = new Set(prev);
+      for (const e of visibleEntries) {
+        if (checked) next.add(e.skuId);
+        else next.delete(e.skuId);
+      }
+      return next;
+    });
   }
 
   async function refreshEntries() {
@@ -244,6 +254,17 @@ export function ExpirationManagement({ isAdmin, warehouses, initialEntries }: Ex
           <p className="text-xs text-muted-foreground">등록된 소비기한이 없습니다.</p>
         ) : (
           <div className="space-y-2">
+            <Tabs value={warehouseFilter} onValueChange={setWarehouseFilter}>
+              <TabsList>
+                <TabsTrigger value="ALL">전체</TabsTrigger>
+                {warehouses.map((w) => (
+                  <TabsTrigger key={w.id} value={w.id}>
+                    {w.name}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+
             {isAdmin && (
               <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/20 p-2.5">
                 <label className="flex items-center gap-2 text-xs font-medium">
@@ -271,7 +292,9 @@ export function ExpirationManagement({ isAdmin, warehouses, initialEntries }: Ex
               </div>
             )}
 
-            {entries.map((entry) => {
+            {visibleEntries.length === 0 && <p className="text-xs text-muted-foreground">이 창고에는 등록된 소비기한이 없습니다.</p>}
+
+            {visibleEntries.map((entry) => {
               const isEditing = editingSkuId === entry.skuId;
               const badge = expirationBadge(daysUntil(entry.expirationDate));
               const riskDaysLabel = `위험판정 D-${entry.expirationRiskDays ?? DEFAULT_EXPIRATION_RISK_DAYS}`;
