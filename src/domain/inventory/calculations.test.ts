@@ -322,6 +322,18 @@ describe('calculateInventoryValueBreakdown', () => {
     expect(result.defectiveStockValue).toBe(5000);
     expect(result.incomingStockValue).toBe(20000);
   });
+
+  it('업로드 원가합이 있으면 정상재고 × 원가보다 우선한다', () => {
+    const result = calculateInventoryValueBreakdown({
+      normalStock: 100,
+      availableStock: 100,
+      defectiveStock: 0,
+      incomingStock: 0,
+      unitCost: 1000,
+      totalCost: 95000,
+    });
+    expect(result.normalStockValue).toBe(95000);
+  });
 });
 
 describe('isNewlyAtRisk', () => {

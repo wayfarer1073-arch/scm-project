@@ -10,6 +10,8 @@ export interface StockObservation {
   defectiveStock: number;
   incomingStock: number;
   unitCost: number;
+  /** 업로드 원가합 또는 유효 원가 × 정상재고로 보정한 재고자산 */
+  totalCost?: number;
   warningQty: number;
   dangerQty: number;
 }

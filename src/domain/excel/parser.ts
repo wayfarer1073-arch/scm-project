@@ -8,7 +8,7 @@ import {
   type ParsedInventoryRow,
   type ValidationIssue,
 } from './types';
-import { bufferToAoa, normalizeString, normalizeHeaderCell, findHeaderRowIndex, buildHeaderMap } from './aoa-reader';
+import { bufferToAoa, normalizeString, findHeaderRowIndex, buildHeaderMap } from './aoa-reader';
 
 /** 콤마 천단위 구분자, 공백, 통화기호를 제거하고 숫자로 변환한다. 빈 값/파싱 실패는 null. */
 function normalizeNumber(value: string): number | null {
@@ -22,14 +22,7 @@ function normalizeNumber(value: string): number | null {
 }
 
 /** DB에 정수(Int) 컬럼으로 저장되는 필드. 소수는 허용하지 않는다. */
-const INTEGER_FIELDS: CanonicalField[] = [
-  'normalStock',
-  'availableStock',
-  'incomingStock',
-  'defectiveStock',
-  'warningQty',
-  'dangerQty',
-];
+const INTEGER_FIELDS: CanonicalField[] = ['normalStock'];
 
 // PostgreSQL Int(4바이트)의 표현 범위. 초과 값은 DB insert 시점에 에러가 나므로 파싱 단계에서 먼저 막는다.
 const INT32_MIN = -2147483648;
@@ -39,8 +32,9 @@ const INT32_MAX = 2147483647;
 const DECIMAL_14_2_MAX = 10 ** 12 - 0.01;
 const DECIMAL_14_2_MIN = -DECIMAL_14_2_MAX;
 
-/** canonical 필드로는 인식되지만 ParsedInventoryRow에 전용 컬럼이 없는 필드 (InventoryItem.extra에 보존) */
-const FIELDS_WITHOUT_DEDICATED_COLUMN: CanonicalField[] = ['supplierName', 'salePrice', 'supplyPrice', 'marketPrice'];
+// 원가합은 단위원가 × PostgreSQL Int 재고수량까지 담을 수 있도록 Decimal(24,2)를 사용한다.
+const DECIMAL_24_2_MAX = 10 ** 22 - 0.01;
+const DECIMAL_24_2_MIN = -DECIMAL_24_2_MAX;
 
 const MAX_DATA_ROWS = 50_000; // 실제 창고 품목 수보다 훨씬 넉넉한 상한 (동기 파싱 리소스 보호용)
 
@@ -120,12 +114,17 @@ export function parseInventoryWorkbook(buffer: Buffer): ParseResult {
     }
     seenProductCodes.set(productCode, rowNumber);
 
+    const productName = get('productName');
+    if (productName === '') {
+      issues.push({ level: 'ERROR', code: 'MISSING_PRODUCT_NAME', message: `${rowNumber}행: 상품명이 비어 있습니다.`, rowNumber, column: 'productName' });
+      return;
+    }
+
     const numericValues: Partial<Record<CanonicalField, number>> = {};
     let hasParseFailure = false;
     for (const field of NUMERIC_FIELDS) {
       const raw = get(field);
       if (raw === '') {
-        numericValues[field] = field === 'unitCost' ? 0 : 0;
         continue;
       }
       const parsed = normalizeNumber(raw);
@@ -151,7 +150,11 @@ export function parseInventoryWorkbook(buffer: Buffer): ParseResult {
         hasParseFailure = true;
         continue;
       }
-      const [rangeMin, rangeMax] = INTEGER_FIELDS.includes(field) ? [INT32_MIN, INT32_MAX] : [DECIMAL_14_2_MIN, DECIMAL_14_2_MAX];
+      const [rangeMin, rangeMax] = INTEGER_FIELDS.includes(field)
+        ? [INT32_MIN, INT32_MAX]
+        : field === 'totalCost'
+          ? [DECIMAL_24_2_MIN, DECIMAL_24_2_MAX]
+          : [DECIMAL_14_2_MIN, DECIMAL_14_2_MAX];
       if (parsed < rangeMin || parsed > rangeMax) {
         issues.push({
           level: 'ERROR',
@@ -169,47 +172,43 @@ export function parseInventoryWorkbook(buffer: Buffer): ParseResult {
 
     const costMissing = get('unitCost') === '';
     if (costMissing) {
-      issues.push({ level: 'WARNING', code: 'COST_MISSING', message: `${rowNumber}행: 원가가 비어 있습니다.`, rowNumber, column: 'unitCost' });
+      issues.push({
+        level: 'WARNING',
+        code: 'COST_MISSING',
+        message: `${rowNumber}행: 원가가 비어 있어 동일 SKU의 최근 원가를 사용합니다. 이전 원가도 없으면 0원으로 처리됩니다.`,
+        rowNumber,
+        column: 'unitCost',
+      });
     }
 
-    if ((numericValues.availableStock ?? 0) < 0 || (numericValues.normalStock ?? 0) < 0) {
+    if ((numericValues.normalStock ?? 0) < 0) {
       issues.push({
         level: 'WARNING',
         code: 'NEGATIVE_STOCK',
-        message: `${rowNumber}행: 재고 수량이 음수입니다 (정상재고=${numericValues.normalStock}, 가용재고=${numericValues.availableStock}).`,
+        message: `${rowNumber}행: 정상재고가 음수입니다 (${numericValues.normalStock}).`,
         rowNumber,
       });
     }
 
-    const extra: Record<string, string> = {};
-    headerRow.forEach((h, idx) => {
-      const normalizedH = normalizeHeaderCell(h);
-      if (normalizedH === '') return;
-      const mappedField = CANONICAL_FIELDS.find((f) => headerMap[f] === h);
-      // supplierName/salePrice/supplyPrice/marketPrice는 canonical 필드로 인식은 되지만
-      // ParsedInventoryRow에 전용 컬럼이 없다. 인식됐다는 이유로 버리지 않고 extra에 보존한다.
-      const hasDedicatedColumn = mappedField !== undefined && !FIELDS_WITHOUT_DEDICATED_COLUMN.includes(mappedField);
-      if (hasDedicatedColumn) return;
-      const value = normalizeString(rawRow[idx]);
-      if (value !== '') extra[h] = value;
-    });
+    const normalStock = numericValues.normalStock ?? 0;
 
     rows.push({
       rowNumber,
       productCode,
-      productName: get('productName'),
-      option: get('option') || null,
-      barcode: get('barcode') || null,
+      productName,
+      option: null,
+      barcode: null,
       unitCost: numericValues.unitCost ?? 0,
-      normalStock: numericValues.normalStock ?? 0,
-      availableStock: numericValues.availableStock ?? 0,
-      incomingStock: numericValues.incomingStock ?? 0,
-      defectiveStock: numericValues.defectiveStock ?? 0,
-      warningQty: numericValues.warningQty ?? 0,
-      dangerQty: numericValues.dangerQty ?? 0,
-      location: get('location') || null,
-      category: get('category') || null,
-      extra,
+      totalCost: numericValues.totalCost ?? null,
+      normalStock,
+      availableStock: normalStock,
+      incomingStock: 0,
+      defectiveStock: 0,
+      warningQty: 0,
+      dangerQty: 0,
+      location: null,
+      category: null,
+      extra: {},
       costMissing,
     });
   });

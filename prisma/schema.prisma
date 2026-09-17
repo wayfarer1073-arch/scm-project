@@ -172,6 +172,8 @@ model InventoryItem {
   location    String?
   category    String?
   unitCost    Decimal @default(0) @db.Decimal(14, 2)
+  unitCostProvided Boolean @default(true) // 업로드 행에 원가가 명시됐는지(빈 값이면 직전 SKU 원가를 이어받음)
+  totalCost   Decimal? @db.Decimal(24, 2) // 업로드 원가합. null이면 유효 원가 × 정상재고
 
   normalStock    Int @default(0) // 정상재고
   defectiveStock Int @default(0) // 불량재고

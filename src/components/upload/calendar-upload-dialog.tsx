@@ -140,6 +140,9 @@ export function CalendarUploadDialog({ open, onOpenChange, warehouseId, warehous
             <div className="space-y-1.5">
               <Label htmlFor="calendar-upload-file">Excel 파일 (.xls, .xlsx)</Label>
               <Input ref={fileInputRef} id="calendar-upload-file" type="file" accept=".xls,.xlsx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+              <p className="text-xs text-muted-foreground">
+                상품코드·상품명·정상재고 헤더만 필수입니다. 원가·원가합은 선택이며, 다른 열은 저장하지 않습니다.
+              </p>
             </div>
 
             <InboundManager warehouseId={warehouseId} date={date} />
@@ -164,7 +167,7 @@ export function CalendarUploadDialog({ open, onOpenChange, warehouseId, warehous
                   <Info className="size-3.5" />
                   동일한 데이터입니다.
                 </div>
-                품목·재고수량이 기존 자료와 완전히 동일하여 반영하지 않았습니다.
+                상품·원가·원가합·정상재고가 기존 자료와 완전히 동일하여 반영하지 않았습니다.
               </div>
             )}
 

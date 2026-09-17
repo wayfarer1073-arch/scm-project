@@ -10,6 +10,7 @@ function row(productCode: string): ParsedInventoryRow {
     option: null,
     barcode: null,
     unitCost: 1000,
+    totalCost: null,
     normalStock: 10,
     availableStock: 10,
     incomingStock: 0,

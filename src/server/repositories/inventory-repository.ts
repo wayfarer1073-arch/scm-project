@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { dateOnlyToString } from '@/lib/date';
 import type { StockObservation } from '@/domain/inventory/types';
+import { resolveInventoryCost } from '@/domain/inventory/costs';
 import type { Prisma } from '@prisma/client';
 
 /**
@@ -107,11 +108,24 @@ export async function loadActiveSkusWithSeries(
   const inboundQuantityBySkuDate = await loadInboundQuantityBySkuDate(skuIds, asOfDate);
 
   const observationsBySku = new Map<string, StockObservation[]>();
+  const latestKnownUnitCostBySku = new Map<string, number>();
   // items가 snapshotDate asc로 정렬되어 있으므로, 마지막에 덮어써지는 값이 asOfDate 시점 기준
   // "가장 최근" 관측치의 상품 속성이 된다. sku.current*는 asOfDate와 무관하게 항상 "지금" 값이라
   // 과거 조회에 미래 변경 사항이 섞여 보이므로 쓰지 않는다.
   const latestAttrsBySku = new Map<string, { productName: string; option: string | null; barcode: string | null; location: string | null }>();
   for (const item of items) {
+    const resolvedCost = resolveInventoryCost(
+      {
+        unitCost: Number(item.unitCost),
+        unitCostProvided: item.unitCostProvided,
+        totalCost: item.totalCost === null ? null : Number(item.totalCost),
+        normalStock: item.normalStock,
+      },
+      latestKnownUnitCostBySku.get(item.skuId) ?? null,
+    );
+    if (resolvedCost.latestKnownUnitCost !== null) {
+      latestKnownUnitCostBySku.set(item.skuId, resolvedCost.latestKnownUnitCost);
+    }
     const list = observationsBySku.get(item.skuId) ?? [];
     list.push({
       date: dateOnlyToString(item.snapshot.snapshotDate),
@@ -120,7 +134,8 @@ export async function loadActiveSkusWithSeries(
       normalStock: item.normalStock,
       defectiveStock: item.defectiveStock,
       incomingStock: item.incomingStock,
-      unitCost: Number(item.unitCost),
+      unitCost: resolvedCost.unitCost,
+      totalCost: resolvedCost.totalCost,
       warningQty: item.warningQty,
       dangerQty: item.dangerQty,
     });
@@ -160,19 +175,36 @@ export async function loadDailyWarehouseTotals(): Promise<DailyWarehouseTotal[]>
   const items = await prisma.inventoryItem.findMany({
     where: { snapshot: { status: 'ACTIVE', ...mockFilter }, sku: { isHiddenFromDashboard: false } },
     select: {
+      skuId: true,
       availableStock: true,
       normalStock: true,
       unitCost: true,
+      unitCostProvided: true,
+      totalCost: true,
       snapshot: { select: { warehouseId: true, snapshotDate: true } },
     },
+    orderBy: { snapshot: { snapshotDate: 'asc' } },
   });
   const map = new Map<string, DailyWarehouseTotal>();
+  const latestKnownUnitCostBySku = new Map<string, number>();
   for (const item of items) {
+    const resolvedCost = resolveInventoryCost(
+      {
+        unitCost: Number(item.unitCost),
+        unitCostProvided: item.unitCostProvided,
+        totalCost: item.totalCost === null ? null : Number(item.totalCost),
+        normalStock: item.normalStock,
+      },
+      latestKnownUnitCostBySku.get(item.skuId) ?? null,
+    );
+    if (resolvedCost.latestKnownUnitCost !== null) {
+      latestKnownUnitCostBySku.set(item.skuId, resolvedCost.latestKnownUnitCost);
+    }
     const date = dateOnlyToString(item.snapshot.snapshotDate);
     const key = `${date}|${item.snapshot.warehouseId}`;
     const existing = map.get(key) ?? { date, warehouseId: item.snapshot.warehouseId, totalAvailableStock: 0, totalInventoryValue: 0 };
     existing.totalAvailableStock += item.availableStock;
-    existing.totalInventoryValue += item.normalStock * Number(item.unitCost);
+    existing.totalInventoryValue += resolvedCost.totalCost;
     map.set(key, existing);
   }
   return [...map.values()].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
@@ -200,17 +232,31 @@ export async function loadSkuWithSeries(
   });
   const inboundQuantityBySkuDate = await loadInboundQuantityBySkuDate([skuId], asOfDate);
 
-  const observations: StockObservation[] = items.map((item) => ({
-    date: dateOnlyToString(item.snapshot.snapshotDate),
-    inboundQuantity: inboundQuantityBySkuDate.get(`${item.skuId}|${dateOnlyToString(item.snapshot.snapshotDate)}`) ?? 0,
-    availableStock: item.availableStock,
-    normalStock: item.normalStock,
-    defectiveStock: item.defectiveStock,
-    incomingStock: item.incomingStock,
-    unitCost: Number(item.unitCost),
-    warningQty: item.warningQty,
-    dangerQty: item.dangerQty,
-  }));
+  let latestKnownUnitCost: number | null = null;
+  const observations: StockObservation[] = items.map((item) => {
+    const resolvedCost = resolveInventoryCost(
+      {
+        unitCost: Number(item.unitCost),
+        unitCostProvided: item.unitCostProvided,
+        totalCost: item.totalCost === null ? null : Number(item.totalCost),
+        normalStock: item.normalStock,
+      },
+      latestKnownUnitCost,
+    );
+    latestKnownUnitCost = resolvedCost.latestKnownUnitCost;
+    return {
+      date: dateOnlyToString(item.snapshot.snapshotDate),
+      inboundQuantity: inboundQuantityBySkuDate.get(`${item.skuId}|${dateOnlyToString(item.snapshot.snapshotDate)}`) ?? 0,
+      availableStock: item.availableStock,
+      normalStock: item.normalStock,
+      defectiveStock: item.defectiveStock,
+      incomingStock: item.incomingStock,
+      unitCost: resolvedCost.unitCost,
+      totalCost: resolvedCost.totalCost,
+      warningQty: item.warningQty,
+      dangerQty: item.dangerQty,
+    };
+  });
 
   // asOfDate 시점 기준 가장 최근 관측치의 상품 속성을 쓴다(과거 조회에 이후 변경분이 섞이지 않도록).
   const latestItem = items.at(-1);
