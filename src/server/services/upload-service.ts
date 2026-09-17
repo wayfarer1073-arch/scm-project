@@ -3,7 +3,6 @@ import { Prisma } from '@prisma/client';
 import { parseInventoryWorkbook } from '@/domain/excel/parser';
 import { validateAgainstPreviousSnapshot } from '@/domain/excel/validator';
 import type { ParsedInventoryRow, ValidationIssue } from '@/domain/excel/types';
-import { resolveInboundEntries, type InboundEntryInput, type ResolvedInboundEntry } from '@/domain/inventory/inbound';
 import {
   createSnapshot,
   findActiveSnapshot,
@@ -18,7 +17,6 @@ export interface UploadRequest {
   fileName: string;
   uploadedById: string;
   replaceExisting: boolean;
-  inboundEntries?: InboundEntryInput[];
   isMock?: boolean;
 }
 
@@ -42,7 +40,7 @@ function sha256(buffer: Buffer): string {
  * 품목코드와 재고수량(정상/불량/가용/입고대기)만으로 데이터 동일성을 판단한다. 파일명·헤더 순서·부가
  * 컬럼(공급처, 판매가 등)이 달라도 품목·수량이 같으면 "동일한 데이터"로 취급한다.
  */
-function computeContentSignature(rows: ParsedInventoryRow[], inboundEntries: ResolvedInboundEntry[]): string {
+function computeContentSignature(rows: ParsedInventoryRow[]): string {
   const normalizedRows = rows
     .map((r) => ({
       productCode: r.productCode,
@@ -52,8 +50,7 @@ function computeContentSignature(rows: ParsedInventoryRow[], inboundEntries: Res
       incomingStock: r.incomingStock,
     }))
     .sort((a, b) => a.productCode.localeCompare(b.productCode));
-  const normalizedInboundEntries = [...inboundEntries].sort((a, b) => a.productCode.localeCompare(b.productCode));
-  return sha256(Buffer.from(JSON.stringify({ rows: normalizedRows, inboundEntries: normalizedInboundEntries })));
+  return sha256(Buffer.from(JSON.stringify(normalizedRows)));
 }
 
 export async function processUpload(request: UploadRequest): Promise<UploadResult> {
@@ -64,19 +61,7 @@ export async function processUpload(request: UploadRequest): Promise<UploadResul
     return { status: 'ERROR', issues: parseResult.issues };
   }
 
-  const inboundResolution = resolveInboundEntries(request.inboundEntries ?? [], parseResult.rows);
-  if (!inboundResolution.ok) {
-    return {
-      status: 'ERROR',
-      issues: inboundResolution.errors.map((message) => ({
-        level: 'ERROR',
-        code: 'INVALID_INBOUND_ENTRY',
-        message,
-      })),
-    };
-  }
-
-  const contentSignature = computeContentSignature(parseResult.rows, inboundResolution.entries);
+  const contentSignature = computeContentSignature(parseResult.rows);
 
   // 중복 판단은 "같은 날짜" 범위에서만 한다. 다른 날짜에 우연히 같은 재고 수치가 관측되는 것은
   // (예: 며칠간 출고가 없었던 경우) 정당한 데이터이므로 저장을 막으면 안 된다 — 막으면 소진/정체
@@ -127,7 +112,6 @@ export async function processUpload(request: UploadRequest): Promise<UploadResul
       uploadedById: request.uploadedById,
       isMock: request.isMock ?? false,
       rows: parseResult.rows,
-      inboundEntries: inboundResolution.entries,
     });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {

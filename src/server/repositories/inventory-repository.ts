@@ -19,26 +19,22 @@ async function resolveMockFilter(warehouseId?: string): Promise<Prisma.Inventory
   return { OR: [{ isMock: false }, { isMock: true, warehouseId: { notIn: realWarehouseIds } }] };
 }
 
-async function loadInboundQuantityBySkuDate(
-  skuIds: string[],
-  mockFilter: Prisma.InventorySnapshotWhereInput,
-  asOfDate?: string,
-): Promise<Map<string, number>> {
+/**
+ * SnapshotInbound는 특정 스냅샷 버전이 아니라 (SKU, 날짜)에 독립적으로 붙어있으므로
+ * snapshot.status/isMock을 거칠 필요 없이 skuId·날짜로 바로 조회한다.
+ */
+async function loadInboundQuantityBySkuDate(skuIds: string[], asOfDate?: string): Promise<Map<string, number>> {
   if (skuIds.length === 0) return new Map();
   const entries = await prisma.snapshotInbound.findMany({
     where: {
       skuId: { in: skuIds },
-      snapshot: {
-        status: 'ACTIVE',
-        ...(asOfDate ? { snapshotDate: { lte: new Date(`${asOfDate}T00:00:00.000Z`) } } : {}),
-        ...mockFilter,
-      },
+      ...(asOfDate ? { snapshotDate: { lte: new Date(`${asOfDate}T00:00:00.000Z`) } } : {}),
     },
-    select: { skuId: true, quantity: true, snapshot: { select: { snapshotDate: true } } },
+    select: { skuId: true, quantity: true, snapshotDate: true },
   });
   const result = new Map<string, number>();
   for (const entry of entries) {
-    const key = `${entry.skuId}|${dateOnlyToString(entry.snapshot.snapshotDate)}`;
+    const key = `${entry.skuId}|${dateOnlyToString(entry.snapshotDate)}`;
     result.set(key, (result.get(key) ?? 0) + entry.quantity);
   }
   return result;
@@ -108,7 +104,7 @@ export async function loadActiveSkusWithSeries(
     include: { snapshot: { select: { snapshotDate: true } } },
     orderBy: { snapshot: { snapshotDate: 'asc' } },
   });
-  const inboundQuantityBySkuDate = await loadInboundQuantityBySkuDate(skuIds, mockFilter, asOfDate);
+  const inboundQuantityBySkuDate = await loadInboundQuantityBySkuDate(skuIds, asOfDate);
 
   const observationsBySku = new Map<string, StockObservation[]>();
   // items가 snapshotDate asc로 정렬되어 있으므로, 마지막에 덮어써지는 값이 asOfDate 시점 기준
@@ -202,7 +198,7 @@ export async function loadSkuWithSeries(
     include: { snapshot: { select: { snapshotDate: true } } },
     orderBy: { snapshot: { snapshotDate: 'asc' } },
   });
-  const inboundQuantityBySkuDate = await loadInboundQuantityBySkuDate([skuId], mockFilter, asOfDate);
+  const inboundQuantityBySkuDate = await loadInboundQuantityBySkuDate([skuId], asOfDate);
 
   const observations: StockObservation[] = items.map((item) => ({
     date: dateOnlyToString(item.snapshot.snapshotDate),
@@ -266,4 +262,25 @@ export async function listAllSkusForVisibilityAdmin(): Promise<SkuVisibilityRow[
 
 export async function setSkuHiddenFromDashboard(skuId: string, hidden: boolean) {
   return prisma.sku.update({ where: { id: skuId }, data: { isHiddenFromDashboard: hidden } });
+}
+
+export interface SkuSearchResult {
+  skuId: string;
+  productCode: string;
+  productName: string;
+}
+
+/** 입고 특이사항 등록용 SKU 드롭다운 검색 — 자유 텍스트 매칭 대신 실제 SKU를 골라 선택하게 한다. */
+export async function searchSkusInWarehouse(warehouseId: string, query: string, limit = 20): Promise<SkuSearchResult[]> {
+  const q = query.trim();
+  if (q === '') return [];
+  const skus = await prisma.sku.findMany({
+    where: {
+      warehouseId,
+      OR: [{ productCode: { contains: q, mode: 'insensitive' } }, { currentProductName: { contains: q, mode: 'insensitive' } }],
+    },
+    orderBy: { productCode: 'asc' },
+    take: limit,
+  });
+  return skus.map((sku) => ({ skuId: sku.id, productCode: sku.productCode, productName: sku.currentProductName }));
 }

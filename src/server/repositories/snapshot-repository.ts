@@ -1,6 +1,5 @@
 import { prisma } from '@/lib/prisma';
 import type { ParsedInventoryRow } from '@/domain/excel/types';
-import type { ResolvedInboundEntry } from '@/domain/inventory/inbound';
 import type { Prisma } from '@prisma/client';
 
 export function findActiveSnapshot(warehouseId: string, snapshotDate: Date) {
@@ -37,7 +36,6 @@ export interface CreateSnapshotInput {
   uploadedById: string;
   isMock?: boolean;
   rows: ParsedInventoryRow[];
-  inboundEntries: ResolvedInboundEntry[];
 }
 
 /**
@@ -79,7 +77,6 @@ export async function createSnapshot(input: CreateSnapshotInput) {
       const isLatestSnapshot = !latestOther || latestOther.snapshotDate <= input.snapshotDate;
 
       const touchedSkuIds: string[] = [];
-      const skuIdByProductCode = new Map<string, string>();
 
       for (const row of input.rows) {
         const sku = await tx.sku.upsert({
@@ -118,7 +115,6 @@ export async function createSnapshot(input: CreateSnapshotInput) {
           },
         });
         touchedSkuIds.push(sku.id);
-        skuIdByProductCode.set(row.productCode, sku.id);
 
         await tx.inventoryItem.create({
           data: {
@@ -142,18 +138,6 @@ export async function createSnapshot(input: CreateSnapshotInput) {
         });
       }
 
-      if (input.inboundEntries.length > 0) {
-        await tx.snapshotInbound.createMany({
-          data: input.inboundEntries.map((entry) => ({
-            snapshotId: snapshot.id,
-            skuId: skuIdByProductCode.get(entry.productCode)!,
-            productCode: entry.productCode,
-            productName: entry.productName,
-            quantity: entry.quantity,
-          })),
-        });
-      }
-
       if (isLatestSnapshot && touchedSkuIds.length > 0) {
         await tx.sku.updateMany({
           where: { warehouseId: input.warehouseId, isActive: true, id: { notIn: touchedSkuIds } },
@@ -171,9 +155,6 @@ export function listSnapshotsForWarehouse(warehouseId: string) {
   return prisma.inventorySnapshot.findMany({
     where: { warehouseId, status: 'ACTIVE' },
     orderBy: { snapshotDate: 'asc' },
-    include: {
-      uploadedBy: { select: { name: true } },
-      inboundEntries: { select: { productCode: true, productName: true, quantity: true }, orderBy: { productCode: 'asc' } },
-    },
+    include: { uploadedBy: { select: { name: true } } },
   });
 }

@@ -128,28 +128,27 @@ model InventorySnapshot {
   uploadedAt     DateTime       @default(now())
 
   items InventoryItem[]
-  inboundEntries SnapshotInbound[]
 
   @@unique([warehouseId, snapshotDate, version])
   @@index([warehouseId, snapshotDate, status])
   @@map("inventory_snapshots")
 }
 
-/// Excel 스냅샷에 함께 기록한 입고 특이사항.
-/// 해당 스냅샷까지의 관측 구간에 실제 입고된 수량으로 간주해 추정 소진량을 보정한다.
+/// 사용자가 직접 기록한 "해당 날짜까지의 실제 입고 수량". 특정 스냅샷 버전에 종속되지 않고
+/// (SKU, 날짜) 단위로 독립적으로 존재한다 — 그날의 재고 스냅샷을 재업로드/교체해도 이 기록은
+/// 그대로 남으며, 사용자가 삭제 버튼을 눌러야만 없어진다.
 model SnapshotInbound {
-  id         String            @id @default(cuid())
-  snapshotId String
-  snapshot   InventorySnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
-  skuId      String
-  sku        Sku               @relation(fields: [skuId], references: [id])
+  id          String   @id @default(cuid())
+  skuId       String
+  sku         Sku      @relation(fields: [skuId], references: [id])
+  snapshotDate DateTime @db.Date // 입고를 반영할 기준일(해당 날짜까지의 입고로 해석)
 
   productCode String
   productName String
   quantity    Int
   createdAt   DateTime @default(now())
 
-  @@unique([snapshotId, skuId])
+  @@unique([skuId, snapshotDate])
   @@index([skuId])
   @@map("snapshot_inbounds")
 }

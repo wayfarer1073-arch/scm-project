@@ -18,7 +18,7 @@ export interface CalendarEntry {
   rowCount: number;
   uploadedByName: string;
   uploadedAt: string;
-  inboundEntries: { productIdentifier: string; productName: string; quantity: string }[];
+  inboundCount: number;
 }
 
 interface UploadCalendarProps {
@@ -30,7 +30,7 @@ interface SelectedSlot {
   warehouseId: string;
   warehouseName: string;
   date: string;
-  existing: { uploadedByName: string; uploadedAt: string; rowCount: number; inboundEntries: { productIdentifier: string; quantity: string }[] } | null;
+  existing: { uploadedByName: string; uploadedAt: string; rowCount: number } | null;
 }
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -126,7 +126,6 @@ export function UploadCalendar({ warehouses, entries }: UploadCalendarProps) {
                                     uploadedByName: entry.uploadedByName,
                                     uploadedAt: entry.uploadedAt,
                                     rowCount: entry.rowCount,
-                                    inboundEntries: entry.inboundEntries.map(({ productIdentifier, quantity }) => ({ productIdentifier, quantity })),
                                   },
                                 })
                               }
@@ -142,7 +141,7 @@ export function UploadCalendar({ warehouses, entries }: UploadCalendarProps) {
                           </TooltipTrigger>
                           <TooltipContent>
                             {entry.warehouseName} · {entry.uploadedByName} 업로드 · {formatKstDateTime(entry.uploadedAt)} · {entry.rowCount.toLocaleString()}건
-                            {entry.inboundEntries.length > 0 ? ` · 입고 특이사항 ${entry.inboundEntries.length}건` : ''}
+                            {entry.inboundCount > 0 ? ` · 입고 특이사항 ${entry.inboundCount}건` : ''}
                           </TooltipContent>
                         </Tooltip>
                       );

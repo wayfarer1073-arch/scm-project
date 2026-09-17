@@ -1,29 +1,30 @@
 import { listWarehouses } from '@/server/repositories/warehouse-repository';
 import { listSnapshotsForWarehouse } from '@/server/repositories/snapshot-repository';
+import { listInboundCountsByWarehouseAndDate } from '@/server/repositories/inbound-repository';
 import { UploadCalendar } from '@/components/upload/upload-calendar';
 import { dateOnlyToString } from '@/lib/date';
 
 export default async function UploadPage() {
   const warehouses = await listWarehouses();
+  const inboundCounts = await listInboundCountsByWarehouseAndDate();
 
   const calendarEntries = (
     await Promise.all(
       warehouses.map(async (w) => {
         const snapshots = await listSnapshotsForWarehouse(w.id);
-        return snapshots.map((s) => ({
-          warehouseId: w.id,
-          warehouseCode: w.code,
-          warehouseName: w.name,
-          date: dateOnlyToString(s.snapshotDate),
-          rowCount: s.rowCount,
-          uploadedByName: s.uploadedBy.name,
-          uploadedAt: s.uploadedAt.toISOString(),
-          inboundEntries: s.inboundEntries.map((entry) => ({
-            productIdentifier: entry.productCode,
-            productName: entry.productName,
-            quantity: String(entry.quantity),
-          })),
-        }));
+        return snapshots.map((s) => {
+          const date = dateOnlyToString(s.snapshotDate);
+          return {
+            warehouseId: w.id,
+            warehouseCode: w.code,
+            warehouseName: w.name,
+            date,
+            rowCount: s.rowCount,
+            uploadedByName: s.uploadedBy.name,
+            uploadedAt: s.uploadedAt.toISOString(),
+            inboundCount: inboundCounts.get(`${w.id}|${date}`) ?? 0,
+          };
+        });
       }),
     )
   ).flat();
