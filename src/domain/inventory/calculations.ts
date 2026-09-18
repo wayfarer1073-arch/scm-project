@@ -188,6 +188,10 @@ export function calculateCoverage(
  * 최근 데이터에 더 의미를 두어 7일 평균을 기본 근거로 쓰되, 데이터가 아직 14/30일에 못 미치면
  * 확보 가능한 가장 긴 window로 대체한다. 확정 예측이 아니라 "현재 추세 기준 예상"임을 UI가 명시해야 한다.
  */
+export function selectDepletionBasis(...windows: WindowDepletion[]): WindowDepletion | null {
+  return windows.find(w => w.observedIntervalDays >= 7 && w.averageDailyDepletion !== null) ?? null;
+}
+
 export function calculateStockoutForecast(
   currentAvailableStock: number,
   lastObservedDate: string,
@@ -200,7 +204,8 @@ export function calculateStockoutForecast(
     return { expectedStockoutDays: null, expectedStockoutDate: null, confidence: null, basisWindowDays: 7 };
   }
 
-  const basis = window7.averageDailyDepletion !== null ? window7 : window14.averageDailyDepletion !== null ? window14 : window30;
+  const basis = selectDepletionBasis(window7, window14, window30);
+  if (!basis) return { expectedStockoutDays: null, expectedStockoutDate: null, confidence: null, basisWindowDays: 7 };
   const basisWindowDays = (basis.windowDays as 7 | 14 | 30) ?? 7;
 
   if (basis.averageDailyDepletion === null || basis.averageDailyDepletion <= 0) {
@@ -230,19 +235,12 @@ export function calculateConfidence(
   window7: WindowDepletion,
   window14: WindowDepletion,
 ): 'LOW' | 'MEDIUM' | 'HIGH' {
-  let base: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
-  if (maturity.hasThirtyDayData) base = 'HIGH';
-  else if (maturity.hasFourteenDayData) base = 'MEDIUM';
-  else base = 'LOW';
-
+  // 스냅샷은 실제 출고·반품·조정을 구분하지 못한다. 보정된 예측 정확도로 오인할 HIGH는 부여하지 않는다.
   const r7 = window7.averageDailyDepletion;
   const r14 = window14.averageDailyDepletion;
-  if (r7 !== null && r14 !== null && r14 > 0) {
-    const volatility = Math.abs(r7 / r14 - 1);
-    if (volatility >= 0.6 && base === 'HIGH') base = 'MEDIUM';
-    else if (volatility >= 0.6 && base === 'MEDIUM') base = 'LOW';
-  }
-  return base;
+  return maturity.snapshotCount >= 15 && window7.observedIntervalDays >= 7
+    && window14.observedIntervalDays >= 14 && r7 !== null && r14 !== null && r14 > 0
+    && Math.abs(r7 / r14 - 1) < 0.6 ? 'MEDIUM' : 'LOW';
 }
 
 /** 소진 가속/둔화: 최소 14일 데이터 필요 */
@@ -254,6 +252,9 @@ export function calculateAcceleration(maturity: DataMaturity, deltas: DailyDelta
   const eightDaysAgo = format(addDays(toDate(asOfDate), -7), 'yyyy-MM-dd');
   const previous7 = calculateWindowDepletion(deltas, eightDaysAgo, 7);
 
+  if (recent7.observedIntervalDays < 7 || previous7.observedIntervalDays < 7) {
+    return { recent7AvgDepletion: null, previous7AvgDepletion: null, accelerationRatePercent: null, trend: null };
+  }
   const recentAvg = recent7.averageDailyDepletion;
   const prevAvg = previous7.averageDailyDepletion;
 
@@ -292,7 +293,8 @@ export function resolveEffectiveThresholds(
   const manualDangerQty = manual?.dangerQty ?? null;
   const manualWarningQty = manual?.warningQty ?? null;
   if (manualDangerQty !== null || manualWarningQty !== null) {
-    return { dangerQty: manualDangerQty ?? 0, warningQty: manualWarningQty ?? 0, source: 'manual' };
+    const fallback = resolveEffectiveThresholds(latest, null, avgDailyDepletion, settings);
+    return { dangerQty: manualDangerQty ?? fallback.dangerQty, warningQty: manualWarningQty ?? fallback.warningQty, source: 'manual' };
   }
   if (latest.dangerQty > 0 || latest.warningQty > 0) {
     return { dangerQty: latest.dangerQty, warningQty: latest.warningQty, source: 'legacy' };
@@ -309,6 +311,7 @@ export function resolveEffectiveThresholds(
 
 /** Excel의 위험수량/경고수량을 우선 적용하는 기본 위험 판정 */
 export function calculateThresholdRisk(observation: StockObservation): ThresholdRisk {
+  if (observation.availableStock <= 0) return { level: 'DANGER', reason: '재고 없음' };
   if (observation.dangerQty > 0 && observation.availableStock <= observation.dangerQty) {
     return { level: 'DANGER', reason: '위험수량 이하' };
   }
@@ -336,7 +339,8 @@ export function calculateStagnation(
     }
   }
   const anchorDate = lastDepletionDate ?? sortedObservations[0].date;
-  const stagnantDays = differenceInCalendarDays(toDate(asOfDate), toDate(anchorDate));
+  const lastObservedDate = sortedObservations[sortedObservations.length - 1].date;
+  const stagnantDays = differenceInCalendarDays(toDate(lastObservedDate < asOfDate ? lastObservedDate : asOfDate), toDate(anchorDate));
   return { lastDepletionDate, stagnantDays, isMeaningful: maturity.hasThirtyDayData };
 }
 
@@ -347,7 +351,7 @@ export function calculateOverstockCandidate(
   maturity: DataMaturity,
   settings: RiskThresholdSettings = DEFAULT_RISK_SETTINGS,
 ): OverstockCandidateInfo {
-  if (!maturity.hasThirtyDayData || window30.averageDailyDepletion === null || window30.averageDailyDepletion <= 0) {
+  if (!maturity.hasThirtyDayData || window30.observedIntervalDays < 30 || window30.averageDailyDepletion === null || window30.averageDailyDepletion <= 0) {
     return { isCandidate: false, coverageDays: null, thresholdDays: settings.overstockCoverageDays };
   }
   // Coverage와 동일한 이유로 음수 가용재고를 방어한다 — 그대로 나누면 음수 coverageDays가 나온다.
@@ -369,6 +373,7 @@ export function calculateExpirationRisk(
   riskDays: number | null,
   coverageDays: number | null,
   asOfDate: string,
+  currentStock?: number,
 ): ExpirationRiskAssessment {
   if (!expirationDate) {
     return { expirationDate: null, riskDays: null, daysUntilExpiration: null, daysUntilRiskDate: null, isAtRisk: false };
@@ -376,7 +381,9 @@ export function calculateExpirationRisk(
   const effectiveRiskDays = riskDays ?? DEFAULT_EXPIRATION_RISK_DAYS;
   const daysUntilExpiration = differenceInCalendarDays(toDate(expirationDate), toDate(asOfDate));
   const daysUntilRiskDate = daysUntilExpiration - effectiveRiskDays;
-  const isAtRisk = coverageDays !== null && coverageDays > daysUntilRiskDate;
+  const isAtRisk = currentStock !== undefined && currentStock <= 0 ? false
+    : (currentStock !== undefined && currentStock > 0 && daysUntilRiskDate <= 0)
+      || (coverageDays !== null && coverageDays > daysUntilRiskDate);
   return { expirationDate, riskDays: effectiveRiskDays, daysUntilExpiration, daysUntilRiskDate, isAtRisk };
 }
 
@@ -404,16 +411,17 @@ export function analyzeSku(
   const deltas = buildDailyDeltas(sorted);
   const maturity = calculateDataMaturity(sorted, asOfDate);
 
-  const window7 = calculateWindowDepletion(deltas, asOfDate, 7);
-  const window14 = calculateWindowDepletion(deltas, asOfDate, 14);
-  const window30 = calculateWindowDepletion(deltas, asOfDate, 30);
+  const window7 = calculateWindowDepletion(deltas, latest.date, 7);
+  const window14 = calculateWindowDepletion(deltas, latest.date, 14);
+  const window30 = calculateWindowDepletion(deltas, latest.date, 30);
+  const basis = selectDepletionBasis(window7, window14, window30);
 
-  const coverage = maturity.hasSevenDayData
-    ? calculateCoverage(latest.availableStock, window7.averageDailyDepletion, settings)
+  const coverage = maturity.hasSevenDayData && basis
+    ? calculateCoverage(latest.availableStock, basis.averageDailyDepletion, settings)
     : { coverageDays: null, band: null };
   const forecast = calculateStockoutForecast(latest.availableStock, latest.date, maturity, window7, window14, window30);
-  const acceleration = calculateAcceleration(maturity, deltas, asOfDate);
-  const riskThresholds = resolveEffectiveThresholds(latest, manualThresholds, window7.averageDailyDepletion, settings);
+  const acceleration = calculateAcceleration(maturity, deltas, latest.date);
+  const riskThresholds = resolveEffectiveThresholds(latest, manualThresholds, basis?.averageDailyDepletion ?? null, settings);
   const effectiveLatest = { ...latest, dangerQty: riskThresholds.dangerQty, warningQty: riskThresholds.warningQty };
   const thresholdRisk = calculateThresholdRisk(effectiveLatest);
   const stagnation = calculateStagnation(sorted, deltas, asOfDate, maturity);
@@ -421,8 +429,9 @@ export function analyzeSku(
   const expirationRisk = calculateExpirationRisk(
     expirationConfig?.expirationDate ?? null,
     expirationConfig?.expirationRiskDays ?? null,
-    coverage.coverageDays,
+    coverage.coverageDays === null ? null : Math.max(0, coverage.coverageDays - differenceInCalendarDays(toDate(asOfDate), toDate(latest.date))),
     asOfDate,
+    latest.normalStock,
   );
 
   const dailyChangeValue = previous ? dailyChange(latest, previous) : null;
@@ -430,6 +439,7 @@ export function analyzeSku(
   const stockIncreasedToday = latestDelta?.toDate === latest.date && latestDelta.increase > 0;
 
   const tags: string[] = [];
+  if (latest.date < asOfDate) tags.push(`[재고 관측일 ${latest.date}]`);
   if (thresholdRisk.reason) tags.push(`[${thresholdRisk.reason}]`);
   if (coverage.band) {
     const label = coverageBandLabel(coverage.band);

@@ -21,10 +21,14 @@ interface WarehouseSummaryCardsProps {
 
 const ROWS: { label: string; format: (s: WarehouseSummary) => string }[] = [
   { label: '관리 SKU', format: (s) => `${formatNumber(s.skuCount)}개` },
-  { label: '재고자산', format: (s) => formatCurrency(s.inventoryValue) },
+  { label: '평가 가능한 재고금액', format: (s) => s.snapshot.knownInventoryValue === null ? '평가 불가' : formatCurrency(s.snapshot.knownInventoryValue) },
+  { label: '평가 가능한 SKU 비율', format: (s) => s.snapshot.valuationCoverageRatio === null ? '산정 불가' : formatPercent(s.snapshot.valuationCoverageRatio) },
+  { label: '재고 보유 SKU 비율', format: (s) => s.snapshot.inStockSkuRatio === null ? '산정 불가' : formatPercent(s.snapshot.inStockSkuRatio) },
+  { label: '무재고 / 음수재고 SKU', format: (s) => `${s.snapshot.zeroStockSkuCount} / ${s.snapshot.negativeStockSkuCount}개` },
+  { label: '기준일 미관측 SKU', format: (s) => `${s.snapshot.staleSkuCount}개` },
   { label: '위험 SKU', format: (s) => `${formatNumber(s.dangerSkuCount)}개 (${formatPercent(s.dangerRatio)})` },
-  { label: '30일 내 소진 예상', format: (s) => formatPercent(s.stockoutSoon30dRatio) },
-  { label: '장기 정체 비율', format: (s) => formatPercent(s.stagnantRatio) },
+  { label: '설정 기간 내 소진 추정', format: (s) => formatPercent(s.stockoutSoon30dRatio) },
+  { label: '관측상 정체 후보 비율', format: (s) => formatPercent(s.stagnantRatio) },
   { label: '과잉재고 후보 비율', format: (s) => formatPercent(s.overstockCandidateRatio) },
 ];
 

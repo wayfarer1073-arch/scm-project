@@ -3,13 +3,9 @@ import { getSettings } from '@/server/repositories/settings-repository';
 import { getInventoryRows } from '@/server/services/inventory-analysis-service';
 import { loadDailyWarehouseTotals } from '@/server/repositories/inventory-repository';
 import { getLatestActiveSnapshot } from '@/server/repositories/snapshot-repository';
-import { todayKstDateString, dateOnlyToString } from '@/lib/date';
+import { todayKstDateString, dateOnlyToString, isDateString } from '@/lib/date';
 import { DashboardClient } from '@/components/dashboard/dashboard-client';
 import { auth } from '@/server/auth';
-
-function isDateString(value: unknown): value is string {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;

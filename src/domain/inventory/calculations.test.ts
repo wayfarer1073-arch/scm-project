@@ -263,7 +263,7 @@ describe('resolveEffectiveThresholds', () => {
 
   it('수동 설정 중 한 필드만 있어도(0은 "설정 안 함"이 아님) manual로 판정한다', () => {
     const result = resolveEffectiveThresholds({ dangerQty: 0, warningQty: 0 }, { dangerQty: 0, warningQty: null }, 10, settings);
-    expect(result).toEqual({ dangerQty: 0, warningQty: 0, source: 'manual' });
+    expect(result).toEqual({ dangerQty: 0, warningQty: 300, source: 'manual' });
   });
 
   it('수동 설정이 없고 업로드(레거시) 값이 0 초과면 그 값을 쓴다', () => {

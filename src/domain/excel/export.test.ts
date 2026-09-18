@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildEventsSheetRows, buildInventorySheetRows, buildRiskSheetRows, buildStagnantSheetRows, buildSummarySheetRows, type ExportRowInput } from './export';
+import { calculateSnapshotKpis } from '@/domain/inventory/aggregation';
 import { analyzeSku } from '@/domain/inventory/calculations';
 import type { StockObservation } from '@/domain/inventory/types';
 
@@ -55,6 +56,7 @@ describe('buildStagnantSheetRows', () => {
 describe('buildSummarySheetRows', () => {
   it('회사 전체 KPI와 창고별 요약을 항목-값 형태로 만든다', () => {
     const kpis = {
+      snapshot: calculateSnapshotKpis([]),
       totalSkuCount: 10,
       totalAvailableStock: 1000,
       totalInventoryValue: 5000000,
@@ -65,7 +67,7 @@ describe('buildSummarySheetRows', () => {
       stagnantValue: 100000,
     };
     const rows = buildSummarySheetRows(kpis, [
-      { warehouseId: 'w1', warehouseCode: 'A', warehouseName: '창고 A', skuCount: 5, inventoryValue: 2000000, dangerSkuCount: 1, dangerRatio: 0.2, stockoutSoon30dRatio: 0.1, stagnantRatio: 0, overstockCandidateRatio: 0 },
+      { snapshot: calculateSnapshotKpis([]), warehouseId: 'w1', warehouseCode: 'A', warehouseName: '창고 A', skuCount: 5, inventoryValue: 2000000, dangerSkuCount: 1, dangerRatio: 0.2, stockoutSoon30dRatio: 0.1, stagnantRatio: 0, overstockCandidateRatio: 0 },
     ]);
     expect(rows.some((r) => r['항목'] === '관리 SKU 수' && r['값'] === 10)).toBe(true);
     expect(rows.some((r) => String(r['항목']).includes('창고 A'))).toBe(true);

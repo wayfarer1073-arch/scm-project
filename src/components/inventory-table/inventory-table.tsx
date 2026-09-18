@@ -162,7 +162,7 @@ export function InventoryTable({
             <Download className="size-3.5" /> 현재 조회결과 다운로드
           </Button>
           <Button variant="outline" size="sm" asChild>
-            <a href={`/api/export/full-report?asOf=${asOfDate}`}>
+            <a href={`/api/export/full-report?asOf=${asOfDate}${fromDate ? `&from=${fromDate}` : ''}`}>
               <FileSpreadsheet className="size-3.5" /> 전체 재고 리포트
             </a>
           </Button>
@@ -270,7 +270,7 @@ export function InventoryTable({
               <TableHead className="min-w-[220px]">상품명</TableHead>
               <TableHead>창고</TableHead>
               <TableHead className="text-right">정상재고</TableHead>
-              <SortableHead label={fromDate ? '기간 변화' : '전일 대비'} active={sortKey === 'increaseDesc'} asc={sortAsc} onClick={() => toggleSort('increaseDesc')} />
+              <SortableHead label={fromDate ? '기간 변화' : '직전 관측 대비'} active={sortKey === 'increaseDesc'} asc={sortAsc} onClick={() => toggleSort('increaseDesc')} />
               <TableHead className="hidden text-right xl:table-cell">7일 소진량</TableHead>
               <SortableHead className="hidden 2xl:table-cell" label="7일 일평균 소진" active={sortKey === 'depletionRateDesc'} asc={sortAsc} onClick={() => toggleSort('depletionRateDesc')} />
               <SortableHead label="7일 vs 이전 변화율" active={sortKey === 'accelerationDesc'} asc={sortAsc} onClick={() => toggleSort('accelerationDesc')} />

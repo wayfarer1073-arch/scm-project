@@ -312,7 +312,7 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, onOpenChang
                   <Field label="14일 평균 소진" value={fmtRate(detail.analysis.window14.averageDailyDepletion)} />
                   <Field label="30일 평균 소진" value={fmtRate(detail.analysis.window30.averageDailyDepletion)} />
                   <Field label="소진 가속/둔화" value={accelerationText(detail.analysis)} />
-                  <Field label="예측 신뢰도" value={confidenceLabel(detail.analysis.forecast.confidence)} />
+                  <Field label="관측 근거 수준" value={confidenceLabel(detail.analysis.forecast.confidence)} />
                 </div>
               </section>
 
@@ -481,6 +481,6 @@ function confidenceLabel(confidence: SkuAnalysis['forecast']['confidence']): str
 function thresholdSourceLabel(source: SkuAnalysis['riskThresholds']['source']): string {
   if (source === 'manual') return '관리자가 직접 설정한 값입니다.';
   if (source === 'legacy') return '업로드 파일이 제공한 값입니다.';
-  if (source === 'auto') return '최근 7일 소진 속도를 기준으로 자동 계산된 값입니다.';
+  if (source === 'auto') return '최소 7일이 관측된 구간의 추정 소진 속도로 자동 계산된 값입니다.';
   return '소진 이력이 부족해 위험 판정을 할 수 없습니다(데이터 축적 중).';
 }

@@ -9,6 +9,7 @@ export interface ResolvedInventoryCost {
   unitCost: number;
   totalCost: number;
   latestKnownUnitCost: number | null;
+  valuationKnown: boolean;
 }
 
 /**
@@ -30,6 +31,7 @@ export function resolveInventoryCost(input: InventoryCostInput, latestKnownUnitC
 
   return {
     unitCost,
+    valuationKnown: input.totalCost !== null || nextKnownUnitCost !== null || input.normalStock === 0,
     totalCost: input.totalCost ?? unitCost * input.normalStock,
     latestKnownUnitCost: nextKnownUnitCost,
   };

@@ -41,7 +41,7 @@ export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows
   const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
   const [selectedSkuId, setSelectedSkuId] = useState<string | null>(null);
 
-  const kpis = useMemo(() => calculateCompanyKpis(rows, settings.stagnantDays), [rows, settings.stagnantDays]);
+  const kpis = useMemo(() => calculateCompanyKpis(rows, settings.stagnantDays, fromDate), [rows, settings.stagnantDays, fromDate]);
   const warehouseSummaries = useMemo(() => calculateWarehouseSummaries(rows, settings.stagnantDays), [rows, settings.stagnantDays]);
   const actionCenterCards = useMemo(() => buildActionCenterCards(rows, settings.stagnantDays), [rows, settings.stagnantDays]);
 
@@ -92,8 +92,8 @@ export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows
         </div>
         <DateRangeControl key={`${fromDate ?? 'day'}-${asOfDate}`} asOfDate={asOfDate} fromDate={fromDate} maxDate={todayKstDateString()} />
       </div>
-      <ActionCenter cards={actionCenterCards} onSelect={handleActionCenterSelect} />
       <KpiCards kpis={kpis} fromDate={fromDate} asOfDate={asOfDate} />
+      <ActionCenter cards={actionCenterCards} onSelect={handleActionCenterSelect} />
       <WarehouseSummaryCards summaries={warehouseSummaries} activeWarehouseId={warehouseFilter} onSelect={setWarehouseFilter} latestUploads={latestUploads} />
       <ChartsSection
         rows={rows}

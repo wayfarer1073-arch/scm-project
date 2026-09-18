@@ -177,3 +177,28 @@ describe('inventory database invariants', () => {
     expect(versions.map(s => s.status)).toEqual(['REPLACED', 'REPLACED', 'ACTIVE']);
   });
 });
+
+it('preserves valuation completeness through database, service, and KPI aggregation', async () => {
+  await snapshot('2026-09-10', [row('unknown', 10, {costMissing: true, unitCost: 0}), row('free', 10, {unitCost: 0}), row('total', 10, {costMissing: true, totalCost: 95}), row('negative', -10)]);
+  const { getInventoryRows } = await import('../src/server/services/inventory-analysis-service');
+  const { calculateCompanyKpis } = await import('../src/domain/inventory/aggregation');
+  const { DEFAULT_RISK_SETTINGS } = await import('../src/domain/inventory/types');
+  const rows = await getInventoryRows({warehouseId: fixture.warehouse.id, asOfDate: '2026-09-10', settings: DEFAULT_RISK_SETTINGS});
+  const kpis = calculateCompanyKpis(rows, 30);
+  expect(kpis.snapshot).toMatchObject({knownInventoryValue: 95, valuedSkuCount: 2, unvaluedSkuCount: 2, negativeStockSkuCount: 1, positiveStockSkuCount: 3});
+  expect(rows.find(r=>r.descriptor.productCode === 'unknown')!.analysis.latest.valuationKnown).toBe(false);
+  await snapshot('2026-09-11', [row('unknown', 8, {unitCost: 5})]);
+  const historical = await getInventoryRows({warehouseId: fixture.warehouse.id, asOfDate: '2026-09-10', settings: DEFAULT_RISK_SETTINGS});
+  expect(calculateCompanyKpis(historical, 30).snapshot.knownInventoryValue).toBe(95);
+});
+
+it('does not mix newly introduced SKUs into requested-period KPI changes', async () => {
+  await snapshot('2026-09-10', [row('A', 100)]);
+  await snapshot('2026-09-11', [row('A', 90), row('B', 50)]);
+  await snapshot('2026-09-12', [row('A', 80), row('B', 20)]);
+  const { getInventoryRows } = await import('../src/server/services/inventory-analysis-service');
+  const { calculateCompanyKpis } = await import('../src/domain/inventory/aggregation');
+  const { DEFAULT_RISK_SETTINGS } = await import('../src/domain/inventory/types');
+  const rows = await getInventoryRows({warehouseId: fixture.warehouse.id, asOfDate: '2026-09-12', compareFromDate: '2026-09-10', settings: DEFAULT_RISK_SETTINGS});
+  expect(calculateCompanyKpis(rows, 30, '2026-09-10').snapshot).toMatchObject({comparableSkuCount: 1, observedDecrease: 20, estimatedDepletion: 20});
+});

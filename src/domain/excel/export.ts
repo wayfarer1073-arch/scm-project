@@ -23,15 +23,17 @@ export function buildInventorySheetRows(rows: ExportRowInput[]): Record<string, 
     창고: r.warehouseName,
     현재가용재고: r.analysis.latest.availableStock,
     정상재고: r.analysis.latest.normalStock,
-    전일대비: r.analysis.dailyChange ?? '',
-    '최근7일소진량': r.analysis.window7.totalDepletion,
+    재고관측일: r.analysis.latest.date,
+    기준일미관측: r.analysis.latest.date < r.analysis.asOfDate ? '예' : '아니오',
+    직전관측대비: r.analysis.dailyChange ?? '',
+    '관측일기준7일추정소진량': r.analysis.window7.totalDepletion,
     '최근7일입고반영량': r.analysis.window7.totalInboundQuantity ?? 0,
     '최근7일일평균소진': r.analysis.window7.averageDailyDepletion ?? '',
     '7일vs이전7일변화율(%)': r.analysis.acceleration.accelerationRatePercent ?? '',
-    'Coverage(일)': r.analysis.coverage.coverageDays ?? (r.analysis.coverage.band === null && r.analysis.maturity.hasSevenDayData ? '소진없음' : ''),
+    'Coverage(일)': r.analysis.coverage.coverageDays ?? '산정 불가',
     예상소진일: r.analysis.forecast.expectedStockoutDate ?? '데이터축적중',
     단위원가: r.analysis.latest.unitCost,
-    재고금액: r.valueBreakdown.normalStockValue,
+    재고금액: r.analysis.latest.valuationKnown === false || r.analysis.latest.normalStock < 0 ? '평가 불가' : r.valueBreakdown.normalStockValue,
     정체일수: r.analysis.stagnation.isMeaningful ? r.analysis.stagnation.stagnantDays : '',
     상태: riskLabelOf(r.analysis.thresholdRisk.level),
     태그: r.analysis.tags.join(' '),
@@ -47,24 +49,28 @@ export function buildStagnantSheetRows(rows: ExportRowInput[]): Record<string, s
 }
 
 export function buildSummarySheetRows(kpis: CompanyKpis, warehouseSummaries: WarehouseSummary[]): Record<string, string | number>[] {
+  const s = kpis.snapshot;
   const rows: Record<string, string | number>[] = [
     { 항목: '관리 SKU 수', 값: kpis.totalSkuCount },
-    { 항목: '총 가용재고', 값: kpis.totalAvailableStock },
-    { 항목: '총 재고자산', 값: kpis.totalInventoryValue },
-    // 여러 창고를 합산할 때 창고마다 최근 업로드일이 달라 "전일"이 아니라 "각 SKU의 직전 관측치
-    // 대비" 값일 수 있다 — 대시보드 KPI 카드(periodLabel)와 동일하게 날짜 수에 대해 정직한 라벨을 쓴다.
-    { 항목: '직전 관측 대비 순재고 증감', 값: kpis.netChangeVsYesterday ?? '데이터축적중' },
-    { 항목: '최근 7일 추정 소진량', 값: kpis.totalDepletion7d },
-    { 항목: '위험 SKU 수', 값: kpis.dangerSkuCount },
-    { 항목: '30일 내 소진 예상 SKU 수', 값: kpis.stockoutSoon30dCount },
-    { 항목: '장기 정체재고 금액', 값: kpis.stagnantValue },
-    { 항목: '', 값: '' },
+    { 항목: '평가 가능한 재고금액', 값: s.knownInventoryValue ?? '평가 불가' },
+    { 항목: '평가 가능한 SKU 수', 값: s.valuedSkuCount },
+    { 항목: '원가 미상·오류 SKU 수', 값: s.unvaluedSkuCount },
+    { 항목: '재고 보유 SKU 비율(%)', 값: s.inStockSkuRatio === null ? '산정 불가' : s.inStockSkuRatio * 100 },
+    { 항목: '무재고 SKU 수', 값: s.zeroStockSkuCount },
+    { 항목: '음수재고 SKU 수', 값: s.negativeStockSkuCount },
+    { 항목: '기준일 미관측 SKU 수', 값: s.staleSkuCount },
+    { 항목: '가장 오래된 재고 관측일', 값: s.oldestObservationDate ?? '' },
+    { 항목: '가장 최근 재고 관측일', 값: s.newestObservationDate ?? '' },
+    { 항목: '비교 가능한 SKU 수', 값: s.comparableSkuCount },
+    { 항목: 'SKU별 순감소 합계', 값: s.observedDecrease ?? '비교 불가' },
+    { 항목: 'SKU별 순증가 합계', 값: s.observedIncrease ?? '비교 불가' },
+    { 항목: '기록된 입고량', 값: s.recordedInbound ?? '비교 불가' },
+    { 항목: '입고 보정 추정 소진', 값: s.estimatedDepletion ?? '비교 불가' },
+    { 항목: '집계 범위', 값: '최신 스냅샷 표시 대상 SKU. 원가 미상·음수재고 평가 제외. 추정 소진은 판매량 아님.' },
   ];
   for (const w of warehouseSummaries) {
-    rows.push({
-      항목: `[${w.warehouseName}] 관리 SKU / 재고자산 / 위험 SKU / 위험비율`,
-      값: `${w.skuCount} / ${w.inventoryValue} / ${w.dangerSkuCount} / ${Math.round(w.dangerRatio * 100)}%`,
-    });
+    rows.push({ 항목: `[${w.warehouseName}] 관리 SKU / 평가 가능한 금액 / 무재고 / 음수재고`,
+      값: `${w.skuCount} / ${w.snapshot.knownInventoryValue ?? '평가 불가'} / ${w.snapshot.zeroStockSkuCount} / ${w.snapshot.negativeStockSkuCount}` });
   }
   return rows;
 }

@@ -12,6 +12,8 @@ export interface StockObservation {
   unitCost: number;
   /** 업로드 원가합 또는 유효 원가 × 정상재고로 보정한 재고자산 */
   totalCost?: number;
+  /** 원가 미상과 명시적 0원을 구분한다. */
+  valuationKnown?: boolean;
   warningQty: number;
   dangerQty: number;
 }
@@ -77,15 +79,15 @@ export type RiskLevel = 'DANGER' | 'WARNING' | 'NORMAL';
 /** Excel의 위험수량/경고수량 기준 (우선 적용 규칙) */
 export interface ThresholdRisk {
   level: RiskLevel;
-  reason: '위험수량 이하' | '경고수량 이하' | null;
+  reason: '재고 없음' | '위험수량 이하' | '경고수량 이하' | null;
 }
 
 /**
  * 위험/경고수량의 출처.
  * - manual: SKU 상세에서 관리자가 직접 지정
  * - legacy: 업로드(Excel 등)가 제공한 스냅샷 값(0 초과)
- * - auto: 최근 소진 속도(7일 평균) × 설정된 기준일수로 역산
- * - none: 위 어느 것도 없어 위험 판정을 할 수 없음(항상 정상)
+ * - auto: 최소 7일이 관측된 구간의 소진 속도 × 설정된 기준일수로 역산
+ * - none: 임계값 판정 근거 없음. 무재고는 별도 위험 판정.
  */
 export type RiskThresholdSource = 'manual' | 'legacy' | 'auto' | 'none';
 
@@ -121,7 +123,7 @@ export interface ExpirationRiskAssessment {
 export type CoverageBand = 'STOCKOUT_SOON' | 'NEEDS_MANAGEMENT' | 'HEALTHY' | null;
 
 export interface CoverageAssessment {
-  /** 소진량이 0이면 null이며 UI는 "소진 없음" 또는 "-" 표시 */
+  /** 소진량이 0이거나 관측이 부족하면 null. UI는 "산정 불가" 표시 */
   coverageDays: number | null;
   band: CoverageBand;
 }
@@ -162,7 +164,28 @@ export interface InventoryValueBreakdown {
   incomingStockValue: number;
 }
 
+export interface SnapshotKpis {
+  positiveStockSkuCount: number;
+  zeroStockSkuCount: number;
+  negativeStockSkuCount: number;
+  /** 양수 정상재고 SKU / 조회 대상 SKU. 주문 충족률이 아니다. */
+  inStockSkuRatio: number | null;
+  valuedSkuCount: number;
+  unvaluedSkuCount: number;
+  knownInventoryValue: number | null;
+  valuationCoverageRatio: number | null;
+  staleSkuCount: number;
+  oldestObservationDate: string | null;
+  newestObservationDate: string | null;
+  comparableSkuCount: number;
+  observedDecrease: number | null;
+  observedIncrease: number | null;
+  recordedInbound: number | null;
+  estimatedDepletion: number | null;
+}
+
 export interface CompanyKpis {
+  snapshot: SnapshotKpis;
   totalSkuCount: number;
   totalAvailableStock: number;
   totalInventoryValue: number;
@@ -196,6 +219,7 @@ export interface PeriodComparison {
 }
 
 export interface WarehouseSummary {
+  snapshot: SnapshotKpis;
   warehouseId: string;
   warehouseCode: string;
   warehouseName: string;

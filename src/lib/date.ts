@@ -1,5 +1,11 @@
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 
+export function isDateString(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 /** 이 앱의 모든 "기준일/날짜 표시"는 한국 시간(KST) 달력 기준으로 통일한다. */
 export const KST_TIMEZONE = 'Asia/Seoul';
 

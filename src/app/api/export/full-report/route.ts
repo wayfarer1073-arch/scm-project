@@ -7,7 +7,7 @@ import { listAllEvents } from '@/server/repositories/event-repository';
 import { getSettings } from '@/server/repositories/settings-repository';
 import { buildEventsSheetRows, buildInventorySheetRows, buildRiskSheetRows, buildStagnantSheetRows, buildSummarySheetRows, type ExportRowInput } from '@/domain/excel/export';
 import { formatKstDateTime } from '@/lib/date';
-import { todayKstDateString } from '@/lib/date';
+import { isDateString, todayKstDateString } from '@/lib/date';
 import { eventTypeLabel } from '@/lib/event-types';
 
 export async function GET(request: Request) {
@@ -17,8 +17,13 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const asOfDate = url.searchParams.get('asOf') ?? todayKstDateString();
 
-  const [rows, events, settings] = await Promise.all([getInventoryRows({ asOfDate }), listAllEvents(), getSettings()]);
-  const kpis = calculateCompanyKpis(rows, settings.stagnantDays);
+  const fromDate = url.searchParams.get('from');
+  if (!isDateString(asOfDate) || (fromDate !== null && (!isDateString(fromDate) || fromDate > asOfDate))) {
+    return NextResponse.json({ error: '유효한 조회 날짜를 입력해주세요.' }, { status: 400 });
+  }
+  const settings = await getSettings();
+  const [rows, events] = await Promise.all([getInventoryRows({ asOfDate, compareFromDate: fromDate ?? undefined, settings }), listAllEvents()]);
+  const kpis = calculateCompanyKpis(rows, settings.stagnantDays, fromDate);
   const warehouseSummaries = calculateWarehouseSummaries(rows, settings.stagnantDays);
 
   const exportRows: ExportRowInput[] = rows.map((r) => ({

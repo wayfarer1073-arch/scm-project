@@ -138,6 +138,7 @@ export async function loadActiveSkusWithSeries(
       incomingStock: item.incomingStock,
       unitCost: resolvedCost.unitCost,
       totalCost: resolvedCost.totalCost,
+      valuationKnown: resolvedCost.valuationKnown,
       warningQty: item.warningQty,
       dangerQty: item.dangerQty,
     });
@@ -267,6 +268,7 @@ export async function loadSkuWithSeries(
       incomingStock: item.incomingStock,
       unitCost: resolvedCost.unitCost,
       totalCost: resolvedCost.totalCost,
+      valuationKnown: resolvedCost.valuationKnown,
       warningQty: item.warningQty,
       dangerQty: item.dangerQty,
     };

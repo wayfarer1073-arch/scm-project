@@ -17,7 +17,7 @@ export function formatPercent(ratio: number): string {
 }
 
 export function formatCoverageDays(days: number | null): string {
-  if (days === null) return '소진 없음';
+  if (days === null) return '산정 불가';
   if (!Number.isFinite(days)) return '-';
   return `${Math.floor(days)}일`;
 }

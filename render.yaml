@@ -10,9 +10,7 @@ services:
     runtime: node
     plan: free
     # NODE_ENV=production이어도 Tailwind/PostCSS/TypeScript 등 빌드 도구가 필요하다.
-    # --legacy-peer-deps: vitest 5의 @types/node peer 범위와 현재 고정된 @types/node 버전이
-    # 충돌해 일반 npm ci가 실패한다 (실제 타입 호환에는 문제 없음).
-    buildCommand: npm ci --include=dev --legacy-peer-deps && npx prisma generate && npm run build
+    buildCommand: npm ci --include=dev && npx prisma generate && npm run build
     startCommand: npx prisma migrate deploy && npm run start
     envVars:
       - key: DATABASE_URL
