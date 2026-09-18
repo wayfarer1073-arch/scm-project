@@ -8,9 +8,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 import { formatCoverageDays, formatCurrency, formatNumber, formatSigned } from '@/lib/format';
 import { formatKstDate } from '@/lib/date';
-import { riskBadgeVariant, riskLabel } from '@/lib/status';
+import { riskLabel } from '@/lib/status';
 import { TABLE_TABS, matchesQuickFilter, matchesTab, type QuickFilter, type TableTab } from '@/lib/inventory-filters';
 import { buildInventorySheetRows, type ExportRowInput } from '@/domain/excel/export';
 import { downloadSheetsAsExcel } from '@/lib/xlsx-download';
@@ -149,7 +150,7 @@ export function InventoryTable({
   }
 
   return (
-    <section className="scroll-mt-20 space-y-3 rounded-2xl border bg-card p-4 shadow-[0_18px_50px_-42px_rgba(15,23,42,0.65)] sm:p-5">
+    <section className="scroll-mt-20 space-y-3 rounded-xl border border-border p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-base font-semibold">전체 재고 현황</h2>
@@ -261,7 +262,7 @@ export function InventoryTable({
         </Select>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border">
+      <div className="overflow-x-auto rounded-lg border border-border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -354,7 +355,18 @@ export function InventoryTable({
                   {r.analysis.stagnation.isMeaningful ? `${r.analysis.stagnation.stagnantDays}일` : <span className="text-muted-foreground">-</span>}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={riskBadgeVariant(r.analysis.thresholdRisk.level)}>{riskLabel(r.analysis.thresholdRisk.level)}</Badge>
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium">
+                    <span
+                      className={cn(
+                        'size-1.5 shrink-0 rounded-full',
+                        r.analysis.thresholdRisk.level === 'DANGER' && 'bg-status-danger',
+                        r.analysis.thresholdRisk.level === 'WARNING' && 'bg-status-warning',
+                        r.analysis.thresholdRisk.level === 'NORMAL' && 'bg-status-normal',
+                      )}
+                      aria-hidden="true"
+                    />
+                    {riskLabel(r.analysis.thresholdRisk.level)}
+                  </span>
                 </TableCell>
               </TableRow>
             ))}

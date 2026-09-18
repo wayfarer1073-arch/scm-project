@@ -34,55 +34,41 @@ export function DateRangeControl({ asOfDate, fromDate, maxDate }: DateRangeContr
   }
 
   return (
-    <section className="rounded-2xl border border-border/70 bg-card p-4 shadow-[0_12px_40px_-28px_rgba(15,23,42,0.45)] sm:p-5">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <CalendarDays className="size-4" aria-hidden="true" />
-            </span>
-            재고 조회 기준
-          </div>
-          <p className="mt-1 pl-10 text-xs text-muted-foreground">하루의 재고를 보거나 두 날짜 사이를 비교합니다. 업로드가 없는 날짜는 가장 가까운 이전 스냅샷을 사용합니다.</p>
-        </div>
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="inline-flex rounded-lg bg-muted p-1" aria-label="조회 방식">
-            <button
-              type="button"
-              onClick={() => setMode('day')}
-              className={cn('rounded-md px-3 py-1.5 text-xs font-medium transition', mode === 'day' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}
-            >
-              특정 날짜
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('range')}
-              className={cn('rounded-md px-3 py-1.5 text-xs font-medium transition', mode === 'range' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}
-            >
-              기간 비교
-            </button>
-          </div>
-
-          {mode === 'day' ? (
-            <label className="flex items-center gap-2 text-xs text-muted-foreground">
-              기준일
-              <input type="date" value={day} max={maxDate} onChange={(event) => setDay(event.target.value)} className="h-9 rounded-lg border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring" />
-            </label>
-          ) : (
-            <div className="flex items-center gap-2">
-              <input type="date" value={start} max={maxDate} onChange={(event) => setStart(event.target.value)} aria-label="비교 시작일" className="h-9 rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
-              <MoveRight className="size-4 text-muted-foreground" aria-hidden="true" />
-              <input type="date" value={end} max={maxDate} onChange={(event) => setEnd(event.target.value)} aria-label="비교 종료일" className="h-9 rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
-            </div>
-          )}
-
-          <Button size="sm" onClick={apply} disabled={pending || (mode === 'day' ? !day : !start || !end)}>
-            {pending && <LoaderCircle className="size-3.5 animate-spin" />}
-            적용
-          </Button>
-        </div>
+    <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-end">
+      <div className="inline-flex items-center gap-1 rounded-md border border-border p-0.5 text-xs" aria-label="조회 방식">
+        <button
+          type="button"
+          onClick={() => setMode('day')}
+          className={cn('rounded px-2.5 py-1 font-medium transition-colors', mode === 'day' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
+        >
+          특정 날짜
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('range')}
+          className={cn('rounded px-2.5 py-1 font-medium transition-colors', mode === 'range' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
+        >
+          기간 비교
+        </button>
       </div>
-    </section>
+
+      {mode === 'day' ? (
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <CalendarDays className="size-3.5" aria-hidden="true" />
+          <input type="date" value={day} max={maxDate} onChange={(event) => setDay(event.target.value)} className="h-8 rounded-md border border-border bg-background px-2.5 text-sm tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+        </label>
+      ) : (
+        <div className="flex items-center gap-1.5">
+          <input type="date" value={start} max={maxDate} onChange={(event) => setStart(event.target.value)} aria-label="비교 시작일" className="h-8 rounded-md border border-border bg-background px-2.5 text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+          <MoveRight className="size-3.5 text-muted-foreground" aria-hidden="true" />
+          <input type="date" value={end} max={maxDate} onChange={(event) => setEnd(event.target.value)} aria-label="비교 종료일" className="h-8 rounded-md border border-border bg-background px-2.5 text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+        </div>
+      )}
+
+      <Button size="sm" onClick={apply} disabled={pending || (mode === 'day' ? !day : !start || !end)}>
+        {pending && <LoaderCircle className="size-3.5 animate-spin" />}
+        적용
+      </Button>
+    </div>
   );
 }

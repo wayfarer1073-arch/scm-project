@@ -1,7 +1,6 @@
 'use client';
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatNumber } from '@/lib/format';
 
 interface RiskDistributionChartProps {
@@ -70,11 +69,9 @@ export function RiskDistributionChart({ danger, warning, normal }: RiskDistribut
   const total = danger + warning + normal;
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm">재고 위험상태 분포</CardTitle>
-      </CardHeader>
-      <CardContent className="h-72 pt-0">
+    <div className="px-5 py-4">
+      <h3 className="text-sm font-semibold">재고 위험상태 분포</h3>
+      <div className="mt-2 h-64">
         {total === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">데이터가 없습니다</div>
         ) : (
@@ -125,7 +122,7 @@ export function RiskDistributionChart({ danger, warning, normal }: RiskDistribut
             </PieChart>
           </ResponsiveContainer>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

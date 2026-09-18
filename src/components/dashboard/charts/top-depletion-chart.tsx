@@ -1,17 +1,16 @@
 'use client';
 
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface TopDepletionChartProps {
   items: { productName: string; depletion: number }[];
 }
 
-/** 순위 기반 단일 hue 순차 램프(진한 cyan -> 옅은 cyan). 무지개색 대신 하나의 색 계열만 쓴다. */
+/** 순위 기반 단일 hue 순차 램프(짙은 잉크 -> 옅은 잉크). 무지개색 대신 중립 톤 하나만 쓴다. */
 function rankColor(index: number, count: number): string {
   const t = count <= 1 ? 0 : index / (count - 1);
-  const lightness = 0.42 + t * 0.32;
-  return `oklch(${lightness.toFixed(3)} 0.13 221)`;
+  const lightness = 0.26 + t * 0.22;
+  return `oklch(${lightness.toFixed(3)} 0.02 260)`;
 }
 
 interface BarShapeProps {
@@ -53,7 +52,7 @@ function RankedBarShape(props: BarShapeProps) {
 }
 
 const MAX_BARS = 7;
-const LABEL_MAX_CHARS = 16;
+const LABEL_MAX_CHARS = 11;
 
 export function TopDepletionChart({ items }: TopDepletionChartProps) {
   const top = items.slice(0, MAX_BARS);
@@ -65,11 +64,9 @@ export function TopDepletionChart({ items }: TopDepletionChartProps) {
   }));
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm">최근 7일 소진량 TOP {MAX_BARS} SKU</CardTitle>
-      </CardHeader>
-      <CardContent className="h-72 pt-0">
+    <div className="px-5 py-4">
+      <h3 className="text-sm font-semibold">최근 7일 소진량 TOP {MAX_BARS} SKU</h3>
+      <div className="mt-2 h-64">
         {data.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">데이터 축적 중</div>
         ) : (
@@ -77,7 +74,7 @@ export function TopDepletionChart({ items }: TopDepletionChartProps) {
             <BarChart data={data} layout="vertical" margin={{ top: 4, right: 44, left: 4, bottom: 4 }} barCategoryGap="32%">
               <CartesianGrid stroke="var(--color-border)" horizontal={false} />
               <XAxis type="number" fontSize={11} stroke="var(--color-muted-foreground)" tickLine={false} axisLine={false} />
-              <YAxis type="category" dataKey="name" width={132} fontSize={11} stroke="var(--color-muted-foreground)" tickLine={false} axisLine={false} />
+              <YAxis type="category" dataKey="name" width={104} fontSize={11} stroke="var(--color-muted-foreground)" tickLine={false} axisLine={false} />
               <Tooltip
                 formatter={(value, _name, item) => [`${Number(value).toLocaleString('ko-KR')}개`, item.payload.fullName]}
                 contentStyle={{ fontSize: 12, borderRadius: 8 }}
@@ -88,7 +85,7 @@ export function TopDepletionChart({ items }: TopDepletionChartProps) {
             </BarChart>
           </ResponsiveContainer>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

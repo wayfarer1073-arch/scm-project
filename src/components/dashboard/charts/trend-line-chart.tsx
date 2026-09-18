@@ -1,7 +1,6 @@
 'use client';
 
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatKstDate } from '@/lib/date';
 
 interface TrendLineChartProps {
@@ -13,11 +12,9 @@ interface TrendLineChartProps {
 
 export function TrendLineChart({ title, data, valueFormatter, color = 'var(--color-chart-1)' }: TrendLineChartProps) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="h-64 pt-0">
+    <div className="px-5 py-4">
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <div className="mt-2 h-60">
         {data.length < 2 ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">데이터 축적 중 (스냅샷 2건 이상 필요)</div>
         ) : (
@@ -49,7 +46,7 @@ export function TrendLineChart({ title, data, valueFormatter, color = 'var(--col
             </LineChart>
           </ResponsiveContainer>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

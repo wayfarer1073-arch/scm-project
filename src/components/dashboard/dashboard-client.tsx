@@ -54,12 +54,13 @@ export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows
   if (rows.length === 0) {
     return (
       <div className="space-y-7">
-        <div className="flex flex-col gap-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Inventory intelligence</p>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">재고 운영 현황</h1>
-          <p className="text-sm text-muted-foreground">{asOfDate} 기준 재고 상태입니다.</p>
+        <div className="flex flex-col gap-3 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-[28px] font-semibold tracking-tight sm:text-[32px]">재고 운영 현황</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{asOfDate} 기준 재고 상태입니다.</p>
+          </div>
+          <DateRangeControl key={`${fromDate ?? 'day'}-${asOfDate}`} asOfDate={asOfDate} fromDate={fromDate} maxDate={todayKstDateString()} />
         </div>
-        <DateRangeControl key={`${fromDate ?? 'day'}-${asOfDate}`} asOfDate={asOfDate} fromDate={fromDate} maxDate={todayKstDateString()} />
         <div className="flex items-center justify-center py-12">
           <div className="flex w-full max-w-md flex-col items-center gap-4 rounded-2xl border border-dashed bg-card p-10 text-center">
           <div className="flex size-12 items-center justify-center rounded-full bg-muted">
@@ -81,15 +82,16 @@ export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows
   }
 
   return (
-    <div className="space-y-7">
-      <div className="flex flex-col gap-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Inventory intelligence</p>
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">재고 운영 현황</h1>
-        <p className="text-sm text-muted-foreground">
-          {fromDate ? `${fromDate}부터 ${asOfDate}까지의 변화와 현재 상태를 함께 봅니다.` : `${asOfDate} 기준 재고 상태입니다.`}
-        </p>
+    <div className="space-y-9">
+      <div className="flex flex-col gap-3 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-[28px] font-semibold tracking-tight sm:text-[32px]">재고 운영 현황</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {fromDate ? `${fromDate}부터 ${asOfDate}까지의 변화와 현재 상태를 함께 봅니다.` : `${asOfDate} 기준 재고 상태입니다.`}
+          </p>
+        </div>
+        <DateRangeControl key={`${fromDate ?? 'day'}-${asOfDate}`} asOfDate={asOfDate} fromDate={fromDate} maxDate={todayKstDateString()} />
       </div>
-      <DateRangeControl key={`${fromDate ?? 'day'}-${asOfDate}`} asOfDate={asOfDate} fromDate={fromDate} maxDate={todayKstDateString()} />
       <ActionCenter cards={actionCenterCards} onSelect={handleActionCenterSelect} />
       <KpiCards kpis={kpis} fromDate={fromDate} asOfDate={asOfDate} />
       <WarehouseSummaryCards summaries={warehouseSummaries} activeWarehouseId={warehouseFilter} onSelect={setWarehouseFilter} latestUploads={latestUploads} />

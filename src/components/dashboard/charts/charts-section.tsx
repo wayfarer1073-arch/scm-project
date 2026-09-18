@@ -55,8 +55,8 @@ export function ChartsSection({ rows, dailyTotals, warehouses, chartWarehouseId,
   );
 
   return (
-    <section>
-      <div className="mb-3 flex items-center justify-between">
+    <section className="rounded-xl border border-border">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3.5">
         <div>
           <h2 className="text-base font-semibold">재고 흐름</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">선택한 조회 범위와 창고 필터를 반영합니다.</p>
@@ -72,9 +72,9 @@ export function ChartsSection({ rows, dailyTotals, warehouses, chartWarehouseId,
           </TabsList>
         </Tabs>
       </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <TrendLineChart title="전체 재고수량 추이" data={stockSeries} valueFormatter={(v) => `${formatNumber(v)}개`} color="var(--color-chart-1)" />
-        <TrendLineChart title="전체 재고자산 추이" data={valueSeries} valueFormatter={(v) => formatCurrency(v)} color="var(--color-chart-4)" />
+      <div className="grid grid-cols-1 divide-y divide-border lg:grid-cols-2 lg:divide-x">
+        <TrendLineChart title="전체 재고수량 추이" data={stockSeries} valueFormatter={(v) => `${formatNumber(v)}개`} color="var(--color-foreground)" />
+        <TrendLineChart title="전체 재고자산 추이" data={valueSeries} valueFormatter={(v) => formatCurrency(v)} color="var(--color-foreground)" />
         <RiskDistributionChart {...riskCounts} />
         <TopDepletionChart items={topDepletion} />
       </div>
