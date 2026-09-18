@@ -63,9 +63,9 @@ function LeaderLineLabel({ cx, cy, midAngle, outerRadius, value, percent, name, 
 
 export function RiskDistributionChart({ danger, warning, normal }: RiskDistributionChartProps) {
   const data = [
-    { name: '위험', value: danger, color: 'var(--color-status-danger)' },
-    { name: '주의', value: warning, color: 'var(--color-status-warning)' },
-    { name: '정상', value: normal, color: 'var(--color-status-normal)' },
+    { name: '위험', value: danger, color: '#F52E7F' },
+    { name: '주의', value: warning, color: '#EAB308' },
+    { name: '정상', value: normal, color: 'var(--color-foreground)' },
   ];
   const total = danger + warning + normal;
 
