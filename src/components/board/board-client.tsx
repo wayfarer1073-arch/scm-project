@@ -118,7 +118,7 @@ export function BoardClient({ posts, page, totalPages, totalCount, currentUserId
         </Button>
       </div>
 
-      <div className="space-y-3 rounded-2xl border bg-card p-4">
+      <div className="space-y-3 rounded-xl border border-border p-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
@@ -187,7 +187,7 @@ export function BoardClient({ posts, page, totalPages, totalCount, currentUserId
       </div>
 
       {posts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed bg-card py-16 text-center">
+        <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border py-16 text-center">
           {hasActiveFilter ? (
             <>
               <p className="text-sm font-medium">검색 결과가 없습니다</p>
@@ -201,7 +201,7 @@ export function BoardClient({ posts, page, totalPages, totalCount, currentUserId
           )}
         </div>
       ) : (
-        <ul className="divide-y rounded-2xl border bg-card">
+        <ul className="divide-y divide-border rounded-xl border border-border">
           {posts.map((post) => {
             const canDelete = post.authorId === currentUserId || currentUserRole === 'ADMIN';
             return (

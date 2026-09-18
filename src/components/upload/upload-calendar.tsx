@@ -56,10 +56,10 @@ export function UploadCalendar({ warehouses, entries }: UploadCalendarProps) {
   }, [month]);
 
   return (
-    <section className="rounded-2xl border bg-card p-4 sm:p-5">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <section className="rounded-xl border border-border">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3.5">
         <div>
-          <h2 className="text-sm font-semibold">업로드 현황 캘린더</h2>
+          <h2 className="text-base font-semibold">업로드 현황 캘린더</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
             날짜별로 어떤 창고가 자료를 올렸는지 한눈에 확인하고, 블록을 눌러 바로 업로드하거나 교체할 수 있습니다.
           </p>
@@ -75,6 +75,7 @@ export function UploadCalendar({ warehouses, entries }: UploadCalendarProps) {
         </div>
       </div>
 
+      <div className="p-4 sm:p-5">
       <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-medium text-muted-foreground">
         {WEEKDAYS.map((d) => (
           <div key={d} className="py-1">
@@ -169,6 +170,7 @@ export function UploadCalendar({ warehouses, entries }: UploadCalendarProps) {
             </div>
           );
         })}
+      </div>
       </div>
 
       {selected && (

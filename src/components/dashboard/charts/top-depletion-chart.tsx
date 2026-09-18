@@ -1,6 +1,7 @@
 'use client';
 
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { BarChart3 } from 'lucide-react';
 
 interface TopDepletionChartProps {
   items: { productName: string; depletion: number }[];
@@ -68,7 +69,10 @@ export function TopDepletionChart({ items }: TopDepletionChartProps) {
       <h3 className="text-sm font-semibold">최근 7일 소진량 TOP {MAX_BARS} SKU</h3>
       <div className="mt-2 h-64">
         {data.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">데이터 축적 중</div>
+          <div className="flex h-full flex-col items-center justify-center gap-1.5 text-muted-foreground">
+            <BarChart3 className="size-5 opacity-40" aria-hidden="true" />
+            <p className="text-sm">데이터 축적 중</p>
+          </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} layout="vertical" margin={{ top: 4, right: 44, left: 4, bottom: 4 }} barCategoryGap="32%">
@@ -77,7 +81,7 @@ export function TopDepletionChart({ items }: TopDepletionChartProps) {
               <YAxis type="category" dataKey="name" width={104} fontSize={11} stroke="var(--color-muted-foreground)" tickLine={false} axisLine={false} />
               <Tooltip
                 formatter={(value, _name, item) => [`${Number(value).toLocaleString('ko-KR')}개`, item.payload.fullName]}
-                contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: 'var(--color-border)', background: 'var(--color-card)' }}
                 cursor={{ fill: 'var(--color-muted)' }}
               />
               {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}

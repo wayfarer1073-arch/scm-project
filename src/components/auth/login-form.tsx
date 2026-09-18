@@ -38,7 +38,7 @@ export function LoginForm() {
 
   return (
     <Card>
-      <CardContent className="pt-5">
+      <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="email">이메일</Label>

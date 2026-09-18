@@ -1,6 +1,7 @@
 'use client';
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart as PieChartIcon } from 'lucide-react';
 import { formatNumber } from '@/lib/format';
 
 interface RiskDistributionChartProps {
@@ -73,7 +74,10 @@ export function RiskDistributionChart({ danger, warning, normal }: RiskDistribut
       <h3 className="text-sm font-semibold">재고 위험상태 분포</h3>
       <div className="mt-2 h-64">
         {total === 0 ? (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">데이터가 없습니다</div>
+          <div className="flex h-full flex-col items-center justify-center gap-1.5 text-muted-foreground">
+            <PieChartIcon className="size-5 opacity-40" aria-hidden="true" />
+            <p className="text-sm">데이터가 없습니다</p>
+          </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart margin={{ top: 24, right: 96, bottom: 24, left: 72 }}>
@@ -117,7 +121,7 @@ export function RiskDistributionChart({ danger, warning, normal }: RiskDistribut
                   const v = Number(value);
                   return [`${v.toLocaleString('ko-KR')}개 (${Math.round((v / total) * 100)}%)`, String(name)];
                 }}
-                contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: 'var(--color-border)', background: 'var(--color-card)' }}
               />
             </PieChart>
           </ResponsiveContainer>

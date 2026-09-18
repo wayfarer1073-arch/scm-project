@@ -103,8 +103,8 @@ export function PostFormDialog({ open, onOpenChange, onCreated }: PostFormDialog
                   aria-checked={tag === opt.value}
                   onClick={() => setTag(opt.value)}
                   className={cn(
-                    'rounded-md px-3.5 py-1.5 text-xs font-medium transition',
-                    tag === opt.value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                    'rounded-md px-3.5 py-1.5 text-xs font-medium transition-colors',
+                    tag === opt.value ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
                   {opt.label}
