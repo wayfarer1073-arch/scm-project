@@ -6,7 +6,6 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { CalendarUploadDialog } from '@/components/upload/calendar-upload-dialog';
-import { warehouseColor } from '@/lib/warehouse-colors';
 import { formatKstDateTime, todayKstDateString } from '@/lib/date';
 import { cn } from '@/lib/utils';
 
@@ -95,14 +94,14 @@ export function UploadCalendar({ warehouses, entries }: UploadCalendarProps) {
               className={cn(
                 'flex min-h-[92px] flex-col gap-1.5 rounded-lg border p-2',
                 inMonth ? 'bg-background' : 'bg-muted/30',
-                isToday && 'border-today-highlight-border bg-today-highlight-bg',
+                isToday && 'border-foreground bg-foreground',
               )}
             >
               <span
                 className={cn(
                   'text-xs tabular-nums',
                   inMonth ? 'text-foreground' : 'text-muted-foreground/60',
-                  isToday && 'font-semibold text-primary',
+                  isToday && 'font-semibold text-background',
                 )}
               >
                 {format(day, 'd')}
@@ -111,7 +110,6 @@ export function UploadCalendar({ warehouses, entries }: UploadCalendarProps) {
                 <div className="flex flex-wrap gap-1">
                   {warehouses.map((w) => {
                     const entry = entryByKey.get(`${w.id}|${dateStr}`);
-                    const c = warehouseColor(w.code);
                     if (entry) {
                       return (
                         <Tooltip key={w.id}>
@@ -132,8 +130,7 @@ export function UploadCalendar({ warehouses, entries }: UploadCalendarProps) {
                               }
                               className={cn(
                                 'flex size-6 items-center justify-center rounded-md text-[11px] font-bold transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                                c.bg,
-                                c.text,
+                                isToday ? 'bg-background text-foreground' : 'bg-foreground text-background',
                               )}
                               aria-label={`${entry.warehouseName} ${dateStr} 자료, ${entry.uploadedByName} 업로드, 누르면 교체`}
                             >
@@ -153,7 +150,12 @@ export function UploadCalendar({ warehouses, entries }: UploadCalendarProps) {
                           <button
                             type="button"
                             onClick={() => setSelected({ warehouseId: w.id, warehouseName: w.name, date: dateStr, existing: null })}
-                            className="flex size-6 items-center justify-center rounded-md border border-dashed border-border text-[11px] font-bold text-muted-foreground/50 transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className={cn(
+                              'flex size-6 items-center justify-center rounded-md border border-dashed text-[11px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                              isToday
+                                ? 'border-background/50 text-background/70 hover:border-background hover:text-background'
+                                : 'border-border text-muted-foreground/50 hover:border-primary/40 hover:text-primary',
+                            )}
                             aria-label={`${w.name} ${dateStr} 자료 업로드`}
                           >
                             {w.code}

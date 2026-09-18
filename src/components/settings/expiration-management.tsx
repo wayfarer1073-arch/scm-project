@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Pencil, Check, X, UploadCloud, Trash2 } from 'lucide-react';
+import { Pencil, Check, X, UploadCloud, Trash2, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,8 +11,11 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Pagination } from '@/components/ui/pagination';
 import { formatKstDate, todayKstDateString } from '@/lib/date';
 import { DEFAULT_EXPIRATION_RISK_DAYS } from '@/domain/inventory/types';
+
+const PAGE_SIZE = 7;
 
 interface ExpirationRow {
   skuId: string;
@@ -58,9 +61,29 @@ export function ExpirationManagement({ isAdmin, warehouses, initialEntries }: Ex
   const [bulkRiskDaysInput, setBulkRiskDaysInput] = useState('');
   const [bulkApplying, setBulkApplying] = useState(false);
   const [warehouseFilter, setWarehouseFilter] = useState<string>('ALL');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
 
-  const visibleEntries = warehouseFilter === 'ALL' ? entries : entries.filter((e) => e.warehouseId === warehouseFilter);
-  const allSelected = visibleEntries.length > 0 && visibleEntries.every((e) => selectedSkuIds.has(e.skuId));
+  const warehouseFiltered = warehouseFilter === 'ALL' ? entries : entries.filter((e) => e.warehouseId === warehouseFilter);
+  const filteredEntries = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return warehouseFiltered;
+    return warehouseFiltered.filter((e) => e.productName.toLowerCase().includes(q) || e.productCode.toLowerCase().includes(q));
+  }, [warehouseFiltered, search]);
+  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageRows = filteredEntries.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const allSelected = filteredEntries.length > 0 && filteredEntries.every((e) => selectedSkuIds.has(e.skuId));
+
+  function changeWarehouseFilter(value: string) {
+    setWarehouseFilter(value);
+    setPage(1);
+  }
+
+  function changeSearch(value: string) {
+    setSearch(value);
+    setPage(1);
+  }
 
   function toggleSelect(skuId: string, checked: boolean) {
     setSelectedSkuIds((prev) => {
@@ -74,7 +97,7 @@ export function ExpirationManagement({ isAdmin, warehouses, initialEntries }: Ex
   function toggleSelectAll(checked: boolean) {
     setSelectedSkuIds((prev) => {
       const next = new Set(prev);
-      for (const e of visibleEntries) {
+      for (const e of filteredEntries) {
         if (checked) next.add(e.skuId);
         else next.delete(e.skuId);
       }
@@ -256,16 +279,28 @@ export function ExpirationManagement({ isAdmin, warehouses, initialEntries }: Ex
           <p className="text-xs text-muted-foreground">등록된 소비기한이 없습니다.</p>
         ) : (
           <div className="space-y-2">
-            <Tabs value={warehouseFilter} onValueChange={setWarehouseFilter}>
-              <TabsList>
-                <TabsTrigger value="ALL">전체</TabsTrigger>
-                {warehouses.map((w) => (
-                  <TabsTrigger key={w.id} value={w.id}>
-                    {w.name}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Tabs value={warehouseFilter} onValueChange={changeWarehouseFilter}>
+                <TabsList>
+                  <TabsTrigger value="ALL">전체</TabsTrigger>
+                  {warehouses.map((w) => (
+                    <TabsTrigger key={w.id} value={w.id}>
+                      {w.name}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+              <div className="relative">
+                <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                <Input
+                  value={search}
+                  onChange={(e) => changeSearch(e.target.value)}
+                  placeholder="상품명/상품코드 검색"
+                  aria-label="소비기한 목록 검색"
+                  className="h-8 w-52 pl-7 text-xs"
+                />
+              </div>
+            </div>
 
             {isAdmin && (
               <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/20 p-2.5">
@@ -294,9 +329,13 @@ export function ExpirationManagement({ isAdmin, warehouses, initialEntries }: Ex
               </div>
             )}
 
-            {visibleEntries.length === 0 && <p className="text-xs text-muted-foreground">이 창고에는 등록된 소비기한이 없습니다.</p>}
+            {filteredEntries.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                {search.trim() ? '검색 결과가 없습니다.' : '이 창고에는 등록된 소비기한이 없습니다.'}
+              </p>
+            )}
 
-            {visibleEntries.map((entry) => {
+            {pageRows.map((entry) => {
               const isEditing = editingSkuId === entry.skuId;
               const badge = expirationBadge(daysUntil(entry.expirationDate));
               const riskDaysLabel = `위험판정 D-${entry.expirationRiskDays ?? DEFAULT_EXPIRATION_RISK_DAYS}`;
@@ -375,6 +414,8 @@ export function ExpirationManagement({ isAdmin, warehouses, initialEntries }: Ex
                 </div>
               );
             })}
+
+            <Pagination page={currentPage} totalPages={totalPages} onChange={setPage} />
           </div>
         )}
       </CardContent>

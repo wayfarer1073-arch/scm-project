@@ -201,6 +201,25 @@ dot)과 랭크 뱃지(TOP7 차트의 값 원)에만 쓴다.
   각주 표기에 가깝다.
 - 그 외 구조(밀도, 정렬, 필터, 페이지네이션)는 유지.
 
+### Tabs (공유 프리미티브 — Action Center 탭, 창고 필터, 소비기한 창고 탭 등)
+- `TabsList`의 회색 pill 배경(`bg-muted p-1`)을 제거했다. 탭 버튼은 `gap-2`로 서로 살짝
+  떨어뜨려 배열하고, 컨테이너 자체는 배경이 없다.
+- 활성 탭은 `bg-primary text-primary-foreground`(잉크 채움 + 흰 글씨), 비활성은
+  `text-muted-foreground`. `shadow-sm`은 제거했다(Flat Paper Rule) — 토글/탭 버튼과 동일한
+  색 언어.
+
+### 업로드 캘린더 배지
+- 업로드된 A/B/C 배지는 창고별 파스텔 색 대신 `bg-foreground text-background`(잉크 채움 +
+  흰 글씨)로 통일했다. 오늘 날짜 칸은 칸 전체를 `bg-foreground`로 채우고 날짜 숫자를
+  `text-background`로 반전한다. 오늘 칸 안의 배지는 잉크-온-잉크로 묻히지 않도록 반전
+  (`bg-background text-foreground`), 미업로드 점선 배지도 옅은 흰색 계열로 반전해 대비를
+  유지한다.
+
+### 목록 페이지네이션 (소비기한 관리, 게시판)
+- 한 페이지당 7건. 상단에 상품명/상품코드 실시간 검색(입력할 때마다 클라이언트에서 바로 필터,
+  디바운스 없음 — 이미 로드된 배열이라 지연이 필요 없다)과 창고 탭 필터를 두고, 하단에 공유
+  `Pagination` 컴포넌트(게시판과 동일)를 쓴다. 검색어나 창고 필터가 바뀌면 1페이지로 리셋한다.
+
 ### Shared Card 프리미티브 (설정/로그인 화면)
 - `ui/card.tsx`를 Panel 컨벤션에 맞춰 수정: `CardHeader`가 `border-b` + `px-5 py-3.5`를 갖고,
   `CardTitle`은 `text-base font-semibold`, `CardDescription`은 `text-xs text-muted-foreground`,
