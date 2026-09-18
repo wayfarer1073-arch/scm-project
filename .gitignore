@@ -44,3 +44,9 @@ next-env.d.ts
 # python (skill scripts under .agents/.claude/.codex/.cursor)
 __pycache__/
 *.pyc
+
+# impeccable skill linked via `impeccable link` against a local /tmp checkout
+# (session-local dev symlink, points outside the repo, not portable/committable)
+.agents/skills/impeccable
+.claude/skills/impeccable
+.cursor/skills/impeccable
