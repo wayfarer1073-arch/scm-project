@@ -41,6 +41,28 @@ describe('parseInventoryWorkbook - 최소 헤더 기반 업로드', () => {
     expect(result.rows[0]).toMatchObject({ productCode: 'SKU-2', productName: '상품B', unitCost: 1250, totalCost: null, normalStock: 7 });
   });
 
+  it('"가용재고" 헤더만 있으면 정상재고로 인식한다', () => {
+    const rows = [
+      ['상품코드', '상품명', '가용재고'],
+      ['00003', '상품C', '42'],
+    ];
+    const result = parseInventoryWorkbook(buildXlsxBuffer(rows));
+
+    expect(result.issues.filter((issue) => issue.level === 'ERROR')).toHaveLength(0);
+    expect(result.rows[0]).toMatchObject({ productCode: '00003', productName: '상품C', normalStock: 42, availableStock: 42 });
+  });
+
+  it('"정상재고"와 "가용재고"가 함께 있으면 정상재고 값만 인식한다(가용재고 열은 무시)', () => {
+    const rows = [
+      ['상품코드', '상품명', '가용재고', '정상재고'],
+      ['00004', '상품D', '999', '15'],
+    ];
+    const result = parseInventoryWorkbook(buildXlsxBuffer(rows));
+
+    expect(result.issues.filter((issue) => issue.level === 'ERROR')).toHaveLength(0);
+    expect(result.rows[0]).toMatchObject({ productCode: '00004', productName: '상품D', normalStock: 15, availableStock: 15 });
+  });
+
   it('원가와 원가합 헤더가 모두 없어도 업로드하고 원가 누락을 표시한다', () => {
     const rows = [
       ['상품코드', '상품명', '정상재고'],

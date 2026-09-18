@@ -269,8 +269,7 @@ export function InventoryTable({
               <TableHead>상품코드</TableHead>
               <TableHead className="min-w-[220px]">상품명</TableHead>
               <TableHead>창고</TableHead>
-              <TableHead className="text-right">가용재고</TableHead>
-              <TableHead className="hidden text-right 2xl:table-cell">정상재고</TableHead>
+              <TableHead className="text-right">정상재고</TableHead>
               <SortableHead label={fromDate ? '기간 변화' : '전일 대비'} active={sortKey === 'increaseDesc'} asc={sortAsc} onClick={() => toggleSort('increaseDesc')} />
               <TableHead className="hidden text-right xl:table-cell">7일 소진량</TableHead>
               <SortableHead className="hidden 2xl:table-cell" label="7일 일평균 소진" active={sortKey === 'depletionRateDesc'} asc={sortAsc} onClick={() => toggleSort('depletionRateDesc')} />
@@ -318,8 +317,7 @@ export function InventoryTable({
                   )}
                 </TableCell>
                 <TableCell>{r.descriptor.warehouseCode}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatNumber(r.analysis.latest.availableStock)}</TableCell>
-                <TableCell className="hidden text-right tabular-nums 2xl:table-cell">{formatNumber(r.analysis.latest.normalStock)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatNumber(r.analysis.latest.normalStock)}</TableCell>
                 <TableCell className="text-right tabular-nums">
                   {fromDate ? (
                     r.periodComparison ? (

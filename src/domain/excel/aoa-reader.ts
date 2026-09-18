@@ -73,13 +73,25 @@ export function findHeaderRowIndex(aoa: string[][], headerAliases: Record<string
   return 0;
 }
 
+/**
+ * 별칭 배열의 순서를 우선순위로 쓴다 — 헤더 행에 같은 필드를 가리키는 별칭이 여러 개
+ * 있으면(예: "정상재고"와 "가용재고"가 한 시트에 함께 있는 경우), 시트 상 컬럼 위치가
+ * 아니라 별칭 배열에서 먼저 나오는 쪽을 채택한다.
+ */
 export function buildHeaderMap<F extends string>(headerRow: string[], headerAliases: Record<F, string[]>, fields: readonly F[]): Partial<Record<F, string>> {
   const normalizedHeaders = headerRow.map(normalizeHeaderCell);
   const map: Partial<Record<F, string>> = {};
   for (const field of fields) {
     const aliases = headerAliases[field].map(normalizeHeaderCell);
-    const idx = normalizedHeaders.findIndex((h) => aliases.includes(h));
-    if (idx !== -1) map[field] = headerRow[idx];
+    let matchedIdx = -1;
+    for (const alias of aliases) {
+      const idx = normalizedHeaders.indexOf(alias);
+      if (idx !== -1) {
+        matchedIdx = idx;
+        break;
+      }
+    }
+    if (matchedIdx !== -1) map[field] = headerRow[matchedIdx];
   }
   return map;
 }
