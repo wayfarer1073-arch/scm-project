@@ -3,15 +3,19 @@ import { dateOnlyToString } from '@/lib/date';
 import type { StockObservation } from '@/domain/inventory/types';
 import { resolveInventoryCost } from '@/domain/inventory/costs';
 import type { Prisma } from '@prisma/client';
+import type { SkuDescriptor, DailyWarehouseTotal } from '@/domain/inventory/read-model';
+import { attachIntervalInbounds, type DatedInbound } from '@/domain/inventory/inbounds';
 
 /**
  * mock과 실데이터는 절대 같은 시계열에 섞이면 안 된다(README 참고). 창고별로 실데이터가
  * 하나라도 있으면 그 창고는 "실데이터 모드"로 보고 mock 스냅샷을 전부 제외하고, 아직 실데이터가
  * 없는 창고(개발/데모 단계)만 mock을 그대로 허용한다.
  */
-async function resolveMockFilter(warehouseId?: string): Promise<Prisma.InventorySnapshotWhereInput> {
+async function resolveMockFilter(warehouseId?: string, asOfDate?: string): Promise<Prisma.InventorySnapshotWhereInput> {
   const realWarehouses = await prisma.inventorySnapshot.findMany({
-    where: { status: 'ACTIVE', isMock: false, ...(warehouseId ? { warehouseId } : {}) },
+    where: { status: 'ACTIVE', isMock: false, ...(warehouseId ? { warehouseId } : {}),
+      ...(asOfDate ? { snapshotDate: { lte: new Date(`${asOfDate}T00:00:00.000Z`) } } : {}),
+    },
     select: { warehouseId: true },
     distinct: ['warehouseId'],
   });
@@ -24,7 +28,7 @@ async function resolveMockFilter(warehouseId?: string): Promise<Prisma.Inventory
  * SnapshotInbound는 특정 스냅샷 버전이 아니라 (SKU, 날짜)에 독립적으로 붙어있으므로
  * snapshot.status/isMock을 거칠 필요 없이 skuId·날짜로 바로 조회한다.
  */
-async function loadInboundQuantityBySkuDate(skuIds: string[], asOfDate?: string): Promise<Map<string, number>> {
+async function loadInboundsBySku(skuIds: string[], asOfDate?: string): Promise<Map<string, DatedInbound[]>> {
   if (skuIds.length === 0) return new Map();
   const entries = await prisma.snapshotInbound.findMany({
     where: {
@@ -33,38 +37,29 @@ async function loadInboundQuantityBySkuDate(skuIds: string[], asOfDate?: string)
     },
     select: { skuId: true, quantity: true, snapshotDate: true },
   });
-  const result = new Map<string, number>();
+  const result = new Map<string, DatedInbound[]>();
   for (const entry of entries) {
-    const key = `${entry.skuId}|${dateOnlyToString(entry.snapshotDate)}`;
-    result.set(key, (result.get(key) ?? 0) + entry.quantity);
+    const list = result.get(entry.skuId) ?? [];
+    list.push({ date: dateOnlyToString(entry.snapshotDate), quantity: entry.quantity });
+    result.set(entry.skuId, list);
   }
   return result;
 }
 
-export interface SkuDescriptor {
-  skuId: string;
-  warehouseId: string;
-  warehouseCode: string;
-  warehouseName: string;
-  productCode: string;
-  productName: string;
-  option: string | null;
-  barcode: string | null;
-  location: string | null;
-  /** 관리자가 SKU 상세에서 직접 지정한 위험/경고수량. null이면 자동계산을 쓴다. */
-  manualDangerQty: number | null;
-  manualWarningQty: number | null;
-  expirationDate: string | null;
-  /** 소비기한 위험 판정 일수. null이면 앱의 기본값(DEFAULT_EXPIRATION_RISK_DAYS)을 쓴다. */
-  expirationRiskDays: number | null;
-}
+// Shared projection avoids transferring unused item IDs, extra JSON and audit fields for every observation.
+const observationSelect = {
+  skuId: true, productName: true, option: true, barcode: true, location: true,
+  unitCost: true, unitCostProvided: true, totalCost: true, normalStock: true,
+  defectiveStock: true, incomingStock: true, warningQty: true, dangerQty: true,
+  snapshot: { select: { snapshotDate: true } },
+} satisfies Prisma.InventoryItemSelect;
 
-/** isActive(최신 스냅샷에 존재) SKU 목록과, 각 SKU의 전체 관측 시계열을 한 번에 로드한다(N+1 방지) */
+/** 기준일의 최신 스냅샷에 존재하는 SKU와 관측 시계열. 현재 isActive는 과거 조회에 적용하지 않는다. */
 export async function loadActiveSkusWithSeries(
   warehouseId?: string,
   asOfDate?: string,
 ): Promise<{ descriptor: SkuDescriptor; observations: StockObservation[] }[]> {
-  const mockFilter = await resolveMockFilter(warehouseId);
+  const mockFilter = await resolveMockFilter(warehouseId, asOfDate);
   const latestSnapshots = await prisma.inventorySnapshot.findMany({
     where: {
       status: 'ACTIVE',
@@ -93,7 +88,7 @@ export async function loadActiveSkusWithSeries(
   const activeSkuIds = [...new Set(latestItems.map((item) => item.skuId))];
 
   const skus = await prisma.sku.findMany({
-    where: { id: { in: activeSkuIds }, isActive: true, isHiddenFromDashboard: false, ...(warehouseId ? { warehouseId } : {}) },
+    where: { id: { in: activeSkuIds }, isHiddenFromDashboard: false, ...(warehouseId ? { warehouseId } : {}) },
     include: { warehouse: { select: { id: true, code: true, name: true } } },
   });
   if (skus.length === 0) return [];
@@ -108,10 +103,10 @@ export async function loadActiveSkusWithSeries(
         ...mockFilter,
       },
     },
-    include: { snapshot: { select: { snapshotDate: true } } },
+    select: observationSelect,
     orderBy: { snapshot: { snapshotDate: 'asc' } },
   });
-  const inboundQuantityBySkuDate = await loadInboundQuantityBySkuDate(skuIds, asOfDate);
+  const inboundsBySku = await loadInboundsBySku(skuIds, asOfDate);
 
   const observationsBySku = new Map<string, StockObservation[]>();
   const latestKnownUnitCostBySku = new Map<string, number>();
@@ -135,7 +130,6 @@ export async function loadActiveSkusWithSeries(
     const list = observationsBySku.get(item.skuId) ?? [];
     list.push({
       date: dateOnlyToString(item.snapshot.snapshotDate),
-      inboundQuantity: inboundQuantityBySkuDate.get(`${item.skuId}|${dateOnlyToString(item.snapshot.snapshotDate)}`) ?? 0,
       // 현재 업로드 규격은 정상재고를 유일한 재고 수량으로 사용한다. 과거 스냅샷도
       // 별도 가용재고 열이 비어 0으로 저장됐을 수 있으므로 정상재고로 분석한다.
       availableStock: item.normalStock,
@@ -169,56 +163,57 @@ export async function loadActiveSkusWithSeries(
         expirationDate: sku.expirationDate ? dateOnlyToString(sku.expirationDate) : null,
         expirationRiskDays: sku.expirationRiskDays,
       },
-      observations: observationsBySku.get(sku.id) ?? [],
+      observations: attachIntervalInbounds(observationsBySku.get(sku.id) ?? [], inboundsBySku.get(sku.id) ?? []),
     };
   });
 }
 
-export interface DailyWarehouseTotal {
-  date: string;
-  warehouseId: string;
-  totalAvailableStock: number;
-  totalInventoryValue: number;
-}
-
 /** 차트용 일자별 창고별 합계(재고수량/재고자산). ACTIVE 스냅샷만 집계하며, 숨김 처리된 SKU는 제외한다. */
-export async function loadDailyWarehouseTotals(): Promise<DailyWarehouseTotal[]> {
-  const mockFilter = await resolveMockFilter();
-  const items = await prisma.inventoryItem.findMany({
-    where: { snapshot: { status: 'ACTIVE', ...mockFilter }, sku: { isActive: true, isHiddenFromDashboard: false } },
-    select: {
-      skuId: true,
-      normalStock: true,
-      unitCost: true,
-      unitCostProvided: true,
-      totalCost: true,
-      snapshot: { select: { warehouseId: true, snapshotDate: true } },
-    },
-    orderBy: { snapshot: { snapshotDate: 'asc' } },
-  });
-  const map = new Map<string, DailyWarehouseTotal>();
-  const latestKnownUnitCostBySku = new Map<string, number>();
-  for (const item of items) {
-    const resolvedCost = resolveInventoryCost(
-      {
-        unitCost: Number(item.unitCost),
-        unitCostProvided: item.unitCostProvided,
-        totalCost: item.totalCost === null ? null : Number(item.totalCost),
-        normalStock: item.normalStock,
-      },
-      latestKnownUnitCostBySku.get(item.skuId) ?? null,
-    );
-    if (resolvedCost.latestKnownUnitCost !== null) {
-      latestKnownUnitCostBySku.set(item.skuId, resolvedCost.latestKnownUnitCost);
-    }
-    const date = dateOnlyToString(item.snapshot.snapshotDate);
-    const key = `${date}|${item.snapshot.warehouseId}`;
-    const existing = map.get(key) ?? { date, warehouseId: item.snapshot.warehouseId, totalAvailableStock: 0, totalInventoryValue: 0 };
-    existing.totalAvailableStock += item.normalStock;
-    existing.totalInventoryValue += resolvedCost.totalCost;
-    map.set(key, existing);
-  }
-  return [...map.values()].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+export async function loadDailyWarehouseTotals(asOfDate?: string): Promise<DailyWarehouseTotal[]> {
+  const endDate = asOfDate ? new Date(`${asOfDate}T00:00:00.000Z`) : null;
+  // Match resolveInventoryCost without sending every historical item to Node:
+  // each explicit cost starts a new carry-forward group; before the first explicit
+  // cost, use the first inferable total/quantity only from its observation date onward.
+  const totals = await prisma.$queryRaw<{
+    date: Date; warehouseId: string; totalAvailableStock: bigint; totalInventoryValue: Prisma.Decimal;
+  }[]>`
+    WITH real_warehouses AS (
+      SELECT DISTINCT "warehouseId" FROM inventory_snapshots
+      WHERE status = 'ACTIVE' AND NOT "isMock"
+        AND (${endDate}::date IS NULL OR "snapshotDate" <= ${endDate}::date)
+    ), observations AS (
+      SELECT i."skuId", s."warehouseId", s."snapshotDate", i."normalStock",
+        i."unitCost", i."unitCostProvided", i."totalCost",
+        COUNT(*) FILTER (WHERE i."unitCostProvided") OVER (
+          PARTITION BY i."skuId" ORDER BY s."snapshotDate" ROWS UNBOUNDED PRECEDING
+        ) AS cost_group
+      FROM inventory_items i
+      JOIN inventory_snapshots s ON s.id = i."snapshotId"
+      JOIN skus k ON k.id = i."skuId"
+      WHERE s.status = 'ACTIVE' AND NOT k."isHiddenFromDashboard"
+        AND (${endDate}::date IS NULL OR s."snapshotDate" <= ${endDate}::date)
+        AND (NOT s."isMock" OR NOT EXISTS (
+          SELECT 1 FROM real_warehouses r WHERE r."warehouseId" = s."warehouseId"
+        ))
+    ), costs AS (
+      SELECT *,
+        MAX("unitCost") FILTER (WHERE "unitCostProvided") OVER (PARTITION BY "skuId", cost_group) AS explicit_cost,
+        MIN("snapshotDate") FILTER (WHERE "totalCost" IS NOT NULL AND "normalStock" <> 0)
+          OVER (PARTITION BY "skuId") AS inferred_date,
+        FIRST_VALUE("totalCost" / NULLIF("normalStock", 0)) OVER (
+          PARTITION BY "skuId"
+          ORDER BY CASE WHEN "totalCost" IS NOT NULL AND "normalStock" <> 0 THEN 0 ELSE 1 END, "snapshotDate"
+        ) AS inferred_cost
+      FROM observations
+    )
+    SELECT "snapshotDate" AS date, "warehouseId", SUM("normalStock") AS "totalAvailableStock",
+      SUM(COALESCE("totalCost", "normalStock" * COALESCE(explicit_cost,
+        CASE WHEN "snapshotDate" >= inferred_date THEN inferred_cost END, 0))) AS "totalInventoryValue"
+    FROM costs GROUP BY "snapshotDate", "warehouseId" ORDER BY "snapshotDate", "warehouseId"
+  `;
+  return totals.map(total => ({ ...total, date: dateOnlyToString(total.date),
+    totalAvailableStock: Number(total.totalAvailableStock), totalInventoryValue: Number(total.totalInventoryValue),
+  }));
 }
 
 export async function loadSkuWithSeries(
@@ -226,9 +221,18 @@ export async function loadSkuWithSeries(
   asOfDate?: string,
 ): Promise<{ descriptor: SkuDescriptor; observations: StockObservation[] } | null> {
   const sku = await prisma.sku.findUnique({ where: { id: skuId }, include: { warehouse: { select: { id: true, code: true, name: true } } } });
-  if (!sku || !sku.isActive || sku.isHiddenFromDashboard) return null;
+  if (!sku || sku.isHiddenFromDashboard) return null;
 
-  const mockFilter = await resolveMockFilter(sku.warehouseId);
+  const mockFilter = await resolveMockFilter(sku.warehouseId, asOfDate);
+  // Match the list's point-in-time membership, including SKUs now inactive.
+  const latestSnapshot = await prisma.inventorySnapshot.findFirst({
+    where: { warehouseId: sku.warehouseId, status: 'ACTIVE', ...mockFilter,
+      ...(asOfDate ? { snapshotDate: { lte: new Date(`${asOfDate}T00:00:00.000Z`) } } : {}),
+    }, orderBy: { snapshotDate: 'desc' }, select: { id: true },
+  });
+  if (!latestSnapshot || !await prisma.inventoryItem.findUnique({
+    where: { snapshotId_skuId: { snapshotId: latestSnapshot.id, skuId } }, select: { id: true },
+  })) return null;
   const items = await prisma.inventoryItem.findMany({
     where: {
       skuId,
@@ -238,10 +242,10 @@ export async function loadSkuWithSeries(
         ...mockFilter,
       },
     },
-    include: { snapshot: { select: { snapshotDate: true } } },
+    select: observationSelect,
     orderBy: { snapshot: { snapshotDate: 'asc' } },
   });
-  const inboundQuantityBySkuDate = await loadInboundQuantityBySkuDate([skuId], asOfDate);
+  const inboundsBySku = await loadInboundsBySku([skuId], asOfDate);
 
   let latestKnownUnitCost: number | null = null;
   const observations: StockObservation[] = items.map((item) => {
@@ -257,7 +261,6 @@ export async function loadSkuWithSeries(
     latestKnownUnitCost = resolvedCost.latestKnownUnitCost;
     return {
       date: dateOnlyToString(item.snapshot.snapshotDate),
-      inboundQuantity: inboundQuantityBySkuDate.get(`${item.skuId}|${dateOnlyToString(item.snapshot.snapshotDate)}`) ?? 0,
       availableStock: item.normalStock,
       normalStock: item.normalStock,
       defectiveStock: item.defectiveStock,
@@ -288,7 +291,7 @@ export async function loadSkuWithSeries(
       expirationDate: sku.expirationDate ? dateOnlyToString(sku.expirationDate) : null,
       expirationRiskDays: sku.expirationRiskDays,
     },
-    observations,
+    observations: attachIntervalInbounds(observations, inboundsBySku.get(skuId) ?? []),
   };
 }
 

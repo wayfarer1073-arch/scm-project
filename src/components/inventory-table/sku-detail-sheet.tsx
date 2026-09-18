@@ -18,7 +18,7 @@ import { formatCoverageDays, formatCurrency, formatNumber, formatSigned } from '
 import { formatKstDate, formatKstDateTime } from '@/lib/date';
 import { riskBadgeVariant, riskLabel } from '@/lib/status';
 import { eventTypeLabel } from '@/lib/event-types';
-import type { SkuDescriptor } from '@/server/repositories/inventory-repository';
+import type { SkuDescriptor } from '@/domain/inventory/read-model';
 
 interface SkuDetailResponse {
   descriptor: SkuDescriptor;

@@ -10,9 +10,10 @@ import { WarehouseSummaryCards } from '@/components/dashboard/warehouse-summary-
 import { ChartsSection } from '@/components/dashboard/charts/charts-section';
 import { InventoryTable } from '@/components/inventory-table/inventory-table';
 import { SkuDetailSheet } from '@/components/inventory-table/sku-detail-sheet';
-import { calculateCompanyKpis, calculateWarehouseSummaries, buildActionCenterCards, type InventoryRow } from '@/server/services/inventory-analysis-service';
+import { calculateCompanyKpis, calculateWarehouseSummaries, buildActionCenterCards } from '@/domain/inventory/aggregation';
+import type { InventoryRow } from '@/domain/inventory/read-model';
 import type { RiskThresholdSettings } from '@/domain/inventory/types';
-import type { DailyWarehouseTotal } from '@/server/repositories/inventory-repository';
+import type { DailyWarehouseTotal } from '@/domain/inventory/read-model';
 import type { QuickFilter, TableTab } from '@/lib/inventory-filters';
 import { DateRangeControl } from '@/components/dashboard/date-range-control';
 import { todayKstDateString } from '@/lib/date';

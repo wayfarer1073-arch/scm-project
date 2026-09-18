@@ -1,7 +1,7 @@
 import { ArrowDownRight, ArrowUpRight, Boxes, CircleDollarSign } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatCurrency, formatNumber } from '@/lib/format';
-import type { CompanyKpis } from '@/server/services/inventory-analysis-service';
+import type { CompanyKpis } from '@/domain/inventory/types';
 
 interface KpiCardsProps {
   kpis: CompanyKpis;

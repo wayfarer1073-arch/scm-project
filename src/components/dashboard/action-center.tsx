@@ -2,7 +2,7 @@
 
 import { AlertOctagon, Clock, Flame, PauseCircle, PackageOpen, CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { ActionCenterCard, ActionCenterCategory } from '@/server/services/inventory-analysis-service';
+import type { ActionCenterCard, ActionCenterCategory } from '@/domain/inventory/aggregation';
 import type { QuickFilter, TableTab } from '@/lib/inventory-filters';
 
 const CARD_META: Record<ActionCenterCategory, { icon: React.ElementType; tone: string; tab: TableTab; quickFilter: QuickFilter }> = {

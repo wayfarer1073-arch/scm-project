@@ -6,8 +6,8 @@ import { TrendLineChart } from './trend-line-chart';
 import { RiskDistributionChart } from './risk-distribution-chart';
 import { TopDepletionChart } from './top-depletion-chart';
 import { formatCurrency, formatNumber } from '@/lib/format';
-import type { DailyWarehouseTotal } from '@/server/repositories/inventory-repository';
-import type { InventoryRow } from '@/server/services/inventory-analysis-service';
+import type { DailyWarehouseTotal } from '@/domain/inventory/read-model';
+import type { InventoryRow } from '@/domain/inventory/read-model';
 
 interface ChartsSectionProps {
   rows: InventoryRow[];

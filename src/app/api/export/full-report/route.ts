@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import { auth } from '@/server/auth';
-import { getInventoryRows, calculateCompanyKpis, calculateWarehouseSummaries } from '@/server/services/inventory-analysis-service';
+import { getInventoryRows } from '@/server/services/inventory-analysis-service';
+import { calculateCompanyKpis, calculateWarehouseSummaries } from '@/domain/inventory/aggregation';
 import { listAllEvents } from '@/server/repositories/event-repository';
 import { getSettings } from '@/server/repositories/settings-repository';
 import { buildEventsSheetRows, buildInventorySheetRows, buildRiskSheetRows, buildStagnantSheetRows, buildSummarySheetRows, type ExportRowInput } from '@/domain/excel/export';
