@@ -14,6 +14,33 @@ function rankColor(index: number, count: number): string {
   return `oklch(${lightness.toFixed(3)} 0.02 260)`;
 }
 
+interface BarTooltipProps {
+  active?: boolean;
+  payload?: { payload: { fullName: string; value: number } }[];
+}
+
+/** 기본 Tooltip은 Y축 라벨(잘린 상품명)과 formatter 결과(전체 상품명)를 각각 한 줄씩 그려 상품명이
+ * 두 번 겹쳐 보인다. 커스텀 content로 전체 상품명 한 줄 + 수량 한 줄만 그린다. */
+function BarTooltip({ active, payload }: BarTooltipProps) {
+  if (!active || !payload || payload.length === 0) return null;
+  const { fullName, value } = payload[0].payload;
+  return (
+    <div
+      style={{
+        background: 'var(--color-card)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 8,
+        padding: '8px 10px',
+        fontSize: 12,
+        maxWidth: 220,
+      }}
+    >
+      <div style={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{fullName}</div>
+      <div style={{ marginTop: 2, color: 'var(--color-muted-foreground)' }}>{value.toLocaleString('ko-KR')}개</div>
+    </div>
+  );
+}
+
 interface BarShapeProps {
   x: number;
   y: number;
@@ -79,11 +106,7 @@ export function TopDepletionChart({ items }: TopDepletionChartProps) {
               <CartesianGrid stroke="var(--color-border)" horizontal={false} />
               <XAxis type="number" fontSize={11} stroke="var(--color-muted-foreground)" tickLine={false} axisLine={false} />
               <YAxis type="category" dataKey="name" width={104} fontSize={11} stroke="var(--color-muted-foreground)" tickLine={false} axisLine={false} />
-              <Tooltip
-                formatter={(value, _name, item) => [`${Number(value).toLocaleString('ko-KR')}개`, item.payload.fullName]}
-                contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: 'var(--color-border)', background: 'var(--color-card)' }}
-                cursor={{ fill: 'var(--color-muted)' }}
-              />
+              <Tooltip content={<BarTooltip />} cursor={{ fill: 'var(--color-muted)' }} />
               {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               <Bar dataKey="value" shape={RankedBarShape as any} isAnimationActive={false} />
             </BarChart>

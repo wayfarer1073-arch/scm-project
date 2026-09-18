@@ -24,14 +24,13 @@ interface LeaderLabelProps {
 }
 
 /**
- * 위험/주의는 작은 슬라이스로 붙어있는 경우가 많아 각도 기준으로만 라벨을 배치하면 겹친다.
- * 그래서 라벨 텍스트는 카테고리별 고정 슬롯에 배치하고, 리더라인의 시작점만 실제 조각 위치에서 뽑는다.
+ * 위험/주의가 아주 작은 조각(전체의 8% 미만)으로 서로 붙어있으면 실제 각도 그대로 라벨을 두었을 때
+ * 겹칠 수 있다. 그 경우에만 두 라벨을 세로로 살짝 떨어뜨린다. 그 외에는 항상 해당 조각의 실제
+ * 각도에서 계산한 위치를 쓴다 — 조각 비율이 커질 때 리더라인이 조각과 무관한 고정 위치로
+ * 튀어서 차트 밖으로 나가 보이던 문제(회귀 테스트 대상)를 막는다.
  */
-const LABEL_SLOTS: Record<string, { side: 'left' | 'right'; yOffset: number }> = {
-  위험: { side: 'right', yOffset: -34 },
-  주의: { side: 'right', yOffset: 10 },
-  정상: { side: 'left', yOffset: -12 },
-};
+const SMALL_SLICE_THRESHOLD = 0.08;
+const SMALL_SLICE_NUDGE: Record<string, number> = { 위험: -16, 주의: 16 };
 
 function LeaderLineLabel({ cx, cy, midAngle, outerRadius, value, percent, name, fill }: LeaderLabelProps) {
   if (value === 0) return null;
@@ -40,12 +39,20 @@ function LeaderLineLabel({ cx, cy, midAngle, outerRadius, value, percent, name, 
   const sx = cx + (outerRadius + 6) * cos;
   const sy = cy + (outerRadius + 6) * sin;
 
-  const slot = LABEL_SLOTS[name] ?? { side: cos >= 0 ? 'right' : 'left', yOffset: 0 };
-  const dir = slot.side === 'right' ? 1 : -1;
-  const ey = cy + slot.yOffset;
+  const side: 'left' | 'right' = cos >= 0 ? 'right' : 'left';
+  const dir = side === 'right' ? 1 : -1;
+
+  // 굽는 지점은 기본적으로 조각의 실제 각도를 따라간다. 작은 조각일 때만 겹침 방지용 고정
+  // 오프셋을 쓰고, 그 오프셋도 링 반지름 범위 안으로 clamp해 차트 밖으로 나가지 않게 한다.
+  const bendRadius = outerRadius + 22;
+  const naturalEy = cy + bendRadius * sin;
+  const maxOffset = outerRadius + 30;
+  const ey = percent < SMALL_SLICE_THRESHOLD && name in SMALL_SLICE_NUDGE
+    ? cy + SMALL_SLICE_NUDGE[name]
+    : Math.min(cy + maxOffset, Math.max(cy - maxOffset, naturalEy));
   const ex = cx + dir * (outerRadius + 44);
   const mx = ex - dir * 14;
-  const textAnchor = slot.side === 'right' ? 'start' : 'end';
+  const textAnchor = side === 'right' ? 'start' : 'end';
 
   return (
     <g>
