@@ -75,6 +75,15 @@ describe('shipping-day trading inventory', () => {
     rows[rows.length - 1] = obs('2026-09-18', 300, 200);
     expect(analyzeOperationalSku(rows, '2026-09-18')!.coverage.coverageDays).toBe(30);
   });
+  it('grades forecast confidence by basis window size, and drops it to LOW whenever a disqualifying reason exists even if an old basis window still looks valid', () => {
+    expect(analyzeOperationalSku(daily(), '2026-09-19')!.forecast.confidence).toBe('HIGH');
+    const holidays = new Set(['2026-09-16']);
+    expect(analyzeOperationalSku(daily(10, holidays), '2026-09-18', undefined, undefined, undefined, { holidays })!.forecast.confidence).toBe('MEDIUM');
+    const stale = analyzeOperationalSku(daily(), '2026-09-21')!;
+    expect(stale.operating?.reason).toBe('자료 갱신 필요');
+    expect(stale.operating?.basisWindowDays).toBe(7);
+    expect(stale.forecast.confidence).toBe('LOW');
+  });
   it('compares a calendar expiry to the projected date, not to shipping-day coverage', () => {
     const a = analyzeOperationalSku(daily(), '2026-09-18', undefined, undefined,
       { expirationDate: '2026-09-30', expirationRiskDays: 0 })!;

@@ -65,6 +65,10 @@ export function analyzeOperationalSku(
       : uncertainMovement ? '입고·조정 확인' : latest.normalStock === 0 ? '관측 무재고' : !basis ? '관측 자료 부족'
         : basis.averageDailyDepletion === 0 ? '소진 미관측' : null;
   const canEstimate = reason === null;
+  // Mirrors dataReliabilityLevel in src/lib/status.ts: a disqualifying reason always wins over
+  // window size, even when an older basis window still looks superficially valid.
+  const confidence: 'HIGH' | 'MEDIUM' | 'LOW' = reason !== null ? 'LOW'
+    : basis!.windowDays === 7 ? 'HIGH' : basis!.windowDays === 14 ? 'MEDIUM' : 'LOW';
   const rate = canEstimate ? basis!.averageDailyDepletion : null;
   const coverage = calculateCoverage(latest.normalStock, rate, settings);
   const stockoutDate = coverage.coverageDays === null ? null : shippingDateAfter(latest.date, coverage.coverageDays, holidays);
@@ -123,7 +127,7 @@ export function analyzeOperationalSku(
     averageDailyDepletion: context.isB2B || context.isMissing || invalid || w.inconsistent ? null : w.averageDailyDepletion });
   return { ...base, window7: displayWindow(w7), window14: displayWindow(w14), window30: displayWindow(w30), coverage,
     forecast: { expectedStockoutDays: coverage.coverageDays, expectedStockoutDate: stockoutDate,
-      basisWindowDays: (basis?.windowDays ?? 7) as 7 | 14 | 30, confidence: stockoutDate ? 'LOW' : null },
+      basisWindowDays: (basis?.windowDays ?? 7) as 7 | 14 | 30, confidence },
     acceleration, thresholdRisk, riskThresholds: thresholds, stagnation,
     overstock: { isCandidate: overstockCoverage !== null && overstockCoverage >= settings.overstockCoverageDays,
       coverageDays: overstockCoverage, thresholdDays: settings.overstockCoverageDays },

@@ -22,17 +22,13 @@ export type DataReliability = 'HIGH' | 'MEDIUM' | 'LOW';
 
 /**
  * 이 SKU의 소진량 추정이 얼마나 믿을 만한 관측 근거를 갖고 있는지 상/중/하로 나눈다.
- * "자료 갱신 필요"·"재고 정합성 확인"·"입고·조정 확인" 등 추정 자체가 불가능한 사유(reason)가
- * 있으면, 설령 예전에 쌓인 window 자료가 있더라도 지금은 근거가 없는 것이므로 무조건 하다.
- * 정상적으로 추정 가능할 때만 basisWindowDays(7/14/30일 중 실제로 근거로 쓴 기간)로 나눈다 —
- * 최근 7일 자료만으로 계산했으면 상, 14일까지 넓혀야 했으면 중, 30일까지 넓혔으면 하.
+ * analysis.forecast.confidence(operational-analysis.ts에서 계산)를 그대로 노출한다 — "자료
+ * 갱신 필요"·"재고 정합성 확인" 등 추정 자체가 불가능한 사유가 있으면 예전에 쌓인 window
+ * 자료가 남아있어도 무조건 하이고, 정상 추정 가능할 때만 실제로 근거로 쓴 기간(7/14/30일)으로
+ * 나뉜다 — 두 번 계산해 값이 어긋나는 일이 없도록 단일 소스를 그대로 사용한다.
  */
 export function dataReliabilityLevel(analysis: SkuAnalysis): DataReliability {
-  const operating = analysis.operating;
-  if (!operating || operating.reason !== null) return 'LOW';
-  if (operating.basisWindowDays === 7) return 'HIGH';
-  if (operating.basisWindowDays === 14) return 'MEDIUM';
-  return 'LOW';
+  return analysis.forecast.confidence ?? 'LOW';
 }
 
 export function dataReliabilityLabel(level: DataReliability): string {
