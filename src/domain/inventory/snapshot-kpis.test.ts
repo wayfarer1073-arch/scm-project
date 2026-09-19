@@ -127,11 +127,20 @@ describe('weekend/holiday carry-forward (매출은 발생하지만 업로드는 
 describe('목록 미관측 SKU는 마지막 재고를 현재 재고로 합산하지 않는다', () => {
   it('이력 노출 중인 미관측 SKU도 현재 보유 수량·금액에서는 제외한다', () => {
     const s = calculateSnapshotKpis([row('a', [obs('2026-08-01', 50)], '2026-09-08', undefined, true)]);
-    expect(s).toMatchObject({ observedSkuCount: 0, staleSkuCount: 1, positiveStockSkuCount: 0, knownInventoryValue: null });
+    expect(s).toMatchObject({ observedSkuCount: 0, staleSkuCount: 1, positiveStockSkuCount: 0, knownInventoryValue: null, soldOutSkuCount: 1 });
   });
-  it('isSoldOut이 아니면 동일한 공백은 여전히 stale로 집계된다(대조군)', () => {
+  it('isSoldOut이 아니면 동일한 공백은 여전히 stale로 집계되지만, "품절 SKU"에는 잡히지 않는다(대조군)', () => {
     const s = calculateSnapshotKpis([row('a', [obs('2026-08-01', 50)], '2026-09-08', undefined, false)]);
-    expect(s).toMatchObject({ observedSkuCount: 0, staleSkuCount: 1 });
+    expect(s).toMatchObject({ observedSkuCount: 0, staleSkuCount: 1, soldOutSkuCount: 0 });
+  });
+  it('"품절 SKU"는 정상재고=0인 SKU나 단순 업로드 지연 SKU를 세지 않고, isSoldOut인 SKU만 센다', () => {
+    const soldOut = row('soldout', [obs('2026-08-01', 50)], '2026-09-08', undefined, true);
+    const zeroStock = row('zero', [obs('2026-09-08', 0)]);
+    const lateUpload = row('late', [obs('2026-09-01', 10)], '2026-09-08');
+    const s = calculateSnapshotKpis([soldOut, zeroStock, lateUpload]);
+    expect(s.soldOutSkuCount).toBe(1);
+    expect(s.zeroStockSkuCount).toBe(1);
+    expect(s.staleSkuCount).toBe(2);
   });
 });
 

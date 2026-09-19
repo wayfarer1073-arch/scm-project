@@ -187,3 +187,12 @@ h1, h2, h3, h4 {
   background: var(--border);
   border-radius: 999px;
 }
+
+/* Recharts는 막대/파이 조각을 접근성 때문에 포커스 가능한 요소로 그려서, 클릭하면 브라우저 기본
+   포커스 테두리(검은 사각 윤곽)가 뜬다. 이 앱의 차트는 클릭 동작이 없고 호버 툴팁만 쓰므로,
+   그 포커스 링만 지우고 커서를 올렸을 때의 hover 상호작용(툴팁)은 그대로 둔다. */
+.recharts-wrapper svg,
+.recharts-wrapper svg *:focus,
+.recharts-wrapper svg *:focus-visible {
+  outline: none;
+}

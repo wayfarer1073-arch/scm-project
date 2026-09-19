@@ -34,9 +34,9 @@ export function KpiCards({ kpis, fromDate, asOfDate }: KpiCardsProps) {
         <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
           <Metric
             label="품절 SKU"
-            value={`${s.zeroStockSkuCount + s.staleSkuCount}개`}
-            emphasis={s.zeroStockSkuCount + s.staleSkuCount ? 'warning' : undefined}
-            tooltip="최근 30일 이내 재고가 0이된 SKU들 입니다."
+            value={`${s.soldOutSkuCount}개`}
+            emphasis={s.soldOutSkuCount ? 'warning' : undefined}
+            tooltip="최신 업로드 목록에서 빠져 품절로 인식된 뒤, 아직 1개월 유예기간이 지나지 않은 SKU 수입니다."
           />
           <Metric
             label="미입고재고"

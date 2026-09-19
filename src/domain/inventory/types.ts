@@ -179,6 +179,8 @@ export interface SnapshotKpis {
   valuationCoverageRatio: number | null;
   /** 기준일에 자료가 올라오지 않아(과거 스냅샷을 그대로 쓰는) 위 집계에서 제외된 SKU 수. */
   staleSkuCount: number;
+  /** 품절 인식(isSoldOut)되어 1개월 유예기간 내 노출 중인 SKU 수 — staleSkuCount의 부분집합. */
+  soldOutSkuCount: number;
   oldestObservationDate: string | null;
   newestObservationDate: string | null;
   /** 집계 시작일 — 이 SKU 집합에서 자료를 가장 먼저 관측한 날짜(SKU.firstSeenDate 최솟값).
