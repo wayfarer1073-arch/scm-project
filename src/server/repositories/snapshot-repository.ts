@@ -163,6 +163,80 @@ export async function createSnapshot(input: CreateSnapshotInput) {
   );
 }
 
+/**
+ * 특정 창고·날짜에 업로드된 자료를 완전히 지운다(ACTIVE/REPLACED 이력 전부, cascade로
+ * InventoryItem도 함께 삭제). 같은 날짜의 수동 입고 기록(SnapshotInbound)도 함께 지운다.
+ * 지운 날짜가 그 창고의 최신 스냅샷이었다면, 남은 스냅샷 중 최신 것으로 SKU 캐시(isActive/
+ * current*)를 다시 맞추고, 모든 SKU의 firstSeenDate/lastSeenDate를 남은 데이터로 재계산한다.
+ */
+export async function resetUploadForDate(warehouseId: string, snapshotDate: Date): Promise<{ deletedSnapshotCount: number }> {
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$queryRaw`SELECT id FROM warehouses WHERE id = ${warehouseId} FOR UPDATE`;
+
+      const toDelete = await tx.inventorySnapshot.findMany({ where: { warehouseId, snapshotDate }, select: { id: true } });
+      if (toDelete.length === 0) return { deletedSnapshotCount: 0 };
+
+      const skusInWarehouse = await tx.sku.findMany({ where: { warehouseId }, select: { id: true } });
+      const skuIds = skusInWarehouse.map((s) => s.id);
+      if (skuIds.length > 0) {
+        await tx.snapshotInbound.deleteMany({ where: { snapshotDate, skuId: { in: skuIds } } });
+      }
+
+      await tx.inventorySnapshot.deleteMany({ where: { id: { in: toDelete.map((s) => s.id) } } });
+
+      const newLatest = await tx.inventorySnapshot.findFirst({
+        where: { warehouseId, status: 'ACTIVE' },
+        orderBy: { snapshotDate: 'desc' },
+      });
+
+      if (newLatest) {
+        await tx.$executeRaw`
+          UPDATE skus AS s SET
+            "currentProductName" = ii."productName",
+            "currentOption" = ii.option,
+            "currentBarcode" = ii.barcode,
+            "currentLocation" = ii.location,
+            "currentUnitCost" = CASE WHEN ii."unitCostProvided" THEN ii."unitCost" ELSE s."currentUnitCost" END,
+            "currentWarningQty" = ii."warningQty",
+            "currentDangerQty" = ii."dangerQty",
+            "isActive" = true,
+            "updatedAt" = NOW()
+          FROM inventory_items ii
+          WHERE ii."snapshotId" = ${newLatest.id} AND s.id = ii."skuId"
+        `;
+        await tx.$executeRaw`
+          UPDATE skus SET "isActive" = false, "updatedAt" = NOW()
+          WHERE "warehouseId" = ${warehouseId}
+            AND id NOT IN (SELECT "skuId" FROM inventory_items WHERE "snapshotId" = ${newLatest.id})
+        `;
+      } else {
+        await tx.sku.updateMany({ where: { warehouseId }, data: { isActive: false } });
+      }
+
+      // 남은 스냅샷 기준으로 firstSeenDate/lastSeenDate를 다시 맞춘다. 이 창고에 데이터가 전혀
+      // 남지 않은 SKU(지운 날짜가 유일한 관측이었던 경우)는 계산할 근거가 없어 건드리지 않는다
+      // (isActive=false로만 남아 대시보드에서는 계속 제외된다).
+      await tx.$executeRaw`
+        UPDATE skus AS s SET
+          "firstSeenDate" = agg.min_date,
+          "lastSeenDate" = agg.max_date
+        FROM (
+          SELECT ii."skuId" AS sku_id, MIN(sn."snapshotDate") AS min_date, MAX(sn."snapshotDate") AS max_date
+          FROM inventory_items ii
+          JOIN inventory_snapshots sn ON sn.id = ii."snapshotId"
+          WHERE sn."warehouseId" = ${warehouseId}
+          GROUP BY ii."skuId"
+        ) AS agg(sku_id, min_date, max_date)
+        WHERE s.id = agg.sku_id
+      `;
+
+      return { deletedSnapshotCount: toDelete.length };
+    },
+    { timeout: 60000, maxWait: 15000 },
+  );
+}
+
 export function listSnapshotsForWarehouse(warehouseId: string) {
   return prisma.inventorySnapshot.findMany({
     where: { warehouseId, status: 'ACTIVE' },

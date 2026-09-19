@@ -1,12 +1,17 @@
 import { listWarehouses } from '@/server/repositories/warehouse-repository';
 import { listSnapshotsForWarehouse } from '@/server/repositories/snapshot-repository';
 import { listInboundCountsByWarehouseAndDate } from '@/server/repositories/inbound-repository';
+import { listHolidays } from '@/server/repositories/holiday-repository';
 import { UploadCalendar } from '@/components/upload/upload-calendar';
 import { dateOnlyToString } from '@/lib/date';
+import { auth } from '@/server/auth';
 
 export default async function UploadPage() {
+  const session = await auth();
+  const isAdmin = session?.user.role === 'ADMIN';
   const warehouses = await listWarehouses();
   const inboundCounts = await listInboundCountsByWarehouseAndDate();
+  const holidays = await listHolidays();
 
   const calendarEntries = (
     await Promise.all(
@@ -37,7 +42,12 @@ export default async function UploadPage() {
           캘린더에서 날짜·창고 칸을 눌러 재고 Excel(.xls, .xlsx)을 업로드하세요. 각 창고는 서로 다른 품목군을 관리하는 독립 재고 Pool입니다.
         </p>
       </div>
-      <UploadCalendar warehouses={warehouses.map((w) => ({ id: w.id, code: w.code, name: w.name }))} entries={calendarEntries} />
+      <UploadCalendar
+        warehouses={warehouses.map((w) => ({ id: w.id, code: w.code, name: w.name }))}
+        entries={calendarEntries}
+        holidays={holidays.map((h) => ({ date: h.date, name: h.name }))}
+        isAdmin={isAdmin}
+      />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, CheckCircle2, Info, Trash2, UploadCloud } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Info, RotateCcw, Trash2, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,8 @@ interface CalendarUploadDialogProps {
   warehouseName: string;
   date: string;
   existing: { uploadedByName: string; uploadedAt: string; rowCount: number } | null;
+  blocked: boolean;
+  isAdmin: boolean;
 }
 
 type UiState =
@@ -32,11 +34,34 @@ type UiState =
   | { phase: 'duplicate' }
   | { phase: 'success'; rowCount: number; issues: ValidationIssue[] };
 
-export function CalendarUploadDialog({ open, onOpenChange, warehouseId, warehouseName, date, existing }: CalendarUploadDialogProps) {
+export function CalendarUploadDialog({ open, onOpenChange, warehouseId, warehouseName, date, existing, blocked, isAdmin }: CalendarUploadDialogProps) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [state, setState] = useState<UiState>({ phase: 'idle' });
+  const [resetting, setResetting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function resetUpload() {
+    if (!confirm(`${warehouseName} · ${formatKstDate(date)}에 올라온 재고 데이터와 입고 기록을 모두 삭제할까요? 되돌릴 수 없습니다.`)) return;
+    setResetting(true);
+    try {
+      const res = await fetch(`/api/upload?warehouseId=${encodeURIComponent(warehouseId)}&snapshotDate=${encodeURIComponent(date)}`, {
+        method: 'DELETE',
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(body.error ?? '초기화에 실패했습니다.');
+        return;
+      }
+      toast.success('업로드 자료를 초기화했습니다.');
+      onOpenChange(false);
+      router.refresh();
+    } catch {
+      toast.error('네트워크 오류로 초기화에 실패했습니다.');
+    } finally {
+      setResetting(false);
+    }
+  }
 
   async function submit() {
     if (!file) {
@@ -100,9 +125,15 @@ export function CalendarUploadDialog({ open, onOpenChange, warehouseId, warehous
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {warehouseName} · {formatKstDate(date)} 자료 {existing ? '교체' : '업로드'}
+            {warehouseName} · {formatKstDate(date)} 자료{!blocked && (existing ? ' 교체' : ' 업로드')}
           </DialogTitle>
-          <DialogDescription>{existing ? '기존에 올라온 자료를 새 파일로 교체합니다.' : '해당 일자·창고에 재고 스냅샷을 새로 업로드합니다.'}</DialogDescription>
+          <DialogDescription>
+            {blocked
+              ? '주말·공휴일에는 자료를 업로드하거나 교체할 수 없습니다. 필요하면 아래에서 초기화만 할 수 있습니다.'
+              : existing
+                ? '기존에 올라온 자료를 새 파일로 교체합니다.'
+                : '해당 일자·창고에 재고 스냅샷을 새로 업로드합니다.'}
+          </DialogDescription>
         </DialogHeader>
 
         {state.phase === 'success' ? (
@@ -127,7 +158,7 @@ export function CalendarUploadDialog({ open, onOpenChange, warehouseId, warehous
           </>
         ) : (
           <>
-            {existing && (
+            {existing && !blocked && (
               <div role="alert" className="flex items-start gap-1.5 rounded-md border border-status-warning/30 bg-status-warning-bg p-2.5 text-xs text-status-warning">
                 <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
                 <span>
@@ -137,13 +168,21 @@ export function CalendarUploadDialog({ open, onOpenChange, warehouseId, warehous
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <Label htmlFor="calendar-upload-file">Excel 파일 (.xls, .xlsx)</Label>
-              <Input ref={fileInputRef} id="calendar-upload-file" type="file" accept=".xls,.xlsx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            {existing && blocked && (
               <p className="text-xs text-muted-foreground">
-                상품코드·상품명·정상재고 헤더만 필수입니다. 원가·원가합은 선택이며, 다른 열은 저장하지 않습니다.
+                {existing.uploadedByName}님이 {formatKstDateTime(existing.uploadedAt)}에 올린 {existing.rowCount.toLocaleString()}건이 있습니다.
               </p>
-            </div>
+            )}
+
+            {!blocked && (
+              <div className="space-y-1.5">
+                <Label htmlFor="calendar-upload-file">Excel 파일 (.xls, .xlsx)</Label>
+                <Input ref={fileInputRef} id="calendar-upload-file" type="file" accept=".xls,.xlsx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+                <p className="text-xs text-muted-foreground">
+                  상품코드·상품명·정상재고 헤더만 필수입니다. 원가·원가합은 선택이며, 다른 열은 저장하지 않습니다.
+                </p>
+              </div>
+            )}
 
             <InboundManager warehouseId={warehouseId} date={date} />
 
@@ -171,14 +210,24 @@ export function CalendarUploadDialog({ open, onOpenChange, warehouseId, warehous
               </div>
             )}
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                취소
-              </Button>
-              <Button onClick={submit} disabled={state.phase === 'uploading' || !file}>
-                <UploadCloud className="size-4" />
-                {state.phase === 'uploading' ? '업로드 중...' : existing ? '교체하기' : '업로드'}
-              </Button>
+            <DialogFooter className={existing && isAdmin ? 'sm:justify-between' : undefined}>
+              {existing && isAdmin && (
+                <Button variant="outline" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={resetUpload} disabled={resetting}>
+                  <RotateCcw className="size-4" />
+                  {resetting ? '초기화 중...' : '초기화'}
+                </Button>
+              )}
+              <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                <Button variant="outline" onClick={() => onOpenChange(false)}>
+                  취소
+                </Button>
+                {!blocked && (
+                  <Button onClick={submit} disabled={state.phase === 'uploading' || !file}>
+                    <UploadCloud className="size-4" />
+                    {state.phase === 'uploading' ? '업로드 중...' : existing ? '교체하기' : '업로드'}
+                  </Button>
+                )}
+              </div>
             </DialogFooter>
           </>
         )}

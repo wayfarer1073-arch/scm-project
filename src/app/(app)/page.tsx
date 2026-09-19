@@ -3,6 +3,7 @@ import { getSettings } from '@/server/repositories/settings-repository';
 import { getInventoryRows } from '@/server/services/inventory-analysis-service';
 import { loadDailyWarehouseTotals } from '@/server/repositories/inventory-repository';
 import { getLatestActiveSnapshot } from '@/server/repositories/snapshot-repository';
+import { listHolidayDateStrings } from '@/server/repositories/holiday-repository';
 import { todayKstDateString, dateOnlyToString, isDateString } from '@/lib/date';
 import { DashboardClient } from '@/components/dashboard/dashboard-client';
 import { auth } from '@/server/auth';
@@ -16,11 +17,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const requestedFrom = isDateString(params.from) ? params.from : asOfDate;
   const fromDate = requestedFrom > asOfDate ? asOfDate : requestedFrom;
   const settings = await getSettings();
-  const [session, warehouses, rows, dailyTotals] = await Promise.all([
+  const [session, warehouses, rows, dailyTotals, holidays] = await Promise.all([
     auth(),
     listWarehouses(),
     getInventoryRows({ asOfDate, compareFromDate: mode === 'range' ? fromDate : undefined, settings }),
     loadDailyWarehouseTotals(asOfDate),
+    listHolidayDateStrings(),
   ]);
   const isAdmin = session?.user.role === 'ADMIN';
 
@@ -45,6 +47,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       dailyTotals={dailyTotals}
       latestUploads={latestUploads}
       isAdmin={isAdmin}
+      holidays={holidays}
     />
   );
 }

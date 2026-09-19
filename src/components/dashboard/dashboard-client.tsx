@@ -33,16 +33,18 @@ interface DashboardClientProps {
   dailyTotals: DailyWarehouseTotal[];
   latestUploads: LatestUpload[];
   isAdmin: boolean;
+  holidays: string[];
 }
 
-export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows, dailyTotals, latestUploads, isAdmin }: DashboardClientProps) {
+export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows, dailyTotals, latestUploads, isAdmin, holidays }: DashboardClientProps) {
   const [warehouseFilter, setWarehouseFilter] = useState<string | 'ALL'>('ALL');
   const [tableTab, setTableTab] = useState<TableTab>('ALL');
   const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
   const [selectedSkuId, setSelectedSkuId] = useState<string | null>(null);
 
-  const kpis = useMemo(() => calculateCompanyKpis(rows, settings.stagnantDays, fromDate), [rows, settings.stagnantDays, fromDate]);
-  const warehouseSummaries = useMemo(() => calculateWarehouseSummaries(rows, settings.stagnantDays), [rows, settings.stagnantDays]);
+  const holidaySet = useMemo(() => new Set(holidays), [holidays]);
+  const kpis = useMemo(() => calculateCompanyKpis(rows, settings.stagnantDays, fromDate, holidaySet), [rows, settings.stagnantDays, fromDate, holidaySet]);
+  const warehouseSummaries = useMemo(() => calculateWarehouseSummaries(rows, settings.stagnantDays, holidaySet), [rows, settings.stagnantDays, holidaySet]);
   const actionCenterCards = useMemo(() => buildActionCenterCards(rows, settings.stagnantDays), [rows, settings.stagnantDays]);
 
   function handleActionCenterSelect(tab: TableTab, qf: QuickFilter) {

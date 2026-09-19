@@ -1,11 +1,29 @@
+import { addDays, format, getDay, parseISO } from 'date-fns';
 import { buildDailyDeltas, isNewlyAtRisk } from './calculations';
 import type { CompanyKpis, SnapshotKpis, WarehouseSummary } from './types';
 import type { InventoryRow } from './read-model';
 
 // ---- 집계 ----
 
+const NO_HOLIDAYS: ReadonlySet<string> = new Set();
+
+function isNonBusinessDay(dateStr: string, holidays: ReadonlySet<string>): boolean {
+  const day = getDay(parseISO(dateStr));
+  return day === 0 || day === 6 || holidays.has(dateStr);
+}
+
+/** 주말·공휴일은 매출이 계속 발생해도 업로드가 없는 게 정상이므로, 그 직전 마지막 영업일 관측치를
+ *  "당일 관측"으로 인정한다. 평일인데 최신 관측이 그보다 이전이면 실제로 업로드를 놓친 것이다. */
+function mostRecentBusinessDayOnOrBefore(dateStr: string, holidays: ReadonlySet<string>): string {
+  let cursor = dateStr;
+  while (isNonBusinessDay(cursor, holidays)) {
+    cursor = format(addDays(parseISO(cursor), -1), 'yyyy-MM-dd');
+  }
+  return cursor;
+}
+
 /** 기간 모드는 양 끝 날짜가 정확히 일치하는 동일 SKU만 비교한다. 신규/누락 SKU는 0으로 대체하지 않는다. */
-export function calculateSnapshotKpis(rows: InventoryRow[], compareFromDate?: string | null): SnapshotKpis {
+export function calculateSnapshotKpis(rows: InventoryRow[], compareFromDate?: string | null, holidays: ReadonlySet<string> = NO_HOLIDAYS): SnapshotKpis {
   const result: SnapshotKpis = {
     observedSkuCount: 0, positiveStockSkuCount: 0, zeroStockSkuCount: 0, negativeStockSkuCount: 0,
     inStockSkuRatio: null, valuedSkuCount: 0, unvaluedSkuCount: 0,
@@ -20,7 +38,10 @@ export function calculateSnapshotKpis(rows: InventoryRow[], compareFromDate?: st
 
     // 기준일에 실제 업로드가 없어 과거 스냅샷을 그대로 쓰는 SKU는 "현재 상태" 집계(보유/무재고/
     // 음수재고/평가금액)에서 완전히 제외한다 — 자료를 올리지 않은 날짜가 오늘 수치에 섞이지 않도록.
-    if (latest.date < asOfDate) {
+    // 다만 주말·공휴일은 매출이 발생해도 업로드가 없는 게 정상이므로, 그 전 마지막 영업일 관측치는
+    // stale로 보지 않고 그대로 인정한다.
+    const expectedObservationDate = mostRecentBusinessDayOnOrBefore(asOfDate, holidays);
+    if (latest.date < expectedObservationDate) {
       result.staleSkuCount++;
     } else {
       result.observedSkuCount++;
@@ -56,7 +77,12 @@ export function calculateSnapshotKpis(rows: InventoryRow[], compareFromDate?: st
   return result;
 }
 
-export function calculateCompanyKpis(rows: InventoryRow[], stagnantDaysThreshold: number, compareFromDate?: string | null): CompanyKpis {
+export function calculateCompanyKpis(
+  rows: InventoryRow[],
+  stagnantDaysThreshold: number,
+  compareFromDate?: string | null,
+  holidays: ReadonlySet<string> = NO_HOLIDAYS,
+): CompanyKpis {
   let totalAvailableStock = 0;
   let totalInventoryValue = 0;
   let netChangeVsYesterday = 0;
@@ -107,7 +133,7 @@ export function calculateCompanyKpis(rows: InventoryRow[], stagnantDaysThreshold
   }
 
   return {
-    snapshot: calculateSnapshotKpis(rows, compareFromDate),
+    snapshot: calculateSnapshotKpis(rows, compareFromDate, holidays),
     totalSkuCount: rows.length,
     totalAvailableStock,
     totalInventoryValue,
@@ -124,7 +150,11 @@ export function calculateCompanyKpis(rows: InventoryRow[], stagnantDaysThreshold
   };
 }
 
-export function calculateWarehouseSummaries(rows: InventoryRow[], stagnantDaysThreshold: number): WarehouseSummary[] {
+export function calculateWarehouseSummaries(
+  rows: InventoryRow[],
+  stagnantDaysThreshold: number,
+  holidays: ReadonlySet<string> = NO_HOLIDAYS,
+): WarehouseSummary[] {
   const byWarehouse = new Map<string, InventoryRow[]>();
   for (const row of rows) {
     const list = byWarehouse.get(row.descriptor.warehouseId) ?? [];
@@ -141,7 +171,7 @@ export function calculateWarehouseSummaries(rows: InventoryRow[], stagnantDaysTh
     const overstockCount = whRows.filter((r) => r.analysis.overstock.isCandidate).length;
 
     return {
-      snapshot: calculateSnapshotKpis(whRows),
+      snapshot: calculateSnapshotKpis(whRows, null, holidays),
       warehouseId,
       warehouseCode: whRows[0].descriptor.warehouseCode,
       warehouseName: whRows[0].descriptor.warehouseName,

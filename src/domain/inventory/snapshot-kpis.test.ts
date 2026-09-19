@@ -81,6 +81,25 @@ describe('directly observed snapshot KPIs', () => {
   });
 });
 
+describe('weekend/holiday carry-forward (매출은 발생하지만 업로드는 없는 날)', () => {
+  it('기준일이 일요일이면 직전 영업일(금요일) 관측치를 stale로 보지 않는다', () => {
+    // 2026-09-06은 일요일, 직전 영업일은 2026-09-04(금)이다.
+    const s = calculateSnapshotKpis([row('a', [obs('2026-09-04', 100)], '2026-09-06')]);
+    expect(s).toMatchObject({ observedSkuCount: 1, staleSkuCount: 0 });
+  });
+  it('기준일이 평일이면 주말만 지나온 것으로는 최신성을 인정하지 않는다(월요일 자료 누락은 여전히 stale)', () => {
+    // 2026-09-08은 화요일. 직전 영업일은 2026-09-07(월)이므로, 2026-09-04(금) 관측은 stale이다.
+    const s = calculateSnapshotKpis([row('a', [obs('2026-09-04', 100)], '2026-09-08')]);
+    expect(s).toMatchObject({ observedSkuCount: 0, staleSkuCount: 1 });
+  });
+  it('공휴일로 지정한 평일도 주말과 동일하게 취급한다', () => {
+    // 2026-09-07은 월요일이지만 공휴일로 지정 -> 직전 영업일은 2026-09-04(금)이다.
+    const holidays = new Set(['2026-09-07']);
+    const s = calculateSnapshotKpis([row('a', [obs('2026-09-04', 100)], '2026-09-07')], null, holidays);
+    expect(s).toMatchObject({ observedSkuCount: 1, staleSkuCount: 0 });
+  });
+});
+
 describe('forecast and risk regressions', () => {
   it('a long history cannot qualify one recent day as seven observed days', () => {
     const a = analyzeSku([obs('2026-01-01', 1000), obs('2026-09-07', 900), obs('2026-09-08', 800)], '2026-09-08')!;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameMonth, startOfMonth, startOfWeek, subMonths } from 'date-fns';
+import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, getDay, isSameMonth, startOfMonth, startOfWeek, subMonths } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -23,6 +23,8 @@ export interface CalendarEntry {
 interface UploadCalendarProps {
   warehouses: { id: string; code: string; name: string }[];
   entries: CalendarEntry[];
+  holidays: { date: string; name: string }[];
+  isAdmin: boolean;
 }
 
 interface SelectedSlot {
@@ -30,11 +32,12 @@ interface SelectedSlot {
   warehouseName: string;
   date: string;
   existing: { uploadedByName: string; uploadedAt: string; rowCount: number } | null;
+  blocked: boolean;
 }
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
-export function UploadCalendar({ warehouses, entries }: UploadCalendarProps) {
+export function UploadCalendar({ warehouses, entries, holidays, isAdmin }: UploadCalendarProps) {
   const [month, setMonth] = useState(() => new Date());
   const [selected, setSelected] = useState<SelectedSlot | null>(null);
 
@@ -48,6 +51,8 @@ export function UploadCalendar({ warehouses, entries }: UploadCalendarProps) {
     return map;
   }, [entries]);
 
+  const holidayByDate = useMemo(() => new Map(holidays.map((h) => [h.date, h.name])), [holidays]);
+
   const days = useMemo(() => {
     const start = startOfWeek(startOfMonth(month), { weekStartsOn: 0 });
     const end = endOfWeek(endOfMonth(month), { weekStartsOn: 0 });
@@ -60,7 +65,8 @@ export function UploadCalendar({ warehouses, entries }: UploadCalendarProps) {
         <div>
           <h2 className="text-base font-semibold">업로드 현황 캘린더</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            날짜별로 어떤 창고가 자료를 올렸는지 한눈에 확인하고, 블록을 눌러 바로 업로드하거나 교체할 수 있습니다.
+            날짜별로 어떤 창고가 자료를 올렸는지 한눈에 확인하고, 블록을 눌러 바로 업로드하거나 교체할 수 있습니다. 주말·공휴일(옅은 회색)은
+            업로드할 수 없지만 KPI 계산에는 직전 영업일 자료가 그대로 포함됩니다.
           </p>
         </div>
         <div className="flex items-center gap-1">
@@ -88,24 +94,35 @@ export function UploadCalendar({ warehouses, entries }: UploadCalendarProps) {
           const inMonth = isSameMonth(day, month);
           const isToday = dateStr === today;
           const isFuture = dateStr > today;
+          const holidayName = holidayByDate.get(dateStr);
+          const isWeekendDay = getDay(day) === 0 || getDay(day) === 6;
+          const isBlocked = isWeekendDay || holidayName !== undefined;
           return (
             <div
               key={dateStr}
               className={cn(
                 'flex min-h-[92px] flex-col gap-1.5 rounded-lg border p-2',
                 inMonth ? 'bg-background' : 'bg-muted/30',
+                isBlocked && !isToday && 'bg-muted/60',
                 isToday && 'border-foreground bg-foreground',
               )}
             >
-              <span
-                className={cn(
-                  'text-xs tabular-nums',
-                  inMonth ? 'text-foreground' : 'text-muted-foreground/60',
-                  isToday && 'font-semibold text-background',
+              <div className="flex items-start justify-between gap-1">
+                <span
+                  className={cn(
+                    'text-xs tabular-nums',
+                    inMonth ? 'text-foreground' : 'text-muted-foreground/60',
+                    isToday && 'font-semibold text-background',
+                  )}
+                >
+                  {format(day, 'd')}
+                </span>
+                {holidayName && (
+                  <span className={cn('truncate text-[9px] font-medium', isToday ? 'text-background/80' : 'text-muted-foreground')}>
+                    {holidayName}
+                  </span>
                 )}
-              >
-                {format(day, 'd')}
-              </span>
+              </div>
               {!isFuture && (
                 <div className="flex flex-wrap gap-1">
                   {warehouses.map((w) => {
@@ -126,13 +143,14 @@ export function UploadCalendar({ warehouses, entries }: UploadCalendarProps) {
                                     uploadedAt: entry.uploadedAt,
                                     rowCount: entry.rowCount,
                                   },
+                                  blocked: isBlocked,
                                 })
                               }
                               className={cn(
                                 'flex size-6 items-center justify-center rounded-md text-[11px] font-bold transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                                 isToday ? 'bg-background text-foreground' : 'bg-foreground text-background',
                               )}
-                              aria-label={`${entry.warehouseName} ${dateStr} 자료, ${entry.uploadedByName} 업로드, 누르면 교체`}
+                              aria-label={`${entry.warehouseName} ${dateStr} 자료, ${entry.uploadedByName} 업로드, 누르면 상세 보기`}
                             >
                               {w.code}
                             </button>
@@ -144,12 +162,13 @@ export function UploadCalendar({ warehouses, entries }: UploadCalendarProps) {
                         </Tooltip>
                       );
                     }
+                    if (isBlocked) return null;
                     return (
                       <Tooltip key={w.id}>
                         <TooltipTrigger asChild>
                           <button
                             type="button"
-                            onClick={() => setSelected({ warehouseId: w.id, warehouseName: w.name, date: dateStr, existing: null })}
+                            onClick={() => setSelected({ warehouseId: w.id, warehouseName: w.name, date: dateStr, existing: null, blocked: false })}
                             className={cn(
                               'flex size-6 items-center justify-center rounded-md border border-dashed text-[11px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                               isToday
@@ -183,6 +202,8 @@ export function UploadCalendar({ warehouses, entries }: UploadCalendarProps) {
           warehouseName={selected.warehouseName}
           date={selected.date}
           existing={selected.existing}
+          blocked={selected.blocked}
+          isAdmin={isAdmin}
         />
       )}
     </section>

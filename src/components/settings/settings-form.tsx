@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { ExpirationManagement } from '@/components/settings/expiration-management';
+import { HolidayManagement } from '@/components/settings/holiday-management';
 import type { RiskThresholdSettings } from '@/domain/inventory/types';
 
 interface SkuVisibilityRow {
@@ -41,14 +43,16 @@ interface ExpirationLotRow {
 
 interface SettingsFormProps {
   isAdmin: boolean;
+  currentUserId: string | null;
   warehouses: { id: string; code: string; name: string }[];
   settings: RiskThresholdSettings;
   users: { id: string; email: string; name: string; role: 'MEMBER' | 'ADMIN'; createdAt: string }[];
   skus: SkuVisibilityRow[];
   expirations: ExpirationLotRow[];
+  holidays: { id: string; date: string; name: string }[];
 }
 
-export function SettingsForm({ isAdmin, warehouses, settings, users: initialUsers, skus, expirations }: SettingsFormProps) {
+export function SettingsForm({ isAdmin, currentUserId, warehouses, settings, users: initialUsers, skus, expirations, holidays }: SettingsFormProps) {
   const [warehouseNames, setWarehouseNames] = useState(Object.fromEntries(warehouses.map((w) => [w.id, w.name])));
   const [thresholds, setThresholds] = useState(settings);
   const [users, setUsers] = useState(initialUsers);
@@ -170,7 +174,9 @@ export function SettingsForm({ isAdmin, warehouses, settings, users: initialUser
 
       <ExpirationManagement isAdmin={isAdmin} warehouses={warehouses} initialEntries={expirations} />
 
-      {isAdmin && <UserManagement users={users} onUsersChange={setUsers} />}
+      <HolidayManagement isAdmin={isAdmin} initialHolidays={holidays} />
+
+      {isAdmin && <UserManagement users={users} onUsersChange={setUsers} currentUserId={currentUserId} />}
     </div>
   );
 }
@@ -346,15 +352,18 @@ function SkuVisibilityItem({
 function UserManagement({
   users,
   onUsersChange,
+  currentUserId,
 }: {
   users: { id: string; email: string; name: string; role: 'MEMBER' | 'ADMIN'; createdAt: string }[];
   onUsersChange: (users: { id: string; email: string; name: string; role: 'MEMBER' | 'ADMIN'; createdAt: string }[]) => void;
+  currentUserId: string | null;
 }) {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'MEMBER' | 'ADMIN'>('MEMBER');
   const [submitting, setSubmitting] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   async function addUser() {
     setSubmitting(true);
@@ -380,22 +389,57 @@ function UserManagement({
     }
   }
 
+  async function removeUser(user: { id: string; name: string }) {
+    if (!confirm(`${user.name} 계정을 삭제할까요? 이 작업은 되돌릴 수 없습니다.`)) return;
+    setDeletingUserId(user.id);
+    try {
+      const res = await fetch(`/api/users/${user.id}`, { method: 'DELETE' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(body.error ?? '삭제에 실패했습니다.');
+        return;
+      }
+      onUsersChange(users.filter((u) => u.id !== user.id));
+      toast.success('계정을 삭제했습니다.');
+    } catch {
+      toast.error('네트워크 오류로 삭제에 실패했습니다.');
+    } finally {
+      setDeletingUserId(null);
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>사용자 관리</CardTitle>
-        <CardDescription>member / admin 권한을 가진 계정을 추가할 수 있습니다.</CardDescription>
+        <CardDescription>member / admin 권한을 가진 계정을 추가하거나 삭제할 수 있습니다.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          {users.map((u) => (
-            <div key={u.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-              <div>
-                <span className="font-medium">{u.name}</span> <span className="text-muted-foreground">{u.email}</span>
+          {users.map((u) => {
+            const isSelf = u.id === currentUserId;
+            return (
+              <div key={u.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                <div>
+                  <span className="font-medium">{u.name}</span> <span className="text-muted-foreground">{u.email}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">{u.role === 'ADMIN' ? '관리자' : '멤버'}</Badge>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive disabled:text-muted-foreground"
+                    disabled={isSelf || deletingUserId === u.id}
+                    onClick={() => removeUser(u)}
+                    aria-label={`${u.name} 계정 삭제`}
+                    title={isSelf ? '본인 계정은 삭제할 수 없습니다.' : undefined}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </div>
               </div>
-              <Badge variant="outline">{u.role === 'ADMIN' ? '관리자' : '멤버'}</Badge>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <Separator />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

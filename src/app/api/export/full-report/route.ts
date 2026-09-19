@@ -5,6 +5,7 @@ import { getInventoryRows } from '@/server/services/inventory-analysis-service';
 import { calculateCompanyKpis, calculateWarehouseSummaries } from '@/domain/inventory/aggregation';
 import { listAllEvents } from '@/server/repositories/event-repository';
 import { getSettings } from '@/server/repositories/settings-repository';
+import { listHolidayDateStrings } from '@/server/repositories/holiday-repository';
 import { buildEventsSheetRows, buildInventorySheetRows, buildRiskSheetRows, buildStagnantSheetRows, buildSummarySheetRows, type ExportRowInput } from '@/domain/excel/export';
 import { formatKstDateTime } from '@/lib/date';
 import { isDateString, todayKstDateString } from '@/lib/date';
@@ -22,9 +23,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: '유효한 조회 날짜를 입력해주세요.' }, { status: 400 });
   }
   const settings = await getSettings();
-  const [rows, events] = await Promise.all([getInventoryRows({ asOfDate, compareFromDate: fromDate ?? undefined, settings }), listAllEvents()]);
-  const kpis = calculateCompanyKpis(rows, settings.stagnantDays, fromDate);
-  const warehouseSummaries = calculateWarehouseSummaries(rows, settings.stagnantDays);
+  const [rows, events, holidays] = await Promise.all([
+    getInventoryRows({ asOfDate, compareFromDate: fromDate ?? undefined, settings }),
+    listAllEvents(),
+    listHolidayDateStrings(),
+  ]);
+  const holidaySet = new Set(holidays);
+  const kpis = calculateCompanyKpis(rows, settings.stagnantDays, fromDate, holidaySet);
+  const warehouseSummaries = calculateWarehouseSummaries(rows, settings.stagnantDays, holidaySet);
 
   const exportRows: ExportRowInput[] = rows.map((r) => ({
     productCode: r.descriptor.productCode,

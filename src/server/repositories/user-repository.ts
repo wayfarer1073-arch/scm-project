@@ -1,9 +1,21 @@
 import bcrypt from 'bcryptjs';
+import { Prisma, type Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import type { Role } from '@prisma/client';
 
 export function listUsers() {
-  return prisma.user.findMany({ orderBy: { createdAt: 'asc' }, select: { id: true, email: true, name: true, role: true, createdAt: true } });
+  return prisma.user.findMany({
+    where: { isActive: true },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, email: true, name: true, role: true, createdAt: true },
+  });
+}
+
+export function getUserRole(userId: string) {
+  return prisma.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true } });
+}
+
+export function countActiveAdmins() {
+  return prisma.user.count({ where: { role: 'ADMIN', isActive: true } });
 }
 
 export async function createUser(input: { email: string; name: string; password: string; role: Role }) {
@@ -12,4 +24,21 @@ export async function createUser(input: { email: string; name: string; password:
     data: { email: input.email.trim().toLowerCase(), name: input.name, passwordHash, role: input.role },
     select: { id: true, email: true, name: true, role: true, createdAt: true },
   });
+}
+
+/**
+ * 업로드/이벤트/게시글 등 참조 이력이 없는 계정은 실제로 삭제하고, 이력이 있어 참조 무결성상
+ * 지울 수 없는 계정은 로그인만 차단(isActive=false)한다. 어느 쪽이든 목록에서는 즉시 사라진다.
+ */
+export async function deleteUser(userId: string): Promise<{ mode: 'hard' | 'soft' }> {
+  try {
+    await prisma.user.delete({ where: { id: userId } });
+    return { mode: 'hard' };
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
+      await prisma.user.update({ where: { id: userId }, data: { isActive: false } });
+      return { mode: 'soft' };
+    }
+    throw e;
+  }
 }
