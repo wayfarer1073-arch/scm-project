@@ -8,6 +8,7 @@ interface RiskDistributionChartProps {
   danger: number;
   warning: number;
   normal: number;
+  unknown?: number;
 }
 
 const RADIAN = Math.PI / 180;
@@ -68,13 +69,14 @@ function LeaderLineLabel({ cx, cy, midAngle, outerRadius, value, percent, name, 
   );
 }
 
-export function RiskDistributionChart({ danger, warning, normal }: RiskDistributionChartProps) {
+export function RiskDistributionChart({ danger, warning, normal, unknown = 0 }: RiskDistributionChartProps) {
   const data = [
     { name: '위험', value: danger, color: '#F52E7F' },
     { name: '주의', value: warning, color: '#EAB308' },
-    { name: '정상', value: normal, color: 'var(--color-foreground)' },
+    { name: '기준 내', value: normal, color: 'var(--color-foreground)' },
+    { name: '개별 확인', value: unknown, color: 'var(--color-muted-foreground)' },
   ];
-  const total = danger + warning + normal;
+  const total = danger + warning + normal + unknown;
 
   return (
     <div className="px-5 py-4">

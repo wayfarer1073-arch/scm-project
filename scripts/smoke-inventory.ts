@@ -46,14 +46,14 @@ async function main() {
       body: JSON.stringify({ warehouseId: fixture.warehouse.id, skuId: sku.id, date: '2026-09-11', quantity: 50 }),
     });
     assert.equal(inbound.status, 201);
-    assert.equal((await upload('2026-09-12', 120)).status, 'SUCCESS');
-    assert.equal((await upload('2026-09-12', 120)).status, 'DUPLICATE');
-    const detailResponse = await request(`/api/sku/${sku.id}?asOf=2026-09-12`);
+    assert.equal((await upload('2026-09-14', 120)).status, 'SUCCESS');
+    assert.equal((await upload('2026-09-14', 120)).status, 'DUPLICATE');
+    const detailResponse = await request(`/api/sku/${sku.id}?asOf=2026-09-14`);
     assert.equal(detailResponse.status, 200);
     const detail = await detailResponse.json();
     assert.equal(detail.analysis.window7.totalDepletion, 30);
-    assert.equal((await request('/?date=2026-09-12')).status, 200);
-    const report = await request('/api/export/full-report?asOf=2026-09-12');
+    assert.equal((await request('/?date=2026-09-14')).status, 200);
+    const report = await request('/api/export/full-report?asOf=2026-09-14');
     assert.equal(report.status, 200);
     const wb = XLSX.read(await report.arrayBuffer(), { type: 'array' });
     assert.ok(wb.SheetNames.includes('Inventory'));

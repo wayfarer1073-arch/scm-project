@@ -105,11 +105,10 @@ describe('weekend/holiday carry-forward (매출은 발생하지만 업로드는 
   });
 });
 
-describe('품절 SKU는 유예기간 중 오래된 관측치라도 stale이 아니라 정상 집계된다', () => {
-  it('품절 인식된 SKU는 업로드 공백이 커도 staleSkuCount가 아니라 observedSkuCount에 잡힌다', () => {
-    // 8/1에 마지막 관측 후 품절 인식됐고, 기준일(9/8)은 그로부터 1개월 유예기간 이내다.
+describe('목록 미관측 SKU는 마지막 재고를 현재 재고로 합산하지 않는다', () => {
+  it('이력 노출 중인 미관측 SKU도 현재 보유 수량·금액에서는 제외한다', () => {
     const s = calculateSnapshotKpis([row('a', [obs('2026-08-01', 50)], '2026-09-08', undefined, true)]);
-    expect(s).toMatchObject({ observedSkuCount: 1, staleSkuCount: 0, positiveStockSkuCount: 1 });
+    expect(s).toMatchObject({ observedSkuCount: 0, staleSkuCount: 1, positiveStockSkuCount: 0, knownInventoryValue: null });
   });
   it('isSoldOut이 아니면 동일한 공백은 여전히 stale로 집계된다(대조군)', () => {
     const s = calculateSnapshotKpis([row('a', [obs('2026-08-01', 50)], '2026-09-08', undefined, false)]);

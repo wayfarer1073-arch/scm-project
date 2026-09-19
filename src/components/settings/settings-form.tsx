@@ -132,31 +132,31 @@ export function SettingsForm({ isAdmin, currentUserId, warehouses, settings, use
             <CardTitle>위험 / 정체 판단 기준</CardTitle>
             <InfoTooltip>
               SKU별 위험/경고수량은 SKU 상세에서 직접 지정할 수 있고, 지정하지 않으면 아래 &quot;품절 임박 기준&quot;·&quot;관리 필요 경계&quot; 일수를 그
-              SKU의 최근 소진 속도로 환산해 자동 계산합니다. 같은 기준은 Coverage(예상 소진일수) 기반 보조 판단과 정체·과잉재고 판정에도 쓰입니다.
+              SKU의 최근 소진 속도로 환산해 자동 계산합니다. 같은 기준은 Coverage(주말·등록 공휴일 제외 출고일수) 기반 보조 판단과 정체·과잉재고 판정에도 쓰입니다.
             </InfoTooltip>
           </div>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <ThresholdField
-            label="품절 임박 기준 (Coverage ≤ N일)"
+            label="품절 임박 기준 (Coverage ≤ N출고일)"
             value={thresholds.stockoutSoonDays}
             onChange={(v) => setThresholds((p) => ({ ...p, stockoutSoonDays: v }))}
             disabled={!isAdmin}
           />
           <ThresholdField
-            label="관리 필요 / 정상 경계 (Coverage ≤ N일)"
+            label="관리 필요 / 정상 경계 (Coverage ≤ N출고일)"
             value={thresholds.manageMaxDays}
             onChange={(v) => setThresholds((p) => ({ ...p, manageMaxDays: v }))}
             disabled={!isAdmin}
           />
           <ThresholdField
-            label="과잉재고 후보 기준 (Coverage ≥ N일)"
+            label="과잉재고 후보 기준 (Coverage ≥ N출고일)"
             value={thresholds.overstockCoverageDays}
             onChange={(v) => setThresholds((p) => ({ ...p, overstockCoverageDays: v }))}
             disabled={!isAdmin}
           />
           <ThresholdField
-            label="장기 정체 기준일 (감소 미관측 ≥ N일)"
+            label="장기 정체 기준일 (추정 소진 미관측 ≥ N출고일)"
             value={thresholds.stagnantDays}
             onChange={(v) => setThresholds((p) => ({ ...p, stagnantDays: v }))}
             disabled={!isAdmin}

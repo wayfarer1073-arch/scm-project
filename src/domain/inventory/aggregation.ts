@@ -1,26 +1,9 @@
-import { addDays, format, getDay, parseISO } from 'date-fns';
+import { latestShippingDay as mostRecentBusinessDayOnOrBefore, NO_HOLIDAYS } from './shipping-calendar';
 import { buildDailyDeltas, isNewlyAtRisk } from './calculations';
 import type { CompanyKpis, SnapshotKpis, WarehouseSummary } from './types';
 import type { InventoryRow } from './read-model';
 
 // ---- 집계 ----
-
-const NO_HOLIDAYS: ReadonlySet<string> = new Set();
-
-function isNonBusinessDay(dateStr: string, holidays: ReadonlySet<string>): boolean {
-  const day = getDay(parseISO(dateStr));
-  return day === 0 || day === 6 || holidays.has(dateStr);
-}
-
-/** 주말·공휴일은 매출이 계속 발생해도 업로드가 없는 게 정상이므로, 그 직전 마지막 영업일 관측치를
- *  "당일 관측"으로 인정한다. 평일인데 최신 관측이 그보다 이전이면 실제로 업로드를 놓친 것이다. */
-function mostRecentBusinessDayOnOrBefore(dateStr: string, holidays: ReadonlySet<string>): string {
-  let cursor = dateStr;
-  while (isNonBusinessDay(cursor, holidays)) {
-    cursor = format(addDays(parseISO(cursor), -1), 'yyyy-MM-dd');
-  }
-  return cursor;
-}
 
 /** 기간 모드는 양 끝 날짜가 정확히 일치하는 동일 SKU만 비교한다. 신규/누락 SKU는 0으로 대체하지 않는다. */
 export function calculateSnapshotKpis(rows: InventoryRow[], compareFromDate?: string | null, holidays: ReadonlySet<string> = NO_HOLIDAYS): SnapshotKpis {
@@ -36,14 +19,14 @@ export function calculateSnapshotKpis(rows: InventoryRow[], compareFromDate?: st
     if (!result.oldestObservationDate || latest.date < result.oldestObservationDate) result.oldestObservationDate = latest.date;
     if (!result.newestObservationDate || latest.date > result.newestObservationDate) result.newestObservationDate = latest.date;
 
-    // 기준일에 실제 업로드가 없어 과거 스냅샷을 그대로 쓰는 SKU는 "현재 상태" 집계(보유/무재고/
-    // 음수재고/평가금액)에서 완전히 제외한다 — 자료를 올리지 않은 날짜가 오늘 수치에 섞이지 않도록.
-    // 다만 주말·공휴일은 매출이 발생해도 업로드가 없는 게 정상이므로, 그 전 마지막 영업일 관측치는
-    // stale로 보지 않고 그대로 인정한다. 품절 인식 유예기간 중인 SKU도 "자료 미제출"이 아니라
-    // 품절이라는 확정된 사유가 있으므로 stale로 제외하지 않고, 품절 시점까지의 마지막 관측으로
-    // 정상 집계한다.
+    // 목록 이탈은 품절의 증거가 아니다. 마지막 재고를 현재 자산으로 다시 집계하지 않는다.
+    if (row.descriptor.isSoldOut) {
+      result.staleSkuCount++;
+      continue;
+    }
+    // 주말·등록 공휴일은 출고가 없으므로 마지막 영업일 재고를 인정한다.
     const expectedObservationDate = mostRecentBusinessDayOnOrBefore(asOfDate, holidays);
-    if (!row.descriptor.isSoldOut && latest.date < expectedObservationDate) {
+    if (latest.date < expectedObservationDate) {
       result.staleSkuCount++;
     } else {
       result.observedSkuCount++;
@@ -101,6 +84,7 @@ export function calculateCompanyKpis(
   let skusWithPeriodRate = 0;
 
   for (const row of rows) {
+    if (row.descriptor.isSoldOut) continue;
     totalAvailableStock += row.analysis.latest.availableStock;
     totalInventoryValue += row.valueBreakdown.normalStockValue;
     totalDepletion7d += row.analysis.window7.totalDepletion;
@@ -166,7 +150,7 @@ export function calculateWarehouseSummaries(
 
   return [...byWarehouse.entries()].map(([warehouseId, whRows]) => {
     const skuCount = whRows.length;
-    const inventoryValue = whRows.reduce((sum, r) => sum + r.valueBreakdown.normalStockValue, 0);
+    const inventoryValue = whRows.filter(r => !r.descriptor.isSoldOut).reduce((sum, r) => sum + r.valueBreakdown.normalStockValue, 0);
     const dangerSkuCount = whRows.filter((r) => r.analysis.thresholdRisk.level === 'DANGER').length;
     const stockoutSoonCount = whRows.filter((r) => r.analysis.coverage.band === 'STOCKOUT_SOON' || r.analysis.coverage.band === 'NEEDS_MANAGEMENT').length;
     const stagnantCount = whRows.filter((r) => r.analysis.stagnation.isMeaningful && r.analysis.stagnation.stagnantDays >= stagnantDaysThreshold).length;
@@ -225,7 +209,7 @@ export function buildActionCenterCards(rows: InventoryRow[], stagnantDaysThresho
       category: 'STOCKOUT_SOON',
       title: '품절 임박 SKU',
       count: stockoutSoon.length,
-      sampleSkus: toSample(stockoutSoon, (r) => `${Math.floor(r.analysis.coverage.coverageDays ?? 0)}일분 남음`),
+      sampleSkus: toSample(stockoutSoon, (r) => `${Math.floor(r.analysis.coverage.coverageDays ?? 0)}출고일분 남음`),
     },
     {
       category: 'ACCELERATING',
@@ -237,19 +221,19 @@ export function buildActionCenterCards(rows: InventoryRow[], stagnantDaysThresho
       category: 'STAGNANT',
       title: '장기 정체 SKU',
       count: stagnant.length,
-      sampleSkus: toSample(stagnant, (r) => `${r.analysis.stagnation.stagnantDays}일간 관측상 감소 없음`),
+      sampleSkus: toSample(stagnant, (r) => `${r.analysis.stagnation.stagnantDays}출고일간 소진 미관측`),
     },
     {
       category: 'OVERSTOCK_CANDIDATE',
       title: '과잉재고 후보',
       count: overstock.length,
-      sampleSkus: toSample(overstock, (r) => `${Math.floor(r.analysis.overstock.coverageDays ?? 0)}일분 재고`),
+      sampleSkus: toSample(overstock, (r) => `${Math.floor(r.analysis.overstock.coverageDays ?? 0)}출고일분 재고`),
     },
     {
       category: 'EXPIRATION_RISK',
-      title: '소비기한 임박 위험',
+      title: '소비기한 확인 필요',
       count: expirationRisk.length,
-      sampleSkus: toSample(expirationRisk, (r) => `소비기한 D-${r.analysis.expirationRisk.daysUntilExpiration} · 재고 ${Math.floor(r.analysis.coverage.coverageDays ?? 0)}일분`),
+      sampleSkus: toSample(expirationRisk, (r) => `소비기한 잔여 ${r.analysis.expirationRisk.daysUntilExpiration}달력일 · 로트 잔량 확인 필요`),
     },
   ];
 }

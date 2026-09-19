@@ -13,7 +13,8 @@ export interface ExportRowInput {
 function riskLabelOf(level: SkuAnalysis['thresholdRisk']['level']): string {
   if (level === 'DANGER') return '위험';
   if (level === 'WARNING') return '주의';
-  return '정상';
+  if (level === 'UNKNOWN') return '개별 확인';
+  return '기준 내';
 }
 
 export function buildInventorySheetRows(rows: ExportRowInput[]): Record<string, string | number>[] {
@@ -21,27 +22,33 @@ export function buildInventorySheetRows(rows: ExportRowInput[]): Record<string, 
     상품코드: r.productCode,
     상품명: r.productName,
     창고: r.warehouseName,
-    현재가용재고: r.analysis.latest.availableStock,
-    정상재고: r.analysis.latest.normalStock,
+    현재가용재고: r.analysis.operating?.isMissing ? '미관측' : r.analysis.latest.availableStock,
+    정상재고: r.analysis.operating?.isMissing ? '미관측' : r.analysis.latest.normalStock,
+    마지막관측재고: r.analysis.latest.normalStock,
+    운영유형: r.analysis.operating?.isB2B ? '직납 B2B' : '일반 판매',
     재고관측일: r.analysis.latest.date,
-    기준일미관측: r.analysis.latest.date < r.analysis.asOfDate ? '예' : '아니오',
+    기준일미관측: (r.analysis.operating
+      ? r.analysis.operating.isMissing || r.analysis.operating.staleShippingDays > 0
+      : r.analysis.latest.date < r.analysis.asOfDate) ? '예' : '아니오',
     직전관측대비: r.analysis.dailyChange ?? '',
-    '관측일기준7일추정소진량': r.analysis.window7.totalDepletion,
+    '관측일기준7일추정소진량': r.analysis.window7.observedIntervalDays > 0 ? r.analysis.window7.totalDepletion : '관측 부족',
     '최근7일입고반영량': r.analysis.window7.totalInboundQuantity ?? 0,
-    '최근7일일평균소진': r.analysis.window7.averageDailyDepletion ?? '',
+    '최근7일출고일평균추정소진': r.analysis.window7.averageDailyDepletion ?? '',
+    커버리지근거기간: r.analysis.operating?.basisWindowDays ?? '',
+    커버리지관측출고일수: r.analysis.operating?.observedShippingDays ?? '',
     '7일vs이전7일변화율(%)': r.analysis.acceleration.accelerationRatePercent ?? '',
-    'Coverage(일)': r.analysis.coverage.coverageDays ?? '산정 불가',
-    예상소진일: r.analysis.forecast.expectedStockoutDate ?? '데이터축적중',
+    'Coverage(출고일)': r.analysis.coverage.coverageDays ?? '산정 불가',
+    예상소진일: r.analysis.forecast.expectedStockoutDate ?? r.analysis.operating?.reason ?? '산정 불가',
     단위원가: r.analysis.latest.unitCost,
-    재고금액: r.analysis.latest.valuationKnown === false || r.analysis.latest.normalStock < 0 ? '평가 불가' : r.valueBreakdown.normalStockValue,
-    정체일수: r.analysis.stagnation.isMeaningful ? r.analysis.stagnation.stagnantDays : '',
-    상태: riskLabelOf(r.analysis.thresholdRisk.level),
+    재고금액: r.analysis.operating?.isMissing ? '미관측' : r.analysis.latest.valuationKnown === false || r.analysis.latest.normalStock < 0 ? '평가 불가' : r.valueBreakdown.normalStockValue,
+    무소진관측출고일수: r.analysis.stagnation.isMeaningful ? r.analysis.stagnation.stagnantDays : '',
+    상태: r.analysis.operating?.reason ?? riskLabelOf(r.analysis.thresholdRisk.level),
     태그: r.analysis.tags.join(' '),
   }));
 }
 
 export function buildRiskSheetRows(rows: ExportRowInput[]): Record<string, string | number>[] {
-  return buildInventorySheetRows(rows.filter((r) => r.analysis.thresholdRisk.level !== 'NORMAL' || r.analysis.coverage.band === 'STOCKOUT_SOON'));
+  return buildInventorySheetRows(rows.filter((r) => r.analysis.thresholdRisk.level === 'DANGER' || r.analysis.thresholdRisk.level === 'WARNING' || r.analysis.coverage.band === 'STOCKOUT_SOON'));
 }
 
 export function buildStagnantSheetRows(rows: ExportRowInput[]): Record<string, string | number>[] {

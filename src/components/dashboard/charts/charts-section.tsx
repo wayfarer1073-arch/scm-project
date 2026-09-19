@@ -36,18 +36,20 @@ export function ChartsSection({ rows, dailyTotals, warehouses, chartWarehouseId,
     let danger = 0;
     let warning = 0;
     let normal = 0;
+    let unknown = 0;
     for (const row of filteredRows) {
       if (row.analysis.thresholdRisk.level === 'DANGER') danger += 1;
       else if (row.analysis.thresholdRisk.level === 'WARNING') warning += 1;
-      else normal += 1;
+      else if (row.analysis.thresholdRisk.level === 'NORMAL') normal += 1;
+      else unknown += 1;
     }
-    return { danger, warning, normal };
+    return { danger, warning, normal, unknown };
   }, [filteredRows]);
 
   const topDepletion = useMemo(
     () =>
       [...filteredRows]
-        .filter((r) => r.analysis.window7.totalDepletion > 0)
+        .filter((r) => !r.descriptor.isB2B && !r.descriptor.isSoldOut && !r.analysis.operating?.staleShippingDays && r.analysis.window7.totalDepletion > 0)
         .sort((a, b) => b.analysis.window7.totalDepletion - a.analysis.window7.totalDepletion)
         .slice(0, 7)
         .map((r) => ({ productName: r.descriptor.productName, depletion: r.analysis.window7.totalDepletion })),

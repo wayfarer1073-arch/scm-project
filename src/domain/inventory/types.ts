@@ -74,7 +74,7 @@ export interface DepletionAcceleration {
   trend: AccelerationTrend;
 }
 
-export type RiskLevel = 'DANGER' | 'WARNING' | 'NORMAL';
+export type RiskLevel = 'DANGER' | 'WARNING' | 'NORMAL' | 'UNKNOWN';
 
 /** Excel의 위험수량/경고수량 기준 (우선 적용 규칙) */
 export interface ThresholdRisk {
@@ -238,6 +238,11 @@ export interface WarehouseSummary {
 
 /** SKU 한 건에 대한 계산된 전체 분석 결과 (테이블/상세/Action Center가 공유) */
 export interface SkuAnalysis {
+  /** Current app policy: calendar windows with shipping-day denominators; missing is never zero stock. */
+  operating?: {
+    reason: string | null; isB2B: boolean; isMissing: boolean; staleShippingDays: number;
+    basisWindowDays: number | null; observedShippingDays: number; unexplainedIncrease: number; intervalCount: number;
+  };
   asOfDate: string;
   latest: StockObservation;
   previous: StockObservation | null;

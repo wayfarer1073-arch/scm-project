@@ -16,7 +16,7 @@ export function matchesTab(analysis: SkuAnalysis, tab: TableTab): boolean {
     case 'ALL':
       return true;
     case 'STOCKOUT_RISK':
-      return analysis.thresholdRisk.level !== 'NORMAL' || analysis.coverage.band === 'STOCKOUT_SOON';
+      return analysis.thresholdRisk.level === 'DANGER' || analysis.thresholdRisk.level === 'WARNING' || analysis.coverage.band === 'STOCKOUT_SOON';
     case 'ACCELERATING':
       return analysis.acceleration.trend === 'ACCELERATING';
     case 'OVERSTOCK_CANDIDATE':

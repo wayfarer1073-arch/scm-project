@@ -16,9 +16,9 @@ import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { EventFormDialog } from '@/components/events/event-form-dialog';
 import { buildDailyDeltas, calculatePeriodComparison, sortObservations } from '@/domain/inventory/calculations';
 import type { InventoryValueBreakdown, SkuAnalysis, StockObservation } from '@/domain/inventory/types';
-import { formatCoverageDays, formatCurrency, formatNumber, formatSigned } from '@/lib/format';
+import { formatCurrency, formatNumber, formatSigned } from '@/lib/format';
 import { formatKstDate, formatKstDateTime } from '@/lib/date';
-import { riskBadgeVariant, riskLabel } from '@/lib/status';
+import { riskBadgeVariant, analysisStatusLabel } from '@/lib/status';
 import { eventTypeLabel } from '@/lib/event-types';
 import type { SkuDescriptor } from '@/domain/inventory/read-model';
 
@@ -260,14 +260,14 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
                   <>
                     <Badge variant="soldout" className="gap-1">
                       <PackageX className="size-3" aria-hidden="true" />
-                      품절
+                      목록 미관측
                     </Badge>
                     <InfoTooltip>
-                      최신 업로드 목록에 없어 품절로 인식됐습니다. 품절 인식일({formatKstDate(detail.descriptor.soldOutDetectedDate!)})로부터 1개월간 품절 시점까지의 마지막 데이터로 노출됩니다.
+                      최근 목록 미관측 상품입니다. 품절인지 판매 종료인지는 확인이 필요합니다. 아래 수량·금액은 마지막 관측값이며 현재 집계에서는 제외됩니다.
                     </InfoTooltip>
                   </>
                 )}
-                <Badge variant={riskBadgeVariant(detail.analysis.thresholdRisk.level)}>{riskLabel(detail.analysis.thresholdRisk.level)}</Badge>
+                <Badge variant={riskBadgeVariant(detail.analysis.thresholdRisk.level)}>{analysisStatusLabel(detail.analysis)}</Badge>
                 {detail.descriptor.isB2B && (
                   <>
                     <Badge variant="outline" className="gap-1">
@@ -299,12 +299,12 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
               )}
 
               <section className="grid grid-cols-2 gap-2">
-                <MetricCard label="가용재고" value={`${formatNumber(detail.analysis.latest.availableStock)}개`} />
-                <MetricCard label="재고자산" value={formatCurrency(detail.valueBreakdown.normalStockValue)} />
-                <MetricCard label="Coverage" value={formatCoverageDays(detail.analysis.coverage.coverageDays)} />
+                <MetricCard label={detail.descriptor.isSoldOut ? '마지막 관측 재고' : '관측 재고'} value={`${formatNumber(detail.analysis.latest.availableStock)}개`} />
+                <MetricCard label={detail.descriptor.isSoldOut ? '마지막 관측 금액' : '관측 재고금액'} value={detail.analysis.latest.valuationKnown === false ? '원가 미상' : formatCurrency(detail.valueBreakdown.normalStockValue)} />
+                <MetricCard label="Coverage (출고일)" value={detail.analysis.coverage.coverageDays === null ? '산정 불가' : `${formatNumber(detail.analysis.coverage.coverageDays)}출고일`} />
                 <MetricCard
                   label="예상 소진일"
-                  value={detail.analysis.forecast.expectedStockoutDate ? formatKstDate(detail.analysis.forecast.expectedStockoutDate) : '데이터 축적 중'}
+                  value={detail.analysis.forecast.expectedStockoutDate ? formatKstDate(detail.analysis.forecast.expectedStockoutDate) : detail.analysis.operating?.reason ?? '산정 불가'}
                 />
               </section>
 
@@ -370,10 +370,10 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
                   {periodMetrics ? (
                     <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                       <Field label="순 변화" value={`${formatSigned(periodMetrics.netChange)}개`} />
-                      <Field label="관측 감소" value={`${formatNumber(periodMetrics.totalDepletion)}개`} />
-                      <Field label="관측 증가" value={`${formatNumber(periodMetrics.totalIncrease)}개`} />
+                      <Field label="입고 보정 추정 소진" value={`${formatNumber(periodMetrics.totalDepletion)}개`} />
+                      <Field label="입고 미설명 증가" value={`${formatNumber(periodMetrics.totalIncrease)}개`} />
                       <Field label="입고 반영" value={`${formatNumber(periodMetrics.totalInboundQuantity ?? 0)}개`} />
-                      <Field label="기간 일평균 소진" value={fmtRate(periodMetrics.averageDailyDepletion)} />
+                      <Field label="기간 달력일평균 소진" value={fmtRate(periodMetrics.averageDailyDepletion, '달력일')} />
                     </div>
                   ) : <p className="text-xs text-muted-foreground">두 날짜를 비교할 관측 데이터가 부족합니다.</p>}
                 </section>
@@ -382,12 +382,12 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
               <Separator />
 
               <section>
-                <h3 className="mb-2 text-sm font-semibold">추세</h3>
+                <h3 className="mb-2 text-sm font-semibold">추세 · 출고 영업일 기준</h3><p className="mb-3 text-xs text-muted-foreground">{detail.analysis.operating?.reason ?? "관측 추세 참고"} · 최근 {detail.analysis.operating?.basisWindowDays ?? "—"}일 중 {detail.analysis.operating?.observedShippingDays ?? 0}출고일 · 마지막 관측 {detail.analysis.latest.date}. 반품·조정은 분리되지 않으며 B2B는 커버리지 예측 대상에서 제외합니다.</p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                  <Field label="7일 평균 소진" value={fmtRate(detail.analysis.window7.averageDailyDepletion)} />
+                  <Field label="7일 출고일평균 추정" value={fmtRate(detail.analysis.window7.averageDailyDepletion)} />
                   <Field label="7일 입고 반영" value={`${formatNumber(detail.analysis.window7.totalInboundQuantity ?? 0)}개`} />
-                  <Field label="14일 평균 소진" value={fmtRate(detail.analysis.window14.averageDailyDepletion)} />
-                  <Field label="30일 평균 소진" value={fmtRate(detail.analysis.window30.averageDailyDepletion)} />
+                  <Field label="14일 출고일평균 추정" value={fmtRate(detail.analysis.window14.averageDailyDepletion)} />
+                  <Field label="30일 출고일평균 추정" value={fmtRate(detail.analysis.window30.averageDailyDepletion)} />
                   <Field label="소진 가속/둔화" value={accelerationText(detail.analysis)} />
                   <Field label="관측 근거 수준" value={confidenceLabel(detail.analysis.forecast.confidence)} />
                 </div>
@@ -535,8 +535,8 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function fmtRate(value: number | null): string {
-  return value === null ? '데이터 축적 중' : `${formatNumber(value)}개/일`;
+function fmtRate(value: number | null, unit = '출고일'): string {
+  return value === null ? '산정 불가' : `${formatNumber(value)}개/${unit}`;
 }
 
 function accelerationText(analysis: SkuAnalysis): string {

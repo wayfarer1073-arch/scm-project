@@ -387,7 +387,7 @@ export function calculateExpirationRisk(
   return { expirationDate, riskDays: effectiveRiskDays, daysUntilExpiration, daysUntilRiskDate, isAtRisk };
 }
 
-const RISK_RANK = { NORMAL: 0, WARNING: 1, DANGER: 2 } as const;
+const RISK_RANK = { UNKNOWN: -1, NORMAL: 0, WARNING: 1, DANGER: 2 } as const;
 
 function coverageBandLabel(band: CoverageBand): string | null {
   if (band === 'STOCKOUT_SOON') return '품절 임박';

@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ActionCenter } from '@/components/dashboard/action-center';
 import { KpiCards } from '@/components/dashboard/kpi-cards';
+import { OperatingSummary } from '@/components/dashboard/operating-summary';
 import { WarehouseSummaryCards } from '@/components/dashboard/warehouse-summary-cards';
 import { FavoritesSummary } from '@/components/dashboard/favorites-summary';
 import { ChartsSection } from '@/components/dashboard/charts/charts-section';
@@ -121,6 +122,7 @@ export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows
         <DateRangeControl key={`${fromDate ?? 'day'}-${asOfDate}`} asOfDate={asOfDate} fromDate={fromDate} maxDate={todayKstDateString()} />
       </div>
       <KpiCards kpis={kpis} fromDate={fromDate} asOfDate={asOfDate} />
+      <OperatingSummary rows={rows} />
       <ActionCenter cards={actionCenterCards} onSelect={handleActionCenterSelect} />
       <WarehouseSummaryCards summaries={warehouseSummaries} activeWarehouseId={warehouseFilter} onSelect={setWarehouseFilter} latestUploads={latestUploads} />
       <ChartsSection

@@ -32,7 +32,9 @@ describe('inventory database invariants', () => {
     expect(await loadSkuWithSeries(await skuId(), '2026-09-10')).not.toBeNull();
     const totals = (await loadDailyWarehouseTotals()).filter(r => r.warehouseId === fixture.warehouse.id);
     expect(totals.find(r => r.date === '2026-09-10')?.totalAvailableStock).toBe(150);
-    expect((await loadActiveSkusWithSeries(fixture.warehouse.id, '2026-09-17')).map(r => r.descriptor.productCode)).toEqual(['B']);
+    const current = await loadActiveSkusWithSeries(fixture.warehouse.id, '2026-09-17');
+    expect(current.filter(r => !r.descriptor.isSoldOut).map(r => r.descriptor.productCode)).toEqual(['B']);
+    expect(current.find(r => r.descriptor.productCode === 'A')?.descriptor.isSoldOut).toBe(true);
   });
 
   it('counts inbound between observations once, including after backfill and replacement', async () => {
