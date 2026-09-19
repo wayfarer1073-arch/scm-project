@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Building2, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { Building2, Pencil, Plus, RotateCcw, Star, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
@@ -44,10 +44,12 @@ interface SkuDetailSheetProps {
   asOfDate: string;
   fromDate: string | null;
   isAdmin: boolean;
+  isFavorited: boolean;
+  onToggleFavorite: (skuId: string, next: boolean) => void;
   onOpenChange: (open: boolean) => void;
 }
 
-export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, onOpenChange }: SkuDetailSheetProps) {
+export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited, onToggleFavorite, onOpenChange }: SkuDetailSheetProps) {
   const [detail, setDetail] = useState<SkuDetailResponse | null>(null);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -244,6 +246,15 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, onOpenChang
           <>
             <SheetHeader>
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => skuId && onToggleFavorite(skuId, !isFavorited)}
+                  className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={isFavorited ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+                  aria-pressed={isFavorited}
+                >
+                  <Star className={isFavorited ? 'size-4 fill-amber-400 text-amber-400' : 'size-4'} aria-hidden="true" />
+                </button>
                 <SheetTitle>{detail.descriptor.productName}</SheetTitle>
                 <Badge variant={riskBadgeVariant(detail.analysis.thresholdRisk.level)}>{riskLabel(detail.analysis.thresholdRisk.level)}</Badge>
                 {detail.descriptor.isB2B && (

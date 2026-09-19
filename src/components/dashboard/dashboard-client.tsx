@@ -3,10 +3,12 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { UploadCloud } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ActionCenter } from '@/components/dashboard/action-center';
 import { KpiCards } from '@/components/dashboard/kpi-cards';
 import { WarehouseSummaryCards } from '@/components/dashboard/warehouse-summary-cards';
+import { FavoritesSummary } from '@/components/dashboard/favorites-summary';
 import { ChartsSection } from '@/components/dashboard/charts/charts-section';
 import { InventoryTable } from '@/components/inventory-table/inventory-table';
 import { SkuDetailSheet } from '@/components/inventory-table/sku-detail-sheet';
@@ -34,18 +36,42 @@ interface DashboardClientProps {
   latestUploads: LatestUpload[];
   isAdmin: boolean;
   holidays: string[];
+  favoriteSkuIds: string[];
 }
 
-export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows, dailyTotals, latestUploads, isAdmin, holidays }: DashboardClientProps) {
+export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows, dailyTotals, latestUploads, isAdmin, holidays, favoriteSkuIds }: DashboardClientProps) {
   const [warehouseFilter, setWarehouseFilter] = useState<string | 'ALL'>('ALL');
   const [tableTab, setTableTab] = useState<TableTab>('ALL');
   const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
   const [selectedSkuId, setSelectedSkuId] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<Set<string>>(() => new Set(favoriteSkuIds));
 
   const holidaySet = useMemo(() => new Set(holidays), [holidays]);
   const kpis = useMemo(() => calculateCompanyKpis(rows, settings.stagnantDays, fromDate, holidaySet), [rows, settings.stagnantDays, fromDate, holidaySet]);
   const warehouseSummaries = useMemo(() => calculateWarehouseSummaries(rows, settings.stagnantDays, holidaySet), [rows, settings.stagnantDays, holidaySet]);
   const actionCenterCards = useMemo(() => buildActionCenterCards(rows, settings.stagnantDays), [rows, settings.stagnantDays]);
+  const favoriteRows = useMemo(() => rows.filter((r) => favorites.has(r.descriptor.skuId)), [rows, favorites]);
+
+  async function toggleFavorite(skuId: string, next: boolean) {
+    setFavorites((prev) => {
+      const nextSet = new Set(prev);
+      if (next) nextSet.add(skuId);
+      else nextSet.delete(skuId);
+      return nextSet;
+    });
+    try {
+      const res = await fetch(`/api/sku/${skuId}/favorite`, { method: next ? 'POST' : 'DELETE' });
+      if (!res.ok) throw new Error();
+    } catch {
+      setFavorites((prev) => {
+        const revert = new Set(prev);
+        if (next) revert.delete(skuId);
+        else revert.add(skuId);
+        return revert;
+      });
+      toast.error('즐겨찾기 변경에 실패했습니다.');
+    }
+  }
 
   function handleActionCenterSelect(tab: TableTab, qf: QuickFilter) {
     setTableTab(tab);
@@ -106,6 +132,7 @@ export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows
         fromDate={fromDate}
         asOfDate={asOfDate}
       />
+      <FavoritesSummary rows={favoriteRows} />
       <div id="inventory-table-section">
         <InventoryTable
           rows={rows}
@@ -124,7 +151,15 @@ export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows
           fromDate={fromDate}
         />
       </div>
-      <SkuDetailSheet skuId={selectedSkuId} asOfDate={asOfDate} fromDate={fromDate} isAdmin={isAdmin} onOpenChange={(open) => !open && setSelectedSkuId(null)} />
+      <SkuDetailSheet
+        skuId={selectedSkuId}
+        asOfDate={asOfDate}
+        fromDate={fromDate}
+        isAdmin={isAdmin}
+        isFavorited={selectedSkuId !== null && favorites.has(selectedSkuId)}
+        onToggleFavorite={toggleFavorite}
+        onOpenChange={(open) => !open && setSelectedSkuId(null)}
+      />
     </div>
   );
 }

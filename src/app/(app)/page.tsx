@@ -4,6 +4,7 @@ import { getInventoryRows } from '@/server/services/inventory-analysis-service';
 import { loadDailyWarehouseTotals } from '@/server/repositories/inventory-repository';
 import { getLatestActiveSnapshot } from '@/server/repositories/snapshot-repository';
 import { listHolidayDateStrings } from '@/server/repositories/holiday-repository';
+import { listFavoriteSkuIds } from '@/server/repositories/favorite-repository';
 import { todayKstDateString, dateOnlyToString, isDateString } from '@/lib/date';
 import { DashboardClient } from '@/components/dashboard/dashboard-client';
 import { auth } from '@/server/auth';
@@ -17,12 +18,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const requestedFrom = isDateString(params.from) ? params.from : asOfDate;
   const fromDate = requestedFrom > asOfDate ? asOfDate : requestedFrom;
   const settings = await getSettings();
-  const [session, warehouses, rows, dailyTotals, holidays] = await Promise.all([
-    auth(),
+  const session = await auth();
+  const [warehouses, rows, dailyTotals, holidays, favoriteSkuIds] = await Promise.all([
     listWarehouses(),
     getInventoryRows({ asOfDate, compareFromDate: mode === 'range' ? fromDate : undefined, settings }),
     loadDailyWarehouseTotals(asOfDate),
     listHolidayDateStrings(),
+    session?.user.id ? listFavoriteSkuIds(session.user.id) : Promise.resolve([]),
   ]);
   const isAdmin = session?.user.role === 'ADMIN';
 
@@ -48,6 +50,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       latestUploads={latestUploads}
       isAdmin={isAdmin}
       holidays={holidays}
+      favoriteSkuIds={favoriteSkuIds}
     />
   );
 }

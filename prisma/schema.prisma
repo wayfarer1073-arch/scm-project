@@ -62,6 +62,7 @@ model User {
   events            InventoryEvent[]
   eventHistories    EventHistory[]
   posts             Post[]
+  favorites         SkuFavorite[]
 
   @@map("users")
 }
@@ -128,6 +129,7 @@ model Sku {
   events InventoryEvent[]
   snapshotInbounds SnapshotInbound[]
   expirationLots   SkuExpirationLot[]
+  favoritedBy      SkuFavorite[]
 
   @@unique([warehouseId, productCode])
   @@index([warehouseId])
@@ -290,6 +292,20 @@ model Holiday {
   createdAt DateTime @default(now())
 
   @@map("holidays")
+}
+
+/// 사용자별 SKU 즐겨찾기. 회사 전체가 공유하는 값이 아니라 각자 자신의 목록만 본다.
+model SkuFavorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skuId     String
+  sku       Sku      @relation(fields: [skuId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, skuId])
+  @@index([skuId])
+  @@map("sku_favorites")
 }
 
 model Settings {
