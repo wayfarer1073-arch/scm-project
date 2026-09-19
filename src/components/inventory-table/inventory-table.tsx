@@ -366,7 +366,7 @@ export function InventoryTableRow({ row: r, fromDate, onSelectSku }: { row: Inve
     >
       <TableCell className="font-mono text-xs text-muted-foreground">{r.descriptor.productCode}</TableCell>
       <TableCell>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <span className="font-medium">{r.descriptor.productName}</span>
           {r.descriptor.isSoldOut && (
             <>
