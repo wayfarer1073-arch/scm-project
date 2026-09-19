@@ -10,10 +10,10 @@ export function KpiCards({ kpis, fromDate, asOfDate }: KpiCardsProps) {
   const quantity = (value: number | null) => value === null ? '비교 불가' : `${formatNumber(value)}개`;
   const periodLabel = fromDate ? `${fromDate} — ${asOfDate} 양 끝 관측 일치` : 'SKU별 직전 관측 대비';
   return (
-    <section className="rounded-xl border border-border" aria-label="스냅샷 기반 재고 KPI">
-      <div className="flex items-center gap-1.5 border-b border-border px-5 py-3.5">
+    <section className="overflow-hidden rounded-xl border border-border" aria-label="스냅샷 기반 재고 KPI">
+      <div className="flex items-center gap-1.5 bg-sidebar px-5 py-3.5 text-sidebar-foreground">
         <h2 className="text-base font-semibold">관측 재고 현황</h2>
-        <InfoTooltip>
+        <InfoTooltip className="text-brand-accent hover:text-brand-accent/80">
           판매 가능한(정상) 재고만 계산에 넣었어요. 선택한 날짜에 실제로 자료가 올라온 상품만 포함하고, 자료가 없는 날은 빼고 계산합니다.
           &quot;보유율&quot;은 주문을 얼마나 채울 수 있는지가 아니라, 재고가 남아있는 상품이 몇 %인지를 뜻해요.
         </InfoTooltip>
@@ -50,9 +50,9 @@ export function KpiCards({ kpis, fromDate, asOfDate }: KpiCardsProps) {
         <Metric label="기록된 입고량" value={quantity(s.recordedInbound)} detail="동일 비교 구간 · 미기록 입고 제외" />
         <Metric label="입고 보정 추정 소진" value={quantity(s.estimatedDepletion)} detail="구간별 max(이전 재고 + 입고 − 현재 재고, 0)" />
       </div>
-      <div className="flex items-center gap-1.5 border-t border-border px-5 py-3">
-        <p className="text-xs text-muted-foreground">추정치 해석 유의사항</p>
-        <InfoTooltip>
+      <div className="flex items-center gap-1.5 bg-sidebar px-5 py-3 text-sidebar-foreground">
+        <p className="text-xs text-sidebar-muted-foreground">추정치 해석 유의사항</p>
+        <InfoTooltip className="text-brand-accent hover:text-brand-accent/80">
           여기 나온 소진량은 재고가 줄어든 만큼을 계산한 추정치예요. 반품, 창고 간 이동, 재고 조정, 기록되지 않은 입고 등이 섞여 있을 수 있어
           실제 판매량과는 다를 수 있습니다. 정확한 회전율이나 품절 시점 예측에는 이 숫자만으로는 충분하지 않아요.
         </InfoTooltip>

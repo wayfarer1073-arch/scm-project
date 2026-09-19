@@ -35,7 +35,7 @@ export function DateRangeControl({ asOfDate, fromDate, maxDate }: DateRangeContr
 
   return (
     <div className="flex flex-col items-start gap-2.5 sm:flex-row sm:items-center sm:justify-end">
-      <div className="inline-flex items-center gap-1 rounded-md border border-border p-0.5 text-xs" aria-label="조회 방식">
+      <div className="inline-flex items-center gap-1 rounded-md p-0.5 text-xs" aria-label="조회 방식">
         <button
           type="button"
           onClick={() => setMode('day')}
