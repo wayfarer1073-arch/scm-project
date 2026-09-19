@@ -12,7 +12,7 @@ function obs(date: string, normalStock: number, rest: Partial<StockObservation> 
 function row(id: string, observations: StockObservation[], asOf = '2026-09-08', from?: string): InventoryRow {
   const analysis = analyzeSku(observations, asOf)!;
   return {
-    descriptor: { skuId: id, productCode: id, productName: id, warehouseId: 'w', warehouseCode: 'A', warehouseName: 'A', option: null, barcode: null, location: null, manualDangerQty: null, manualWarningQty: null, expirationDate: null, expirationRiskDays: null },
+    descriptor: { skuId: id, productCode: id, productName: id, warehouseId: 'w', warehouseCode: 'A', warehouseName: 'A', option: null, barcode: null, location: null, manualDangerQty: null, manualWarningQty: null, expirationDate: null, expirationRiskDays: null, isB2B: false, firstSeenDate: observations[0]?.date ?? asOf },
     analysis, valueBreakdown: calculateInventoryValueBreakdown(analysis.latest),
     periodComparison: from ? calculatePeriodComparison(observations, from, asOf) : null,
   };
@@ -22,9 +22,25 @@ describe('directly observed snapshot KPIs', () => {
   it('empty data is unknown, not zero percent or a zero valuation', () => {
     expect(calculateSnapshotKpis([])).toMatchObject({ inStockSkuRatio: null, knownInventoryValue: null, observedDecrease: null, comparableSkuCount: 0 });
   });
-  it('uses SKU count, separates zero and negative inventory, exposes stale stock', () => {
-    const s = calculateSnapshotKpis([row('a', [obs('2026-09-08', 1000)]), row('b', [obs('2026-09-08', 0)]), row('c', [obs('2026-09-01', -100)])]);
-    expect(s).toMatchObject({ positiveStockSkuCount: 1, zeroStockSkuCount: 1, negativeStockSkuCount: 1, knownInventoryValue: 10000, valuedSkuCount: 2, unvaluedSkuCount: 1, staleSkuCount: 1, oldestObservationDate: '2026-09-01', newestObservationDate: '2026-09-08' });
+  it('uses SKU count, separates zero and negative inventory, excludes stale (no-upload-today) SKUs from every current-status tally', () => {
+    const s = calculateSnapshotKpis([
+      row('a', [obs('2026-09-08', 1000)]),
+      row('b', [obs('2026-09-08', 0)]),
+      row('d', [obs('2026-09-08', -50)]),
+      row('c', [obs('2026-09-01', -100)]), // 기준일(09-08)에 업로드가 없어 stale — 현재 집계에서 제외
+    ]);
+    expect(s).toMatchObject({
+      observedSkuCount: 3,
+      positiveStockSkuCount: 1,
+      zeroStockSkuCount: 1,
+      negativeStockSkuCount: 1,
+      knownInventoryValue: 10000,
+      valuedSkuCount: 2,
+      unvaluedSkuCount: 1,
+      staleSkuCount: 1,
+      oldestObservationDate: '2026-09-01',
+      newestObservationDate: '2026-09-08',
+    });
     expect(s.inStockSkuRatio).toBeCloseTo(1 / 3);
   });
   it('does not turn missing costs into known zero; honors uploaded total and explicit zero', () => {

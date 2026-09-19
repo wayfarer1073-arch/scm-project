@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "skus" ADD COLUMN     "isB2B" BOOLEAN NOT NULL DEFAULT false;

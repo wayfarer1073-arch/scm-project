@@ -98,6 +98,9 @@ model Sku {
   manualWarningQty Int?
   manualDangerQty  Int?
 
+  // 관리자가 SKU 상세에서 직접 지정하는 B2B 상품 마커. 업로드/자동판정 없이 수동 토글로만 바뀐다.
+  isB2B Boolean @default(false)
+
   firstSeenDate DateTime @db.Date
   lastSeenDate  DateTime @db.Date
   isActive      Boolean  @default(true) // 가장 최근 활성 스냅샷에 존재하는지 (사라진 SKU 판별)

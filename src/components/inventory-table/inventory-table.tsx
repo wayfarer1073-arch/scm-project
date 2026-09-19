@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, FileSpreadsheet, Search, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Building2, Download, FileSpreadsheet, Search, X } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -307,7 +307,15 @@ export function InventoryTable({
               >
                 <TableCell className="font-mono text-xs text-muted-foreground">{r.descriptor.productCode}</TableCell>
                 <TableCell>
-                  <div className="font-medium">{r.descriptor.productName}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medium">{r.descriptor.productName}</span>
+                    {r.descriptor.isB2B && (
+                      <Badge variant="outline" className="gap-1 px-1.5 py-0 text-[10px]">
+                        <Building2 className="size-2.5" aria-hidden="true" />
+                        B2B
+                      </Badge>
+                    )}
+                  </div>
                   {r.analysis.tags.length > 0 && (
                     <div className="mt-0.5 flex flex-wrap gap-1">
                       {r.analysis.tags.slice(0, 3).map((t) => (

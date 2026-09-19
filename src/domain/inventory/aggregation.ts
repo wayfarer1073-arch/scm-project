@@ -7,7 +7,7 @@ import type { InventoryRow } from './read-model';
 /** 기간 모드는 양 끝 날짜가 정확히 일치하는 동일 SKU만 비교한다. 신규/누락 SKU는 0으로 대체하지 않는다. */
 export function calculateSnapshotKpis(rows: InventoryRow[], compareFromDate?: string | null): SnapshotKpis {
   const result: SnapshotKpis = {
-    positiveStockSkuCount: 0, zeroStockSkuCount: 0, negativeStockSkuCount: 0,
+    observedSkuCount: 0, positiveStockSkuCount: 0, zeroStockSkuCount: 0, negativeStockSkuCount: 0,
     inStockSkuRatio: null, valuedSkuCount: 0, unvaluedSkuCount: 0,
     knownInventoryValue: null, valuationCoverageRatio: null, staleSkuCount: 0,
     oldestObservationDate: null, newestObservationDate: null, comparableSkuCount: 0,
@@ -15,18 +15,25 @@ export function calculateSnapshotKpis(rows: InventoryRow[], compareFromDate?: st
   };
   for (const row of rows) {
     const { latest, previous, asOfDate } = row.analysis;
-    if (latest.normalStock > 0) result.positiveStockSkuCount++;
-    else if (latest.normalStock === 0) result.zeroStockSkuCount++;
-    else result.negativeStockSkuCount++;
-    if (latest.date < asOfDate) result.staleSkuCount++;
     if (!result.oldestObservationDate || latest.date < result.oldestObservationDate) result.oldestObservationDate = latest.date;
     if (!result.newestObservationDate || latest.date > result.newestObservationDate) result.newestObservationDate = latest.date;
-    // 음수재고는 정합성 오류로 별도 표시하고 양수 재고자산을 상쇄하지 않는다.
-    const known = latest.valuationKnown ?? (latest.totalCost !== undefined || latest.unitCost > 0 || latest.normalStock === 0);
-    if (known && latest.normalStock >= 0 && Number.isFinite(row.valueBreakdown.normalStockValue) && row.valueBreakdown.normalStockValue >= 0) {
-      result.valuedSkuCount++;
-      result.knownInventoryValue = (result.knownInventoryValue ?? 0) + row.valueBreakdown.normalStockValue;
-    } else result.unvaluedSkuCount++;
+
+    // 기준일에 실제 업로드가 없어 과거 스냅샷을 그대로 쓰는 SKU는 "현재 상태" 집계(보유/무재고/
+    // 음수재고/평가금액)에서 완전히 제외한다 — 자료를 올리지 않은 날짜가 오늘 수치에 섞이지 않도록.
+    if (latest.date < asOfDate) {
+      result.staleSkuCount++;
+    } else {
+      result.observedSkuCount++;
+      if (latest.normalStock > 0) result.positiveStockSkuCount++;
+      else if (latest.normalStock === 0) result.zeroStockSkuCount++;
+      else result.negativeStockSkuCount++;
+      // 음수재고는 정합성 오류로 별도 표시하고 양수 재고자산을 상쇄하지 않는다.
+      const known = latest.valuationKnown ?? (latest.totalCost !== undefined || latest.unitCost > 0 || latest.normalStock === 0);
+      if (known && latest.normalStock >= 0 && Number.isFinite(row.valueBreakdown.normalStockValue) && row.valueBreakdown.normalStockValue >= 0) {
+        result.valuedSkuCount++;
+        result.knownInventoryValue = (result.knownInventoryValue ?? 0) + row.valueBreakdown.normalStockValue;
+      } else result.unvaluedSkuCount++;
+    }
 
     const period = row.periodComparison;
     if (latest.normalStock < 0 || (!compareFromDate && previous && previous.normalStock < 0) || (compareFromDate && period && period.startAvailableStock < 0)) continue;
@@ -42,9 +49,9 @@ export function calculateSnapshotKpis(rows: InventoryRow[], compareFromDate?: st
     result.recordedInbound = (result.recordedInbound ?? 0) + (compareFromDate ? period!.totalInboundQuantity ?? 0 : delta!.inboundQuantity);
     result.estimatedDepletion = (result.estimatedDepletion ?? 0) + (compareFromDate ? period!.totalDepletion : delta!.depletion);
   }
-  if (rows.length) {
-    result.inStockSkuRatio = result.positiveStockSkuCount / rows.length;
-    result.valuationCoverageRatio = result.valuedSkuCount / rows.length;
+  if (result.observedSkuCount) {
+    result.inStockSkuRatio = result.positiveStockSkuCount / result.observedSkuCount;
+    result.valuationCoverageRatio = result.valuedSkuCount / result.observedSkuCount;
   }
   return result;
 }

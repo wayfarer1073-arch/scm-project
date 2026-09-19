@@ -163,6 +163,8 @@ export async function loadActiveSkusWithSeries(
         manualWarningQty: sku.manualWarningQty,
         expirationDate: sku.expirationDate ? dateOnlyToString(sku.expirationDate) : null,
         expirationRiskDays: sku.expirationRiskDays,
+        isB2B: sku.isB2B,
+        firstSeenDate: dateOnlyToString(sku.firstSeenDate),
       },
       observations: attachIntervalInbounds(observationsBySku.get(sku.id) ?? [], inboundsBySku.get(sku.id) ?? []),
     };
@@ -292,6 +294,8 @@ export async function loadSkuWithSeries(
       manualWarningQty: sku.manualWarningQty,
       expirationDate: sku.expirationDate ? dateOnlyToString(sku.expirationDate) : null,
       expirationRiskDays: sku.expirationRiskDays,
+      isB2B: sku.isB2B,
+      firstSeenDate: dateOnlyToString(sku.firstSeenDate),
     },
     observations: attachIntervalInbounds(observations, inboundsBySku.get(skuId) ?? []),
   };
@@ -329,6 +333,10 @@ export async function listAllSkusForVisibilityAdmin(): Promise<SkuVisibilityRow[
 
 export async function setSkuHiddenFromDashboard(skuId: string, hidden: boolean) {
   return prisma.sku.update({ where: { id: skuId }, data: { isHiddenFromDashboard: hidden } });
+}
+
+export async function setSkuB2B(skuId: string, isB2B: boolean) {
+  return prisma.sku.update({ where: { id: skuId }, data: { isB2B } });
 }
 
 /** 위험/경고수량 직접 설정. 필드별로 null을 넘기면 그 필드만 자동계산으로 되돌린다. */

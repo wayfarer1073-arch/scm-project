@@ -4,6 +4,7 @@ import { UploadCloud } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatNumber, formatPercent } from '@/lib/format';
 import { formatKstDate, formatKstDateTime } from '@/lib/date';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 import type { WarehouseSummary } from '@/domain/inventory/types';
 
 interface LatestUpload {
@@ -36,9 +37,9 @@ export function WarehouseSummaryCards({ summaries: summariesInput, activeWarehou
   const summaries = [...summariesInput].sort((a, b) => a.warehouseCode.localeCompare(b.warehouseCode));
   return (
     <section className="rounded-xl border border-border">
-      <div className="flex flex-wrap items-center justify-between gap-1 border-b border-border px-5 py-3.5">
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-5 py-3.5">
         <h2 className="text-base font-semibold">창고별 요약</h2>
-        <p className="text-xs text-muted-foreground">각 창고는 서로 다른 품목을 관리하는 독립 재고 Pool입니다 · 창고 간 우열 비교 아님</p>
+        <InfoTooltip>각 창고는 서로 다른 품목을 관리하는 독립 재고 Pool입니다 · 창고 간 우열 비교 아님</InfoTooltip>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm" style={{ minWidth: 560 }}>

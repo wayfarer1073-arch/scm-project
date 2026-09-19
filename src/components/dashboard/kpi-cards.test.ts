@@ -19,6 +19,6 @@ describe('KPI display uncertainty', () => {
       kpis: calculateCompanyKpis([], 30, '2026-09-01'), asOfDate: '2026-09-18', fromDate: '2026-09-01',
     }));
     expect(html).toContain('2026-09-01 — 2026-09-18 양 끝 관측 일치');
-    expect(html).toContain('보유율은 주문 충족률이 아닙니다');
+    expect(html).toContain('자세히 보기');
   });
 });

@@ -165,15 +165,19 @@ export interface InventoryValueBreakdown {
 }
 
 export interface SnapshotKpis {
+  /** 기준일에 실제 업로드가 있어 오늘 값으로 집계된 SKU 수 (positiveStockSkuCount + zeroStockSkuCount +
+   * negativeStockSkuCount와 일치). 자료를 올리지 않은 날짜(stale)는 어떤 집계에도 섞이지 않는다. */
+  observedSkuCount: number;
   positiveStockSkuCount: number;
   zeroStockSkuCount: number;
   negativeStockSkuCount: number;
-  /** 양수 정상재고 SKU / 조회 대상 SKU. 주문 충족률이 아니다. */
+  /** 양수 정상재고 SKU / 기준일에 실제 관측된 SKU(observedSkuCount). 주문 충족률이 아니다. */
   inStockSkuRatio: number | null;
   valuedSkuCount: number;
   unvaluedSkuCount: number;
   knownInventoryValue: number | null;
   valuationCoverageRatio: number | null;
+  /** 기준일에 자료가 올라오지 않아(과거 스냅샷을 그대로 쓰는) 위 집계에서 제외된 SKU 수. */
   staleSkuCount: number;
   oldestObservationDate: string | null;
   newestObservationDate: string | null;

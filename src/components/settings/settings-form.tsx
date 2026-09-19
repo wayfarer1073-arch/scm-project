@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { ExpirationManagement } from '@/components/settings/expiration-management';
 import type { RiskThresholdSettings } from '@/domain/inventory/types';
 
@@ -89,8 +90,10 @@ export function SettingsForm({ isAdmin, warehouses, settings, users: initialUser
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>창고명</CardTitle>
-          <CardDescription>각 창고는 서로 다른 품목을 관리하는 독립 Pool입니다. 표시 이름만 변경할 수 있습니다.</CardDescription>
+          <div className="flex items-center gap-1.5">
+            <CardTitle>창고명</CardTitle>
+            <InfoTooltip>각 창고는 서로 다른 품목을 관리하는 독립 Pool입니다. 표시 이름만 변경할 수 있습니다.</InfoTooltip>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           {warehouses.map((w) => (
@@ -117,11 +120,13 @@ export function SettingsForm({ isAdmin, warehouses, settings, users: initialUser
 
       <Card>
         <CardHeader>
-          <CardTitle>위험 / 정체 판단 기준</CardTitle>
-          <CardDescription>
-            SKU별 위험/경고수량은 SKU 상세에서 직접 지정할 수 있고, 지정하지 않으면 아래 &quot;품절 임박 기준&quot;·&quot;관리 필요 경계&quot; 일수를 그
-            SKU의 최근 소진 속도로 환산해 자동 계산합니다. 같은 기준은 Coverage(예상 소진일수) 기반 보조 판단과 정체·과잉재고 판정에도 쓰입니다.
-          </CardDescription>
+          <div className="flex items-center gap-1.5">
+            <CardTitle>위험 / 정체 판단 기준</CardTitle>
+            <InfoTooltip>
+              SKU별 위험/경고수량은 SKU 상세에서 직접 지정할 수 있고, 지정하지 않으면 아래 &quot;품절 임박 기준&quot;·&quot;관리 필요 경계&quot; 일수를 그
+              SKU의 최근 소진 속도로 환산해 자동 계산합니다. 같은 기준은 Coverage(예상 소진일수) 기반 보조 판단과 정체·과잉재고 판정에도 쓰입니다.
+            </InfoTooltip>
+          </div>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <ThresholdField
@@ -220,10 +225,12 @@ function SkuVisibilityManagement({ isAdmin, initialSkus }: { isAdmin: boolean; i
   return (
     <Card>
       <CardHeader>
-        <CardTitle>SKU 대시보드 노출 관리</CardTitle>
-        <CardDescription>
-          특정 상품을 대시보드(KPI·차트·재고 테이블·Action Center·리포트)에서 제외합니다. 업로드 데이터 자체는 계속 쌓이며 언제든 다시 표시할 수 있습니다.
-        </CardDescription>
+        <div className="flex items-center gap-1.5">
+          <CardTitle>SKU 대시보드 노출 관리</CardTitle>
+          <InfoTooltip>
+            특정 상품을 대시보드(KPI·차트·재고 테이블·Action Center·리포트)에서 제외합니다. 업로드 데이터 자체는 계속 쌓이며 언제든 다시 표시할 수 있습니다.
+          </InfoTooltip>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">

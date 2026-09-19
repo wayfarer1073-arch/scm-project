@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { auth } from '@/server/auth';
 import { getSkuDetail } from '@/server/services/inventory-analysis-service';
 import { getSettings } from '@/server/repositories/settings-repository';
-import { setSkuHiddenFromDashboard, setSkuManualThresholds } from '@/server/repositories/inventory-repository';
+import { setSkuB2B, setSkuHiddenFromDashboard, setSkuManualThresholds } from '@/server/repositories/inventory-repository';
 import { todayKstDateString } from '@/lib/date';
 
 export async function GET(request: Request, { params }: { params: Promise<{ skuId: string }> }) {
@@ -26,6 +26,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ skuI
 const patchSchema = z
   .object({
     isHiddenFromDashboard: z.boolean().optional(),
+    isB2B: z.boolean().optional(),
     manualDangerQty: z.number().int().min(0).nullable().optional(),
     manualWarningQty: z.number().int().min(0).nullable().optional(),
   })
@@ -45,6 +46,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sk
     if (parsed.data.isHiddenFromDashboard !== undefined) {
       const sku = await setSkuHiddenFromDashboard(skuId, parsed.data.isHiddenFromDashboard);
       return NextResponse.json({ skuId: sku.id, isHiddenFromDashboard: sku.isHiddenFromDashboard });
+    }
+    if (parsed.data.isB2B !== undefined) {
+      const sku = await setSkuB2B(skuId, parsed.data.isB2B);
+      return NextResponse.json({ skuId: sku.id, isB2B: sku.isB2B });
     }
     const sku = await setSkuManualThresholds(skuId, {
       dangerQty: parsed.data.manualDangerQty ?? null,

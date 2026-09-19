@@ -16,6 +16,10 @@ export interface SkuDescriptor {
   expirationDate: string | null;
   /** 소비기한 위험 판정 일수. null이면 앱의 기본값(DEFAULT_EXPIRATION_RISK_DAYS)을 쓴다. */
   expirationRiskDays: number | null;
+  /** 관리자가 직접 지정하는 B2B 상품 마커. */
+  isB2B: boolean;
+  /** 이 SKU가 이 창고에서 처음 관측된 날짜(최초 업로드로 인식된 시점). */
+  firstSeenDate: string;
 }
 
 export interface DailyWarehouseTotal {

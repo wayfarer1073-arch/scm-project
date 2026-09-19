@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { Building2, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EventFormDialog } from '@/components/events/event-form-dialog';
 import { buildDailyDeltas, calculatePeriodComparison, sortObservations } from '@/domain/inventory/calculations';
@@ -56,6 +57,7 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, onOpenChang
   const [dangerInput, setDangerInput] = useState('');
   const [warningInput, setWarningInput] = useState('');
   const [savingThresholds, setSavingThresholds] = useState(false);
+  const [togglingB2B, setTogglingB2B] = useState(false);
 
   async function reload() {
     if (!skuId) return;
@@ -110,6 +112,33 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, onOpenChang
       })
       .filter((v): v is { date: string; availableStock: number; note: string; eventType: string } => v !== null);
   }, [chartData, events]);
+
+  // 이 SKU에 관측치가 이번 한 건뿐이면(과거 이력 없음) 현재 표시된 재고는 처음 인식된 그대로의
+  // 초기재고다 — 소진/증가 계산 대상이 아니므로 계산 로직은 이미 이를 건드리지 않고, 여기서는
+  // 그 사실을 사용자에게 보이는 태그로만 알려준다.
+  const isInitialObservation = useMemo(() => {
+    if (!detail) return false;
+    return sortObservations(detail.observations).length <= 1;
+  }, [detail]);
+
+  async function toggleB2B(checked: boolean) {
+    if (!skuId) return;
+    setTogglingB2B(true);
+    try {
+      const res = await fetch(`/api/sku/${skuId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isB2B: checked }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(checked ? 'B2B 상품으로 표시했습니다.' : 'B2B 표시를 해제했습니다.');
+      reload();
+    } catch {
+      toast.error('변경에 실패했습니다.');
+    } finally {
+      setTogglingB2B(false);
+    }
+  }
 
   const unclassifiedIncreases = useMemo(() => {
     if (!detail) return [];
@@ -213,19 +242,30 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, onOpenChang
         {detail && (
           <>
             <SheetHeader>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <SheetTitle>{detail.descriptor.productName}</SheetTitle>
                 <Badge variant={riskBadgeVariant(detail.analysis.thresholdRisk.level)}>{riskLabel(detail.analysis.thresholdRisk.level)}</Badge>
+                {detail.descriptor.isB2B && (
+                  <Badge variant="outline" className="gap-1">
+                    <Building2 className="size-3" aria-hidden="true" />
+                    B2B
+                  </Badge>
+                )}
               </div>
               <SheetDescription>
                 {detail.descriptor.productCode} · {detail.descriptor.warehouseName}
                 {detail.descriptor.option ? ` · ${detail.descriptor.option}` : ''}
+                {' · 최초 인식 '}
+                {formatKstDate(detail.descriptor.firstSeenDate)}
               </SheetDescription>
             </SheetHeader>
 
             <div className="space-y-5 p-4 sm:p-5">
-              {detail.analysis.tags.length > 0 && (
+              {(detail.analysis.tags.length > 0 || isInitialObservation) && (
                 <div className="flex flex-wrap gap-1.5">
+                  {isInitialObservation && (
+                    <span className="rounded-md bg-status-increase-bg px-2 py-0.5 text-xs text-status-increase">[초기재고]</span>
+                  )}
                   {detail.analysis.tags.map((t) => (
                     <span key={t} className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">{t}</span>
                   ))}
@@ -281,6 +321,16 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, onOpenChang
                 )}
                 {!editingThresholds && <p className="mt-2 text-[11px] text-muted-foreground">{thresholdSourceLabel(detail.analysis.riskThresholds.source)}</p>}
               </section>
+
+              {isAdmin && (
+                <section className="flex items-center justify-between rounded-xl border bg-muted/30 p-3">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                    <span className="text-xs font-semibold">B2B 상품</span>
+                  </div>
+                  <Switch checked={detail.descriptor.isB2B} onCheckedChange={toggleB2B} disabled={togglingB2B} aria-label="B2B 상품 표시" />
+                </section>
+              )}
 
               {fromDate && (
                 <section className="rounded-xl border bg-muted/30 p-3">
