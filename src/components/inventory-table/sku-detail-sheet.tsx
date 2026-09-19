@@ -18,7 +18,7 @@ import { buildDailyDeltas, calculatePeriodComparison, sortObservations } from '@
 import type { InventoryValueBreakdown, SkuAnalysis, StockObservation } from '@/domain/inventory/types';
 import { formatCurrency, formatNumber, formatSigned } from '@/lib/format';
 import { formatKstDate, formatKstDateTime } from '@/lib/date';
-import { riskBadgeVariant, analysisStatusLabel, humanizeTag } from '@/lib/status';
+import { riskBadgeVariant, analysisStatusLabel, dataReliabilityClassName, dataReliabilityLabel, dataReliabilityLevel, humanizeTag, isObservedDateTag } from '@/lib/status';
 import { eventTypeLabel } from '@/lib/event-types';
 import type { SkuDescriptor } from '@/domain/inventory/read-model';
 
@@ -296,7 +296,10 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
                   {isInitialObservation && (
                     <span className="rounded-md bg-status-increase-bg px-2 py-0.5 text-xs text-status-increase">[초기재고]</span>
                   )}
-                  {detail.analysis.tags.map((t) => (
+                  <span className={`rounded-md bg-muted px-2 py-0.5 text-xs font-medium ${dataReliabilityClassName(dataReliabilityLevel(detail.analysis))}`}>
+                    신뢰도 {dataReliabilityLabel(dataReliabilityLevel(detail.analysis))}
+                  </span>
+                  {detail.analysis.tags.filter((t) => !isObservedDateTag(t)).map((t) => (
                     <span key={t} className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">{humanizeTag(t)}</span>
                   ))}
                 </div>

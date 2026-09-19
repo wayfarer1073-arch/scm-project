@@ -18,6 +18,34 @@ export function riskBadgeVariant(level: RiskLevel): 'danger' | 'warning' | 'norm
   return 'normal';
 }
 
+export type DataReliability = 'HIGH' | 'MEDIUM' | 'LOW';
+
+/**
+ * 이 SKU의 소진량 추정에 쓰인 데이터가 얼마나 충분한지 상/중/하로 나눈다. 최근 7일 자료만으로
+ * 계산했으면 상, 자료가 부족해 14일까지 넓혀야 했으면 중, 30일까지 넓혔거나 그마저도 근거가 없으면
+ * 하 — basisWindowDays는 이미 계산되어 있는 값이라 그대로 재사용한다.
+ */
+export function dataReliabilityLevel(analysis: SkuAnalysis): DataReliability {
+  const basisWindowDays = analysis.operating?.basisWindowDays;
+  if (basisWindowDays === 7) return 'HIGH';
+  if (basisWindowDays === 14) return 'MEDIUM';
+  return 'LOW';
+}
+
+export function dataReliabilityLabel(level: DataReliability): string {
+  return level === 'HIGH' ? '상' : level === 'MEDIUM' ? '중' : '하';
+}
+
+export function dataReliabilityClassName(level: DataReliability): string {
+  return level === 'HIGH' ? 'text-muted-foreground' : level === 'MEDIUM' ? 'text-status-warning' : 'text-status-danger';
+}
+
+/** "[관측 2026-09-18]" 형태의 날짜 태그인지. 화면에는 이제 신뢰도(상/중/하)로 대체해 보여주므로
+ * 별도로 걸러낼 수 있게 분리했다 — 엑셀 내보내기(analysis.tags 원본)에는 그대로 남는다. */
+export function isObservedDateTag(tag: string): boolean {
+  return /^\[관측 \d{4}-\d{2}-\d{2}\]$/.test(tag);
+}
+
 /**
  * SKU 행에 붙는 "[...]" 요약 태그를 물류 용어를 몰라도 바로 이해할 수 있는 짧은 문구로 바꿔서
  * 보여준다. 빠른 필터("장기 정체"·"신규 위험")와 엑셀 내보내기는 원본 태그 문자열을 그대로 매칭에

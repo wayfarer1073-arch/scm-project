@@ -13,7 +13,7 @@ import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatNumber, formatSigned } from '@/lib/format';
 import { formatKstDate } from '@/lib/date';
-import { analysisStatusLabel, humanizeTag } from '@/lib/status';
+import { analysisStatusLabel, dataReliabilityClassName, dataReliabilityLabel, dataReliabilityLevel, humanizeTag, isObservedDateTag } from '@/lib/status';
 import { TABLE_TABS, matchesQuickFilter, matchesTab, type QuickFilter, type TableTab } from '@/lib/inventory-filters';
 import { buildInventorySheetRows, type ExportRowInput } from '@/domain/excel/export';
 import { downloadSheetsAsExcel } from '@/lib/xlsx-download';
@@ -576,13 +576,17 @@ export function InventoryTableRow({
             </>
           )}
         </div>
-        {r.analysis.tags.length > 0 && (
-          <div className="mt-0.5 flex flex-wrap gap-1">
-            {r.analysis.tags.slice(0, 3).map((t) => (
-              <span key={t} className="text-[10px] text-muted-foreground">{humanizeTag(t)}</span>
+        <div className="mt-0.5 flex flex-nowrap items-center gap-1 overflow-hidden">
+          <span className={cn('shrink-0 text-[10px] font-medium whitespace-nowrap', dataReliabilityClassName(dataReliabilityLevel(r.analysis)))}>
+            신뢰도 {dataReliabilityLabel(dataReliabilityLevel(r.analysis))}
+          </span>
+          {r.analysis.tags
+            .filter((t) => !isObservedDateTag(t))
+            .slice(0, 2)
+            .map((t) => (
+              <span key={t} className="shrink-0 text-[10px] whitespace-nowrap text-muted-foreground">{humanizeTag(t)}</span>
             ))}
-          </div>
-        )}
+        </div>
       </TableCell>
       {isVisible('status') && (
         <TableCell className="px-2 py-1.5">

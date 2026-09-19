@@ -57,7 +57,7 @@ export function ChartsSection({ rows, dailyTotals, warehouses, chartWarehouseId,
   );
 
   return (
-    <section className="rounded-xl border border-border">
+    <section className="overflow-hidden rounded-xl border border-border">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3.5">
         <div>
           <h2 className="text-base font-semibold">재고 흐름</h2>

@@ -89,7 +89,7 @@ export function RiskDistributionChart({ danger, warning, normal, unknown = 0 }: 
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart margin={{ top: 24, right: 96, bottom: 24, left: 72 }}>
+            <PieChart margin={{ top: 32, right: 96, bottom: 32, left: 72 }}>
               <Pie
                 data={data}
                 dataKey="value"
