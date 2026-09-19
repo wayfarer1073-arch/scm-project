@@ -81,14 +81,15 @@ async function syncSkuExpirationDate(tx: Tx, skuId: string): Promise<void> {
   await tx.sku.update({ where: { id: skuId }, data: { expirationDate: soonest ? soonest.expirationDate : null } });
 }
 
-/** 최신 업로드에 남아 있고 로트가 하나 이상 등록된 SKU의 모든 로트를, 가장 임박한 순으로 나열한다. */
+/** 최신 업로드에 남아 있고 로트가 하나 이상 등록된 SKU의 모든 로트를, 상품코드 순으로 나열한다(같은
+ *  상품코드는 창고, 그 다음 소비기한 순으로 정렬). */
 export async function listExpirationLots(): Promise<ExpirationLotRow[]> {
   await backfillLegacyExpirationDates();
 
   const lots = await prisma.skuExpirationLot.findMany({
     where: { sku: { isActive: true } },
     include: { sku: { include: { warehouse: { select: { code: true, name: true } } } } },
-    orderBy: { expirationDate: 'asc' },
+    orderBy: [{ sku: { productCode: 'asc' } }, { sku: { warehouse: { code: 'asc' } } }, { expirationDate: 'asc' }],
   });
 
   return lots.map((l) => ({
