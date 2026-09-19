@@ -13,14 +13,14 @@ function buildXlsxBuffer(aoa: (string | number)[][]): Buffer {
 const HEADER = ['공급처', '상품코드', '상품명', '로트번호', '유통기한', '로케이션', '수량(로케이션)'];
 
 describe('parseExpirationWorkbook', () => {
-  it('상품코드/상품명/유통기한을 정상 파싱한다', () => {
+  it('상품코드/상품명/로트/유통기한을 정상 파싱한다', () => {
     const rows = [HEADER, ['거래처A', '00001', '상품 A', 'L1', '2027-01-01', 'A-01', '10']];
     const result = parseExpirationWorkbook(buildXlsxBuffer(rows));
     expect(result.issues.filter((i) => i.level === 'ERROR')).toHaveLength(0);
-    expect(result.rows).toEqual([{ rowNumber: 1, productCode: '00001', productName: '상품 A', expirationDate: '2027-01-01' }]);
+    expect(result.rows).toEqual([{ rowNumber: 1, productCode: '00001', productName: '상품 A', lot: 'L1', expirationDate: '2027-01-01' }]);
   });
 
-  it('같은 상품코드가 여러 로트로 나뉘면 가장 이른 유통기한을 대표값으로 삼는다', () => {
+  it('같은 상품코드가 여러 로트로 나뉘면 로트별로 각각의 행을 유지한다(합치지 않는다)', () => {
     const rows = [
       HEADER,
       ['거래처A', '00001', '상품 A', 'L1', '2027-06-01', 'A-01', '10'],
@@ -28,8 +28,18 @@ describe('parseExpirationWorkbook', () => {
       ['거래처A', '00001', '상품 A', 'L3', '2027-12-01', 'A-03', '3'],
     ];
     const result = parseExpirationWorkbook(buildXlsxBuffer(rows));
-    expect(result.rows).toHaveLength(1);
-    expect(result.rows[0].expirationDate).toBe('2027-01-01');
+    expect(result.rows).toHaveLength(3);
+    expect(result.rows.map((r) => [r.lot, r.expirationDate])).toEqual([
+      ['L1', '2027-06-01'],
+      ['L2', '2027-01-01'],
+      ['L3', '2027-12-01'],
+    ]);
+  });
+
+  it('로트 컬럼이 비어 있으면 lot을 null로 둔다(자동 배정은 저장 시점에 처리)', () => {
+    const rows = [HEADER, ['거래처A', '00001', '상품 A', '', '2027-01-01', '', '']];
+    const result = parseExpirationWorkbook(buildXlsxBuffer(rows));
+    expect(result.rows[0].lot).toBeNull();
   });
 
   it('점(.) 또는 슬래시(/) 구분 날짜도 인식한다', () => {

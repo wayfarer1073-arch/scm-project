@@ -31,6 +31,9 @@ function parseFlexibleDate(value: string): string | null {
  * 날짜 해석 실패)는 WARNING으로 처리하고 나머지 유효한 행은 그대로 반영한다 — 대량 로트별 내보내기에서
  * 일부 행 품질 문제로 전체 업로드가 막히면 오히려 운영에 방해가 된다. 구조적 문제(필수 컬럼 없음,
  * 데이터 없음)만 ERROR로 막는다.
+ *
+ * 한 행 = 한 로트로 취급하며 같은 상품코드라도 합치지 않는다(로트별 소비기한을 각각 반영하기 위함).
+ * 로트 컬럼이 비어 있는 행은 lot: null로 두고, 실제 라벨(A/B/C…) 배정은 저장 시점에 처리한다.
  */
 export function parseExpirationWorkbook(buffer: Buffer): ExpirationParseResult {
   const issues: ValidationIssue[] = [];
@@ -79,9 +82,7 @@ export function parseExpirationWorkbook(buffer: Buffer): ExpirationParseResult {
     return { rows: [], issues };
   }
 
-  // productCode -> 가장 이른(soonest) 소비기한. 같은 상품이 로트별로 여러 행에 걸쳐 있으면
-  // 가장 급하게 관리해야 할 날짜를 대표값으로 삼는다.
-  const soonestByCode = new Map<string, { rowNumber: number; productName: string | null; expirationDate: string }>();
+  const rows: ParsedExpirationRow[] = [];
 
   dataRows.forEach((rawRow, i) => {
     const rowNumber = i + 1;
@@ -110,18 +111,9 @@ export function parseExpirationWorkbook(buffer: Buffer): ExpirationParseResult {
     }
 
     const productName = get('productName') || null;
-    const existing = soonestByCode.get(productCode);
-    if (!existing || expirationDate < existing.expirationDate) {
-      soonestByCode.set(productCode, { rowNumber, productName, expirationDate });
-    }
+    const lot = get('lot') || null;
+    rows.push({ rowNumber, productCode, productName, lot, expirationDate });
   });
-
-  const rows: ParsedExpirationRow[] = [...soonestByCode.entries()].map(([productCode, v]) => ({
-    rowNumber: v.rowNumber,
-    productCode,
-    productName: v.productName,
-    expirationDate: v.expirationDate,
-  }));
 
   return { rows, issues };
 }

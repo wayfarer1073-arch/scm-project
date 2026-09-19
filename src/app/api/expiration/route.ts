@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/server/auth';
 import { parseExpirationWorkbook } from '@/domain/excel/expiration-parser';
-import { listExpirations, applyExpirationRows, setExpirationRiskDaysBulk } from '@/server/repositories/expiration-repository';
+import { listExpirationLots, applyExpirationLotRows, setExpirationRiskDaysBulk } from '@/server/repositories/expiration-repository';
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
@@ -10,7 +10,7 @@ export async function GET() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 });
 
-  const entries = await listExpirations();
+  const entries = await listExpirationLots();
   return NextResponse.json({ entries });
 }
 
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ status: 'ERROR', issues: parseResult.issues }, { status: 422 });
   }
 
-  const applyResult = await applyExpirationRows(warehouseId, parseResult.rows);
+  const applyResult = await applyExpirationLotRows(warehouseId, parseResult.rows);
   return NextResponse.json({
     status: 'SUCCESS',
     updatedCount: applyResult.updatedCount,

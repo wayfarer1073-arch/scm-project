@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { EventFormDialog } from '@/components/events/event-form-dialog';
 import { buildDailyDeltas, calculatePeriodComparison, sortObservations } from '@/domain/inventory/calculations';
 import type { InventoryValueBreakdown, SkuAnalysis, StockObservation } from '@/domain/inventory/types';
@@ -246,10 +247,13 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, onOpenChang
                 <SheetTitle>{detail.descriptor.productName}</SheetTitle>
                 <Badge variant={riskBadgeVariant(detail.analysis.thresholdRisk.level)}>{riskLabel(detail.analysis.thresholdRisk.level)}</Badge>
                 {detail.descriptor.isB2B && (
-                  <Badge variant="outline" className="gap-1">
-                    <Building2 className="size-3" aria-hidden="true" />
-                    B2B
-                  </Badge>
+                  <>
+                    <Badge variant="outline" className="gap-1">
+                      <Building2 className="size-3" aria-hidden="true" />
+                      B2B
+                    </Badge>
+                    <InfoTooltip>B2B 상품의 경우 KPI의 신뢰도가 낮을 수 있습니다.</InfoTooltip>
+                  </>
                 )}
               </div>
               <SheetDescription>
@@ -324,9 +328,10 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, onOpenChang
 
               {isAdmin && (
                 <section className="flex items-center justify-between rounded-xl border bg-muted/30 p-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <Building2 className="size-3.5 text-muted-foreground" aria-hidden="true" />
                     <span className="text-xs font-semibold">B2B 상품</span>
+                    <InfoTooltip>B2B 상품의 경우 KPI의 신뢰도가 낮을 수 있습니다.</InfoTooltip>
                   </div>
                   <Switch checked={detail.descriptor.isB2B} onCheckedChange={toggleB2B} disabled={togglingB2B} aria-label="B2B 상품 표시" />
                 </section>

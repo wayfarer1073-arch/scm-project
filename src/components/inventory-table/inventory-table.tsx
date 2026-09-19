@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { cn } from '@/lib/utils';
 import { formatCoverageDays, formatCurrency, formatNumber, formatSigned } from '@/lib/format';
 import { formatKstDate } from '@/lib/date';
@@ -310,10 +311,13 @@ export function InventoryTable({
                   <div className="flex items-center gap-1.5">
                     <span className="font-medium">{r.descriptor.productName}</span>
                     {r.descriptor.isB2B && (
-                      <Badge variant="outline" className="gap-1 px-1.5 py-0 text-[10px]">
-                        <Building2 className="size-2.5" aria-hidden="true" />
-                        B2B
-                      </Badge>
+                      <>
+                        <Badge variant="outline" className="gap-1 px-1.5 py-0 text-[10px]">
+                          <Building2 className="size-2.5" aria-hidden="true" />
+                          B2B
+                        </Badge>
+                        <InfoTooltip>B2B 상품의 경우 KPI의 신뢰도가 낮을 수 있습니다.</InfoTooltip>
+                      </>
                     )}
                   </div>
                   {r.analysis.tags.length > 0 && (

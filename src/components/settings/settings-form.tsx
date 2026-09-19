@@ -25,13 +25,16 @@ interface SkuVisibilityRow {
   isHiddenFromDashboard: boolean;
 }
 
-interface ExpirationRow {
+interface ExpirationLotRow {
+  lotId: string;
   skuId: string;
   warehouseId: string;
   warehouseCode: string;
   warehouseName: string;
   productCode: string;
   productName: string;
+  lot: string;
+  isAutoLot: boolean;
   expirationDate: string;
   expirationRiskDays: number | null;
 }
@@ -42,7 +45,7 @@ interface SettingsFormProps {
   settings: RiskThresholdSettings;
   users: { id: string; email: string; name: string; role: 'MEMBER' | 'ADMIN'; createdAt: string }[];
   skus: SkuVisibilityRow[];
-  expirations: ExpirationRow[];
+  expirations: ExpirationLotRow[];
 }
 
 export function SettingsForm({ isAdmin, warehouses, settings, users: initialUsers, skus, expirations }: SettingsFormProps) {

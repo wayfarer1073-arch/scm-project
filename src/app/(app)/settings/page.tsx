@@ -3,7 +3,7 @@ import { listWarehouses } from '@/server/repositories/warehouse-repository';
 import { getSettings } from '@/server/repositories/settings-repository';
 import { listUsers } from '@/server/repositories/user-repository';
 import { listAllSkusForVisibilityAdmin } from '@/server/repositories/inventory-repository';
-import { listExpirations } from '@/server/repositories/expiration-repository';
+import { listExpirationLots } from '@/server/repositories/expiration-repository';
 import { SettingsForm } from '@/components/settings/settings-form';
 
 export default async function SettingsPage() {
@@ -15,7 +15,7 @@ export default async function SettingsPage() {
     getSettings(),
     isAdmin ? listUsers() : Promise.resolve([]),
     listAllSkusForVisibilityAdmin(),
-    listExpirations(),
+    listExpirationLots(),
   ]);
 
   return (
