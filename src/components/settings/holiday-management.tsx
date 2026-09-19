@@ -81,8 +81,8 @@ export function HolidayManagement({ isAdmin, initialHolidays }: HolidayManagemen
         <div className="flex items-center gap-1.5">
           <CardTitle>공휴일 관리</CardTitle>
           <InfoTooltip>
-            지정한 날짜는 주말과 동일하게 업로드 캘린더에서 업로드가 막히고 옅은 회색으로 표시됩니다. KPI 계산에서는 매출이 계속 발생하는 날로
-            보고 직전 영업일 자료를 그대로 인정합니다(자료 없음으로 제외하지 않음).
+            여기서 지정한 날짜는 주말처럼 취급돼요. 업로드 화면에서 회색으로 표시되고 그 날짜엔 자료를 올릴 수 없습니다. 다만 매출·판매는
+            공휴일에도 계속 일어난다고 보기 때문에, 통계에서 &quot;자료 없음&quot;으로 빼지 않고 바로 전 영업일 자료를 그대로 사용합니다.
           </InfoTooltip>
         </div>
       </CardHeader>

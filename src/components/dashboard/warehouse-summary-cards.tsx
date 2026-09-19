@@ -39,7 +39,7 @@ export function WarehouseSummaryCards({ summaries: summariesInput, activeWarehou
     <section className="rounded-xl border border-border">
       <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-5 py-3.5">
         <h2 className="text-base font-semibold">창고별 요약</h2>
-        <InfoTooltip>각 창고는 서로 다른 품목을 관리하는 독립 재고 Pool입니다 · 창고 간 우열 비교 아님</InfoTooltip>
+        <InfoTooltip>창고 A/B/C는 서로 다른 상품을 관리하는 별개의 공간이에요. 어느 창고가 더 잘하고 있는지 비교하는 표가 아닙니다.</InfoTooltip>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm" style={{ minWidth: 560 }}>

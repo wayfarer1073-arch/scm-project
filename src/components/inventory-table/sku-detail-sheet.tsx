@@ -18,7 +18,7 @@ import { buildDailyDeltas, calculatePeriodComparison, sortObservations } from '@
 import type { InventoryValueBreakdown, SkuAnalysis, StockObservation } from '@/domain/inventory/types';
 import { formatCurrency, formatNumber, formatSigned } from '@/lib/format';
 import { formatKstDate, formatKstDateTime } from '@/lib/date';
-import { riskBadgeVariant, analysisStatusLabel } from '@/lib/status';
+import { riskBadgeVariant, analysisStatusLabel, humanizeTag } from '@/lib/status';
 import { eventTypeLabel } from '@/lib/event-types';
 import type { SkuDescriptor } from '@/domain/inventory/read-model';
 
@@ -263,7 +263,8 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
                       품절
                     </Badge>
                     <InfoTooltip>
-                      최근 업로드 목록에서 빠져 품절로 분류한 상품입니다. 아래 수량·금액은 마지막 관측값이며 현재 집계에서는 제외됩니다.
+                      최근 자료에 이 상품이 더 이상 나오지 않아서 품절로 판단했어요. 아래 수량·금액은 품절 전 마지막으로 확인된 값이며, 현재
+                      재고 합계에는 넣지 않습니다.
                     </InfoTooltip>
                   </>
                 )}
@@ -274,7 +275,10 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
                       <Building2 className="size-3" aria-hidden="true" />
                       B2B
                     </Badge>
-                    <InfoTooltip>B2B 상품의 경우 KPI의 신뢰도가 낮을 수 있습니다.</InfoTooltip>
+                    <InfoTooltip>
+                      한 번에 많은 양을 주문받아 통째로 내보내는 상품이에요. 아래 예상 소진일·재고 부족 예측은 매일 조금씩 팔리는 상품을 기준으로
+                      계산해서 이 상품에는 잘 안 맞을 수 있어요.
+                    </InfoTooltip>
                   </>
                 )}
               </div>
@@ -293,7 +297,7 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
                     <span className="rounded-md bg-status-increase-bg px-2 py-0.5 text-xs text-status-increase">[초기재고]</span>
                   )}
                   {detail.analysis.tags.map((t) => (
-                    <span key={t} className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">{t}</span>
+                    <span key={t} className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">{humanizeTag(t)}</span>
                   ))}
                 </div>
               )}
@@ -353,7 +357,10 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
                   <div className="flex items-center gap-1.5">
                     <Building2 className="size-3.5 text-muted-foreground" aria-hidden="true" />
                     <span className="text-xs font-semibold">B2B 상품</span>
-                    <InfoTooltip>B2B 상품의 경우 KPI의 신뢰도가 낮을 수 있습니다.</InfoTooltip>
+                    <InfoTooltip>
+                      켜두면 한 번에 많은 양을 주문받아 통째로 내보내는 상품으로 표시돼요. 매일 조금씩 팔리는 걸 가정한 예상 소진일·재고 부족
+                      예측 계산에서 빠지게 됩니다.
+                    </InfoTooltip>
                   </div>
                   <Switch checked={detail.descriptor.isB2B} onCheckedChange={toggleB2B} disabled={togglingB2B} aria-label="B2B 상품 표시" />
                 </section>

@@ -13,7 +13,10 @@ export function KpiCards({ kpis, fromDate, asOfDate }: KpiCardsProps) {
     <section className="rounded-xl border border-border" aria-label="스냅샷 기반 재고 KPI">
       <div className="flex items-center gap-1.5 border-b border-border px-5 py-3.5">
         <h2 className="text-base font-semibold">관측 재고 현황</h2>
-        <InfoTooltip>정상재고 기준 · 기준일에 실제 업로드된 SKU만 집계(자료 없는 날짜 제외) · 보유율은 주문 충족률이 아닙니다.</InfoTooltip>
+        <InfoTooltip>
+          판매 가능한(정상) 재고만 계산에 넣었어요. 선택한 날짜에 실제로 자료가 올라온 상품만 포함하고, 자료가 없는 날은 빼고 계산합니다.
+          &quot;보유율&quot;은 주문을 얼마나 채울 수 있는지가 아니라, 재고가 남아있는 상품이 몇 %인지를 뜻해요.
+        </InfoTooltip>
       </div>
       <div className="grid gap-6 px-5 py-5 lg:grid-cols-[1fr_2fr]">
         <div>
@@ -39,7 +42,10 @@ export function KpiCards({ kpis, fromDate, asOfDate }: KpiCardsProps) {
       </div>
       <div className="flex items-center gap-1.5 border-t border-border px-5 py-3">
         <p className="text-xs text-muted-foreground">추정치 해석 유의사항</p>
-        <InfoTooltip>추정 소진에는 반품·이동·재고조정 및 미기록 입고의 영향이 남습니다. 회전율·실제 판매량·정확한 품절 예측은 이 데이터만으로 검증할 수 없습니다.</InfoTooltip>
+        <InfoTooltip>
+          여기 나온 소진량은 재고가 줄어든 만큼을 계산한 추정치예요. 반품, 창고 간 이동, 재고 조정, 기록되지 않은 입고 등이 섞여 있을 수 있어
+          실제 판매량과는 다를 수 있습니다. 정확한 회전율이나 품절 시점 예측에는 이 숫자만으로는 충분하지 않아요.
+        </InfoTooltip>
       </div>
     </section>
   );

@@ -1,18 +1,19 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, Building2, Download, FileSpreadsheet, PackageX, Search, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Building2, Columns3, Download, FileSpreadsheet, PackageX, Search, X } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatNumber, formatSigned } from '@/lib/format';
 import { formatKstDate } from '@/lib/date';
-import { analysisStatusLabel } from '@/lib/status';
+import { analysisStatusLabel, humanizeTag } from '@/lib/status';
 import { TABLE_TABS, matchesQuickFilter, matchesTab, type QuickFilter, type TableTab } from '@/lib/inventory-filters';
 import { buildInventorySheetRows, type ExportRowInput } from '@/domain/excel/export';
 import { downloadSheetsAsExcel } from '@/lib/xlsx-download';
@@ -43,17 +44,38 @@ type SortKey =
   | 'netChangeDesc';
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: 'stockoutFast', label: '예상 소진 빠른 순' },
-  { value: 'coverageAsc', label: 'Coverage 낮은 순' },
-  { value: 'depletionRateDesc', label: '소진속도 높은 순' },
-  { value: 'accelerationDesc', label: '소진 가속률 높은 순' },
+  { value: 'stockoutFast', label: '예상소진일 빠른 순' },
+  { value: 'coverageAsc', label: '지속일수 낮은 순' },
+  { value: 'depletionRateDesc', label: '평균소진 높은 순' },
+  { value: 'accelerationDesc', label: '소진가속률 높은 순' },
   { value: 'valueDesc', label: '재고금액 높은 순' },
   { value: 'stagnantDesc', label: '정체일수 높은 순' },
   { value: 'increaseDesc', label: '전일 증가량 높은 순' },
-  { value: 'netChangeDesc', label: '직전 관측 대비 큰 순' },
+  { value: 'netChangeDesc', label: '직전대비 큰 순' },
 ];
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 7;
+
+/** 상품코드·상품명(항상 표시)을 제외한, 표시/숨김을 고를 수 있는 열. 검색 필터 바 우측 드롭다운에서 고른다. */
+type ColumnKey =
+  | 'status' | 'warehouse' | 'normalStock' | 'netChange' | 'depletion7d'
+  | 'avgDepletion' | 'acceleration' | 'coverage' | 'stockoutDate'
+  | 'unitCost' | 'inventoryValue' | 'stagnantDays';
+
+const COLUMN_OPTIONS: { key: ColumnKey; label: string }[] = [
+  { key: 'status', label: '상태' },
+  { key: 'warehouse', label: '창고' },
+  { key: 'normalStock', label: '정상재고' },
+  { key: 'netChange', label: '직전대비' },
+  { key: 'depletion7d', label: '소진량' },
+  { key: 'avgDepletion', label: '평균소진' },
+  { key: 'acceleration', label: '소진가속률' },
+  { key: 'coverage', label: '지속일수' },
+  { key: 'stockoutDate', label: '예상소진일' },
+  { key: 'unitCost', label: '단위원가' },
+  { key: 'inventoryValue', label: '재고금액' },
+  { key: 'stagnantDays', label: '정체일수' },
+];
 
 // 정렬 기준값은 반드시 해당 열에 실제로 표시되는 값과 같아야 한다 — 표시값과 다른 값으로 정렬하면
 // (예: 표시는 순증감인데 정렬은 증가분만 반영) 오름차순/내림차순을 눌러도 체감상 정렬이 바뀌지
@@ -115,6 +137,17 @@ export function InventoryTable({
   const [sortKey, setSortKey] = useState<SortKey>('coverageAsc');
   const [sortAsc, setSortAsc] = useState(true);
   const [page, setPage] = useState(1);
+  const [hiddenColumns, setHiddenColumns] = useState<Set<ColumnKey>>(new Set());
+
+  function toggleColumn(key: ColumnKey) {
+    setHiddenColumns((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+  const isVisible = (key: ColumnKey) => !hiddenColumns.has(key);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -260,7 +293,7 @@ export function InventoryTable({
         </Select>
 
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          Coverage
+          지속일수
           <Input value={coverageMin} onChange={(e) => setCoverageMin(e.target.value)} placeholder="min" className="h-8 w-16 text-xs" inputMode="numeric" />
           ~
           <Input value={coverageMax} onChange={(e) => setCoverageMax(e.target.value)} placeholder="max" className="h-8 w-16 text-xs" inputMode="numeric" />
@@ -274,14 +307,33 @@ export function InventoryTable({
           <Input value={costMax} onChange={(e) => setCostMax(e.target.value)} placeholder="max" className="h-8 w-20 text-xs" inputMode="numeric" />
         </div>
 
-        <Select value={sortKey} onValueChange={(v) => toggleSort(v as SortKey)}>
-          <SelectTrigger className="ml-auto h-8 text-xs"><SelectValue placeholder="정렬" /></SelectTrigger>
-          <SelectContent>
-            {SORT_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="ml-auto flex items-center gap-2">
+          <Select value={sortKey} onValueChange={(v) => toggleSort(v as SortKey)}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="정렬" /></SelectTrigger>
+            <SelectContent>
+              {SORT_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 text-xs">
+                <Columns3 className="size-3.5" /> 열 표시
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>표시할 열 선택</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {COLUMN_OPTIONS.map((c) => (
+                <DropdownMenuCheckboxItem key={c.key} checked={isVisible(c.key)} onCheckedChange={() => toggleColumn(c.key)} onSelect={(e) => e.preventDefault()}>
+                  {c.label}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-border">
@@ -290,78 +342,100 @@ export function InventoryTable({
             <TableRow>
               <TableHead className="px-2 py-1.5">상품코드</TableHead>
               <TableHead className="min-w-[180px] px-2 py-1.5">상품명</TableHead>
-              <TableHead className="px-2 py-1.5">
-                <HeaderLabel label="상태" tooltip="재고 위험 수준입니다. 위험/경고 수량 기준(자동 계산 또는 수동 설정)에 따라 판정됩니다." />
-              </TableHead>
-              <TableHead className="px-2 py-1.5">창고</TableHead>
-              <TableHead className="px-2 py-1.5 text-right">정상재고</TableHead>
-              <SortableHead
-                label={fromDate ? '기간 변화' : '직전 관측 대비'}
-                tooltip={fromDate ? '선택한 기간 동안의 재고 순증감(증가분 - 감소분)입니다.' : '가장 최근 업로드 대비 재고 순증감입니다.'}
-                active={sortKey === 'netChangeDesc'}
-                asc={sortAsc}
-                onClick={() => toggleSort('netChangeDesc')}
-              />
-              <TableHead className="hidden px-2 py-1.5 text-right xl:table-cell">
-                <HeaderLabel label="7일 소진량" tooltip="최근 7일간 실제 관측된 총 소진(감소)량입니다." />
-              </TableHead>
-              <SortableHead
-                className="hidden 2xl:table-cell"
-                label="출고일평균(7일)"
-                tooltip="최근 7일 중 실제 출고 기록이 있었던 날만 기준으로 계산한 하루 평균 소진량입니다."
-                active={sortKey === 'depletionRateDesc'}
-                asc={sortAsc}
-                onClick={() => toggleSort('depletionRateDesc')}
-              />
-              <SortableHead
-                label="소진 가속률"
-                tooltip="최근 소진 속도가 이전 대비 얼마나 빨라졌는지(+) 또는 느려졌는지(-)를 나타냅니다."
-                active={sortKey === 'accelerationDesc'}
-                asc={sortAsc}
-                onClick={() => toggleSort('accelerationDesc')}
-              />
-              <SortableHead
-                label="Coverage(출고일)"
-                tooltip="현재 재고 ÷ 일평균 소진량으로 계산한, 앞으로 버틸 수 있는 출고일수입니다."
-                active={sortKey === 'coverageAsc'}
-                asc={sortAsc}
-                onClick={() => toggleSort('coverageAsc')}
-              />
-              <SortableHead
-                label="예상 소진일"
-                tooltip="현재 소진 속도가 유지된다고 가정했을 때 재고가 0이 되는 예상 날짜입니다."
-                active={sortKey === 'stockoutFast'}
-                asc={sortAsc}
-                onClick={() => toggleSort('stockoutFast')}
-              />
-              <TableHead className="hidden px-2 py-1.5 text-right 2xl:table-cell">단위원가</TableHead>
-              <SortableHead
-                label="재고금액"
-                tooltip="정상재고 × 단위원가로 계산한 평가금액입니다. 원가 정보가 없으면 '원가 미상'으로 표시됩니다."
-                active={sortKey === 'valueDesc'}
-                asc={sortAsc}
-                onClick={() => toggleSort('valueDesc')}
-              />
-              <SortableHead
-                className="hidden xl:table-cell"
-                label="정체일수"
-                tooltip="가장 최근 감소가 관측된 날 이후 며칠째 재고가 줄지 않았는지를 나타냅니다."
-                active={sortKey === 'stagnantDesc'}
-                asc={sortAsc}
-                onClick={() => toggleSort('stagnantDesc')}
-              />
+              {isVisible('status') && (
+                <TableHead className="px-2 py-1.5">
+                  <HeaderLabel label="상태" tooltip="재고가 얼마나 위험한 상태인지 보여줘요. 위험/경고 수량보다 재고가 적어지면 표시가 바뀝니다." />
+                </TableHead>
+              )}
+              {isVisible('warehouse') && <TableHead className="px-2 py-1.5">창고</TableHead>}
+              {isVisible('normalStock') && <TableHead className="px-2 py-1.5 text-right">정상재고</TableHead>}
+              {isVisible('netChange') && (
+                <SortableHead
+                  label={fromDate ? '기간변화' : '직전대비'}
+                  tooltip={
+                    fromDate
+                      ? "정식 이름은 '선택 기간 재고 변화'예요. 선택한 기간 동안 재고가 전체적으로 얼마나 늘고 줄었는지 보여줘요."
+                      : "정식 이름은 '직전 관측 대비 재고 증감'이에요. 가장 최근 자료와 비교했을 때 재고가 늘었는지(+) 줄었는지(-) 보여줘요."
+                  }
+                  active={sortKey === 'netChangeDesc'}
+                  asc={sortAsc}
+                  onClick={() => toggleSort('netChangeDesc')}
+                />
+              )}
+              {isVisible('depletion7d') && (
+                <TableHead className="hidden px-2 py-1.5 text-right xl:table-cell">
+                  <HeaderLabel label="소진량" tooltip="정식 이름은 '최근 7일 소진량'이에요. 최근 7일 동안 이 상품 재고가 총 얼마나 줄었는지 보여줘요." />
+                </TableHead>
+              )}
+              {isVisible('avgDepletion') && (
+                <SortableHead
+                  className="hidden 2xl:table-cell"
+                  label="평균소진"
+                  tooltip="정식 이름은 '출고일 평균 소진량(최근 7일 기준)'이에요. 최근 7일 중 실제로 재고가 줄어든 날만 골라, 하루 평균 얼마나 줄었는지 계산한 값이에요."
+                  active={sortKey === 'depletionRateDesc'}
+                  asc={sortAsc}
+                  onClick={() => toggleSort('depletionRateDesc')}
+                />
+              )}
+              {isVisible('acceleration') && (
+                <SortableHead
+                  label="소진가속률"
+                  tooltip="재고가 줄어드는 속도가 예전보다 빨라졌는지(+) 느려졌는지(-)를 보여줘요."
+                  active={sortKey === 'accelerationDesc'}
+                  asc={sortAsc}
+                  onClick={() => toggleSort('accelerationDesc')}
+                />
+              )}
+              {isVisible('coverage') && (
+                <SortableHead
+                  label="지속일수"
+                  tooltip="정식 이름은 '출고일 기준 재고 지속일수'예요. 지금 남은 재고로, 실제 출고가 있는 날 기준으로 며칠 더 버틸 수 있는지 예상한 값이에요."
+                  active={sortKey === 'coverageAsc'}
+                  asc={sortAsc}
+                  onClick={() => toggleSort('coverageAsc')}
+                />
+              )}
+              {isVisible('stockoutDate') && (
+                <SortableHead
+                  label="예상소진일"
+                  tooltip="지금 속도로 계속 줄어든다면 재고가 0이 될 것으로 예상되는 날짜예요."
+                  active={sortKey === 'stockoutFast'}
+                  asc={sortAsc}
+                  onClick={() => toggleSort('stockoutFast')}
+                />
+              )}
+              {isVisible('unitCost') && <TableHead className="hidden px-2 py-1.5 text-right 2xl:table-cell">단위원가</TableHead>}
+              {isVisible('inventoryValue') && (
+                <SortableHead
+                  label="재고금액"
+                  tooltip="지금 남은 재고를 돈으로 환산하면 얼마인지예요(재고 수량 × 단가). 단가를 모르면 '원가 미상'으로 표시돼요."
+                  active={sortKey === 'valueDesc'}
+                  asc={sortAsc}
+                  onClick={() => toggleSort('valueDesc')}
+                />
+              )}
+              {isVisible('stagnantDays') && (
+                <SortableHead
+                  className="hidden xl:table-cell"
+                  label="정체일수"
+                  tooltip="마지막으로 재고가 줄어든 날 이후로, 며칠째 그대로인지 보여줘요."
+                  active={sortKey === 'stagnantDesc'}
+                  asc={sortAsc}
+                  onClick={() => toggleSort('stagnantDesc')}
+                />
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
             {pageRows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={14} className="h-24 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={2 + COLUMN_OPTIONS.length - hiddenColumns.size} className="h-24 text-center text-sm text-muted-foreground">
                   조건에 맞는 재고가 없습니다.
                 </TableCell>
               </TableRow>
             )}
             {pageRows.map((r) => (
-              <InventoryTableRow key={r.descriptor.skuId} row={r} fromDate={fromDate} onSelectSku={onSelectSku} />
+              <InventoryTableRow key={r.descriptor.skuId} row={r} fromDate={fromDate} onSelectSku={onSelectSku} hiddenColumns={hiddenColumns} />
             ))}
           </TableBody>
         </Table>
@@ -431,12 +505,12 @@ export function InventoryTableStaticHeader({ fromDate }: { fromDate: string | nu
       <TableHead className="px-2 py-1.5">상태</TableHead>
       <TableHead className="px-2 py-1.5">창고</TableHead>
       <TableHead className="px-2 py-1.5 text-right">정상재고</TableHead>
-      <TableHead className="px-2 py-1.5 text-right">{fromDate ? '기간 변화' : '직전 관측 대비'}</TableHead>
-      <TableHead className="hidden px-2 py-1.5 text-right xl:table-cell">7일 소진량</TableHead>
-      <TableHead className="hidden px-2 py-1.5 text-right 2xl:table-cell">출고일평균(7일)</TableHead>
-      <TableHead className="px-2 py-1.5 text-right">소진 가속률</TableHead>
-      <TableHead className="px-2 py-1.5 text-right">Coverage(출고일)</TableHead>
-      <TableHead className="px-2 py-1.5 text-right">예상 소진일</TableHead>
+      <TableHead className="px-2 py-1.5 text-right">{fromDate ? '기간변화' : '직전대비'}</TableHead>
+      <TableHead className="hidden px-2 py-1.5 text-right xl:table-cell">소진량</TableHead>
+      <TableHead className="hidden px-2 py-1.5 text-right 2xl:table-cell">평균소진</TableHead>
+      <TableHead className="px-2 py-1.5 text-right">소진가속률</TableHead>
+      <TableHead className="px-2 py-1.5 text-right">지속일수</TableHead>
+      <TableHead className="px-2 py-1.5 text-right">예상소진일</TableHead>
       <TableHead className="hidden px-2 py-1.5 text-right 2xl:table-cell">단위원가</TableHead>
       <TableHead className="px-2 py-1.5 text-right">재고금액</TableHead>
       <TableHead className="hidden px-2 py-1.5 text-right xl:table-cell">정체일수</TableHead>
@@ -444,8 +518,21 @@ export function InventoryTableStaticHeader({ fromDate }: { fromDate: string | nu
   );
 }
 
-/** 전체 재고 현황 테이블의 행 하나. 같은 형식으로 즐겨찾기 등 다른 곳에서도 재사용한다. */
-export function InventoryTableRow({ row: r, fromDate, onSelectSku }: { row: InventoryRow; fromDate: string | null; onSelectSku: (skuId: string) => void }) {
+/** 전체 재고 현황 테이블의 행 하나. 같은 형식으로 즐겨찾기 등 다른 곳에서도 재사용한다.
+ * hiddenColumns는 검색 필터 바의 "열 표시" 드롭다운에서 고른, 감춰야 할 열이다(상품코드·상품명 제외).
+ * 즐겨찾기 요약 등 그 드롭다운이 없는 곳에서는 넘기지 않으면 모든 열이 그대로 보인다. */
+export function InventoryTableRow({
+  row: r,
+  fromDate,
+  onSelectSku,
+  hiddenColumns,
+}: {
+  row: InventoryRow;
+  fromDate: string | null;
+  onSelectSku: (skuId: string) => void;
+  hiddenColumns?: ReadonlySet<ColumnKey>;
+}) {
+  const isVisible = (key: ColumnKey) => !hiddenColumns?.has(key);
   return (
     <TableRow
       tabIndex={0}
@@ -471,7 +558,8 @@ export function InventoryTableRow({ row: r, fromDate, onSelectSku }: { row: Inve
                 품절
               </Badge>
               <InfoTooltip>
-                최근 업로드 목록에서 빠져 품절로 분류한 상품입니다. {r.descriptor.soldOutDetectedDate}부터 1개월간 이력 확인용으로 표시하며 현재 재고 집계에서는 제외합니다.
+                최근 자료에 이 상품이 더 이상 나오지 않아서 품절로 판단했어요. {r.descriptor.soldOutDetectedDate}부터 한 달 동안은 참고용으로 계속
+                보여드리고, 현재 재고 합계에는 넣지 않습니다.
               </InfoTooltip>
             </>
           )}
@@ -481,69 +569,94 @@ export function InventoryTableRow({ row: r, fromDate, onSelectSku }: { row: Inve
                 <Building2 className="size-2.5" aria-hidden="true" />
                 B2B
               </Badge>
-              <InfoTooltip>발주량을 일괄 출고하는 직납 재고입니다. 반복 소진을 가정한 커버리지·소진일·과잉 예측에서 제외하며 납품 일정과 로트 소비기한을 개별 확인하세요.</InfoTooltip>
+              <InfoTooltip>
+                한 번에 많은 양을 주문받아 통째로 내보내는 상품이에요. 매일 조금씩 팔리는 걸 가정한 예상 소진일·재고 부족 예측은 이 상품에는 맞지
+                않으니, 납품 날짜와 소비기한을 직접 확인해 주세요.
+              </InfoTooltip>
             </>
           )}
         </div>
         {r.analysis.tags.length > 0 && (
           <div className="mt-0.5 flex flex-wrap gap-1">
             {r.analysis.tags.slice(0, 3).map((t) => (
-              <span key={t} className="text-[10px] text-muted-foreground">{t}</span>
+              <span key={t} className="text-[10px] text-muted-foreground">{humanizeTag(t)}</span>
             ))}
           </div>
         )}
       </TableCell>
-      <TableCell className="px-2 py-1.5">
-        <span className="inline-flex items-center gap-1.5 text-xs font-medium">
-          <span
-            className={cn(
-              'size-1.5 shrink-0 rounded-full',
-              r.analysis.thresholdRisk.level === 'DANGER' && 'bg-status-danger',
-              r.analysis.thresholdRisk.level === 'WARNING' && 'bg-status-warning',
-              r.analysis.thresholdRisk.level === 'NORMAL' && 'bg-status-normal',
-              r.analysis.thresholdRisk.level === 'UNKNOWN' && 'bg-muted-foreground',
-            )}
-            aria-hidden="true"
-          />
-          {analysisStatusLabel(r.analysis)}
-        </span>
-      </TableCell>
-      <TableCell className="px-2 py-1.5">{r.descriptor.warehouseCode}</TableCell>
-      <TableCell className="px-2 py-1.5 text-right tabular-nums">{r.descriptor.isSoldOut ? "0" : formatNumber(r.analysis.latest.normalStock)}</TableCell>
-      <TableCell className="px-2 py-1.5 text-right tabular-nums">
-        {fromDate ? (
-          r.periodComparison ? (
-            <div>
-              <span className={r.periodComparison.netChange > 0 ? 'text-status-increase' : r.periodComparison.netChange < 0 ? 'text-status-warning' : ''}>
-                {formatSigned(r.periodComparison.netChange)}
-              </span>
-              <div className="text-[10px] text-muted-foreground">추정 소진 {formatNumber(r.periodComparison.totalDepletion)} · 미설명 증가 {formatNumber(r.periodComparison.totalIncrease)}</div>
-            </div>
-          ) : <span className="text-muted-foreground">비교 불가</span>
-        ) : r.analysis.dailyChange === null ? <span className="text-muted-foreground">데이터 축적 중</span> : formatSigned(r.analysis.dailyChange)}
-      </TableCell>
-      <TableCell className="hidden px-2 py-1.5 text-right tabular-nums xl:table-cell"><div>{r.descriptor.isSoldOut || r.analysis.window7.observedIntervalDays === 0 ? "—" : formatNumber(r.analysis.window7.totalDepletion)}</div><div className="text-[10px] text-muted-foreground">{r.analysis.window7.observedIntervalDays}출고일 관측</div></TableCell>
-      <TableCell className="hidden px-2 py-1.5 text-right tabular-nums 2xl:table-cell">
-        {r.descriptor.isB2B || r.descriptor.isSoldOut || r.analysis.window7.averageDailyDepletion === null ? '-' : formatNumber(r.analysis.window7.averageDailyDepletion)}
-      </TableCell>
-      <TableCell className="px-2 py-1.5 text-right tabular-nums">
-        {r.analysis.acceleration.accelerationRatePercent === null ? (
-          <span className="text-muted-foreground">{r.analysis.acceleration.trend === 'NEW_DEPLETION' ? '신규 소진' : '-'}</span>
-        ) : (
-          <span className={r.analysis.acceleration.trend === 'ACCELERATING' ? 'text-status-danger' : r.analysis.acceleration.trend === 'DECELERATING' ? 'text-status-increase' : ''}>
-            {formatSigned(r.analysis.acceleration.accelerationRatePercent)}%
+      {isVisible('status') && (
+        <TableCell className="px-2 py-1.5">
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium">
+            <span
+              className={cn(
+                'size-1.5 shrink-0 rounded-full',
+                r.analysis.thresholdRisk.level === 'DANGER' && 'bg-status-danger',
+                r.analysis.thresholdRisk.level === 'WARNING' && 'bg-status-warning',
+                r.analysis.thresholdRisk.level === 'NORMAL' && 'bg-status-normal',
+                r.analysis.thresholdRisk.level === 'UNKNOWN' && 'bg-muted-foreground',
+              )}
+              aria-hidden="true"
+            />
+            {analysisStatusLabel(r.analysis)}
           </span>
-        )}
-      </TableCell>
-      <TableCell className="px-2 py-1.5 text-right tabular-nums"><div>{r.analysis.coverage.coverageDays === null ? "—" : `${formatNumber(r.analysis.coverage.coverageDays)}출고일`}</div><div className="text-[10px] text-muted-foreground">{r.analysis.operating?.reason ?? `최근 ${r.analysis.operating?.basisWindowDays ?? 7}일 근거`}</div></TableCell>
-      <TableCell className="px-2 py-1.5 text-right text-xs">
-        {r.analysis.forecast.expectedStockoutDate ? formatKstDate(r.analysis.forecast.expectedStockoutDate) : <span className="text-muted-foreground">산정 불가</span>}
-      </TableCell>
-      <TableCell className="hidden px-2 py-1.5 text-right tabular-nums 2xl:table-cell">{formatNumber(r.analysis.latest.unitCost)}</TableCell>
-      <TableCell className="px-2 py-1.5 text-right tabular-nums">{r.descriptor.isSoldOut ? "0" : r.analysis.latest.valuationKnown === false ? "원가 미상" : formatCurrency(r.valueBreakdown.normalStockValue)}</TableCell>
-      <TableCell className="hidden px-2 py-1.5 text-right tabular-nums xl:table-cell">
-        {r.analysis.stagnation.isMeaningful ? `${r.analysis.stagnation.stagnantDays}출고일` : <span className="text-muted-foreground">-</span>}
-      </TableCell>
+        </TableCell>
+      )}
+      {isVisible('warehouse') && <TableCell className="px-2 py-1.5">{r.descriptor.warehouseCode}</TableCell>}
+      {isVisible('normalStock') && (
+        <TableCell className="px-2 py-1.5 text-right tabular-nums">{r.descriptor.isSoldOut ? "0" : formatNumber(r.analysis.latest.normalStock)}</TableCell>
+      )}
+      {isVisible('netChange') && (
+        <TableCell className="px-2 py-1.5 text-right tabular-nums">
+          {fromDate ? (
+            r.periodComparison ? (
+              <div>
+                <span className={r.periodComparison.netChange > 0 ? 'text-status-increase' : r.periodComparison.netChange < 0 ? 'text-status-warning' : ''}>
+                  {formatSigned(r.periodComparison.netChange)}
+                </span>
+                <div className="text-[10px] text-muted-foreground">추정 소진 {formatNumber(r.periodComparison.totalDepletion)} · 미설명 증가 {formatNumber(r.periodComparison.totalIncrease)}</div>
+              </div>
+            ) : <span className="text-muted-foreground">비교 불가</span>
+          ) : r.analysis.dailyChange === null ? <span className="text-muted-foreground">데이터 축적 중</span> : formatSigned(r.analysis.dailyChange)}
+        </TableCell>
+      )}
+      {isVisible('depletion7d') && (
+        <TableCell className="hidden px-2 py-1.5 text-right tabular-nums xl:table-cell"><div>{r.descriptor.isSoldOut || r.analysis.window7.observedIntervalDays === 0 ? "—" : formatNumber(r.analysis.window7.totalDepletion)}</div><div className="text-[10px] text-muted-foreground">{r.analysis.window7.observedIntervalDays}출고일 관측</div></TableCell>
+      )}
+      {isVisible('avgDepletion') && (
+        <TableCell className="hidden px-2 py-1.5 text-right tabular-nums 2xl:table-cell">
+          {r.descriptor.isB2B || r.descriptor.isSoldOut || r.analysis.window7.averageDailyDepletion === null ? '-' : formatNumber(r.analysis.window7.averageDailyDepletion)}
+        </TableCell>
+      )}
+      {isVisible('acceleration') && (
+        <TableCell className="px-2 py-1.5 text-right tabular-nums">
+          {r.analysis.acceleration.accelerationRatePercent === null ? (
+            <span className="text-muted-foreground">{r.analysis.acceleration.trend === 'NEW_DEPLETION' ? '신규 소진' : '-'}</span>
+          ) : (
+            <span className={r.analysis.acceleration.trend === 'ACCELERATING' ? 'text-status-danger' : r.analysis.acceleration.trend === 'DECELERATING' ? 'text-status-increase' : ''}>
+              {formatSigned(r.analysis.acceleration.accelerationRatePercent)}%
+            </span>
+          )}
+        </TableCell>
+      )}
+      {isVisible('coverage') && (
+        <TableCell className="px-2 py-1.5 text-right tabular-nums"><div>{r.analysis.coverage.coverageDays === null ? "—" : `${formatNumber(r.analysis.coverage.coverageDays)}출고일`}</div><div className="text-[10px] text-muted-foreground">{r.analysis.operating?.reason ?? `최근 ${r.analysis.operating?.basisWindowDays ?? 7}일 근거`}</div></TableCell>
+      )}
+      {isVisible('stockoutDate') && (
+        <TableCell className="px-2 py-1.5 text-right text-xs">
+          {r.analysis.forecast.expectedStockoutDate ? formatKstDate(r.analysis.forecast.expectedStockoutDate) : <span className="text-muted-foreground">산정 불가</span>}
+        </TableCell>
+      )}
+      {isVisible('unitCost') && (
+        <TableCell className="hidden px-2 py-1.5 text-right tabular-nums 2xl:table-cell">{formatNumber(r.analysis.latest.unitCost)}</TableCell>
+      )}
+      {isVisible('inventoryValue') && (
+        <TableCell className="px-2 py-1.5 text-right tabular-nums">{r.descriptor.isSoldOut ? "0" : r.analysis.latest.valuationKnown === false ? "원가 미상" : formatCurrency(r.valueBreakdown.normalStockValue)}</TableCell>
+      )}
+      {isVisible('stagnantDays') && (
+        <TableCell className="hidden px-2 py-1.5 text-right tabular-nums xl:table-cell">
+          {r.analysis.stagnation.isMeaningful ? `${r.analysis.stagnation.stagnantDays}출고일` : <span className="text-muted-foreground">-</span>}
+        </TableCell>
+      )}
     </TableRow>
   );
 }
