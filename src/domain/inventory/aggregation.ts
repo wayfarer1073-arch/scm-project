@@ -13,6 +13,7 @@ export function calculateSnapshotKpis(rows: InventoryRow[], compareFromDate?: st
     knownInventoryValue: null, valuationCoverageRatio: null, staleSkuCount: 0,
     oldestObservationDate: null, newestObservationDate: null, comparableSkuCount: 0,
     observedDecrease: null, observedIncrease: null, recordedInbound: null, estimatedDepletion: null,
+    unexplainedIncreaseTotal: null, unexplainedIncreaseSkus: [],
   };
   for (const row of rows) {
     const { latest, previous, asOfDate } = row.analysis;
@@ -54,6 +55,11 @@ export function calculateSnapshotKpis(rows: InventoryRow[], compareFromDate?: st
     result.observedIncrease = (result.observedIncrease ?? 0) + Math.max(change, 0);
     result.recordedInbound = (result.recordedInbound ?? 0) + (compareFromDate ? period!.totalInboundQuantity ?? 0 : delta!.inboundQuantity);
     result.estimatedDepletion = (result.estimatedDepletion ?? 0) + (compareFromDate ? period!.totalDepletion : delta!.depletion);
+    const unexplainedIncrease = compareFromDate ? period!.totalIncrease : delta!.increase;
+    if (unexplainedIncrease > 0) {
+      result.unexplainedIncreaseTotal = (result.unexplainedIncreaseTotal ?? 0) + unexplainedIncrease;
+      result.unexplainedIncreaseSkus.push({ skuId: row.descriptor.skuId, productCode: row.descriptor.productCode, productName: row.descriptor.productName, amount: unexplainedIncrease });
+    }
   }
   if (result.observedSkuCount) {
     result.inStockSkuRatio = result.positiveStockSkuCount / result.observedSkuCount;

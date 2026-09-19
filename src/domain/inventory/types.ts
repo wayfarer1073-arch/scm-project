@@ -186,6 +186,10 @@ export interface SnapshotKpis {
   observedIncrease: number | null;
   recordedInbound: number | null;
   estimatedDepletion: number | null;
+  /** 입고로 설명되지 않는 증가(재고가 늘었지만 입고 기록에 없는 양)의 합. */
+  unexplainedIncreaseTotal: number | null;
+  /** 위 합계에 기여한 SKU 목록(0보다 큰 것만) — 툴팁에서 상품코드 확인용. */
+  unexplainedIncreaseSkus: { skuId: string; productCode: string; productName: string; amount: number }[];
 }
 
 export interface CompanyKpis {

@@ -25,13 +25,23 @@ export function KpiCards({ kpis, fromDate, asOfDate }: KpiCardsProps) {
           <p className="mt-1.5 text-xs text-muted-foreground">업로드 원가합 우선, 없으면 정상재고 × 유효 원가</p>
           <p className="mt-1 text-xs text-muted-foreground">평가 범위 {s.valuedSkuCount} / {s.observedSkuCount} SKU ({percent(s.valuationCoverageRatio)}) · 원가 미상·오류 {s.unvaluedSkuCount}개 제외</p>
         </div>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
-          <Metric label="재고 보유 SKU 비율" value={percent(s.inStockSkuRatio)} detail={`정상재고 > 0 · ${s.positiveStockSkuCount} / ${s.observedSkuCount} SKU`} />
-          <Metric label="무재고 SKU" value={`${s.zeroStockSkuCount}개`} detail="정상재고 = 0 · 기준일 관측" emphasis="warning" />
-          <Metric label="음수재고 SKU" value={`${s.negativeStockSkuCount}개`} detail="정합성 확인 필요 · 평가금액 제외" emphasis="danger" />
-          <Metric label="기준일 미관측 SKU" value={`${s.staleSkuCount}개`} detail={`${asOfDate} 스냅샷 없음 · 위 집계에서 제외됨`} emphasis={s.staleSkuCount ? 'warning' : undefined} />
-          <Metric label="관측 재고 기준일" value={s.newestObservationDate ?? '관측 없음'} detail={s.oldestObservationDate && s.oldestObservationDate !== s.newestObservationDate ? `가장 오래된 관측 ${s.oldestObservationDate}` : '대상 SKU의 관측일 동일'} />
-          <Metric label="비교 가능한 SKU" value={`${s.comparableSkuCount} / ${kpis.totalSkuCount}`} detail={periodLabel} />
+        <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+          <Metric
+            label="품절 SKU"
+            value={`${s.zeroStockSkuCount + s.staleSkuCount}개`}
+            emphasis={s.zeroStockSkuCount + s.staleSkuCount ? 'warning' : undefined}
+            tooltip="최근 30일 이내 재고가 0이된 SKU들 입니다."
+          />
+          <Metric
+            label="미입고재고"
+            value={`${formatNumber(s.unexplainedIncreaseTotal ?? 0)}개 / ${s.unexplainedIncreaseSkus.length}개 SKU`}
+            detail="입고 특이사항으로 등록되지 않아 늘어난 재고"
+            tooltip={s.unexplainedIncreaseSkus.length === 0
+              ? '입고로 설명되지 않는 증가가 관측되지 않았습니다.'
+              : `해당 SKU 상품코드: ${s.unexplainedIncreaseSkus.slice(0, 8).map((x) => x.productCode).join(', ')}${s.unexplainedIncreaseSkus.length > 8 ? ` 외 ${s.unexplainedIncreaseSkus.length - 8}건` : ''}`}
+          />
+          <Metric label="측정 기준일" value={s.newestObservationDate ?? '관측 없음'} detail={s.newestObservationDate ? `마지막 업로드 일자 · 집계 시작일 ${s.oldestObservationDate ?? s.newestObservationDate}` : undefined} />
+          <Metric label="총 SKU" value={`${s.comparableSkuCount} / ${kpis.totalSkuCount}`} detail={periodLabel} />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4 border-t border-border px-5 py-4 sm:grid-cols-4">
@@ -50,7 +60,16 @@ export function KpiCards({ kpis, fromDate, asOfDate }: KpiCardsProps) {
     </section>
   );
 }
-function Metric({ label, value, detail, emphasis }: { label: string; value: string; detail?: string; emphasis?: 'danger' | 'warning' }) {
+function Metric({ label, value, detail, emphasis, tooltip }: { label: string; value: string; detail?: string; emphasis?: 'danger' | 'warning'; tooltip?: React.ReactNode }) {
   const valueClass = emphasis === 'danger' ? 'text-status-danger' : emphasis === 'warning' ? 'text-status-warning' : 'text-foreground';
-  return <div><p className="text-[11px] text-muted-foreground">{label}</p><p className={`mt-1 text-lg font-semibold tabular-nums ${valueClass}`}>{value}</p>{detail && <p className="mt-0.5 text-[11px] text-muted-foreground">{detail}</p>}</div>;
+  return (
+    <div>
+      <div className="flex items-center gap-1">
+        <p className="text-[11px] text-muted-foreground">{label}</p>
+        {tooltip && <InfoTooltip>{tooltip}</InfoTooltip>}
+      </div>
+      <p className={`mt-1 text-lg font-semibold tabular-nums ${valueClass}`}>{value}</p>
+      {detail && <p className="mt-0.5 text-[11px] text-muted-foreground">{detail}</p>}
+    </div>
+  );
 }

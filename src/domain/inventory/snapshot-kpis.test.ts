@@ -64,6 +64,15 @@ describe('directly observed snapshot KPIs', () => {
       expect(calculateSnapshotKpis([r], from)).toMatchObject({ comparableSkuCount: 1, observedDecrease: 0, observedIncrease: 20, recordedInbound: 50, estimatedDepletion: 30 });
     }
   });
+  it('sums increases not explained by recorded inbound, and lists only the contributing SKUs', () => {
+    const explained = row('explained', [obs('2026-09-01', 100), obs('2026-09-08', 150, { inboundQuantity: 50 })], '2026-09-08', '2026-09-01');
+    const unexplained = row('unexplained', [obs('2026-09-01', 100), obs('2026-09-08', 170, { inboundQuantity: 50 })], '2026-09-08', '2026-09-01');
+    for (const from of [undefined, '2026-09-01']) {
+      const s = calculateSnapshotKpis([explained, unexplained], from);
+      expect(s.unexplainedIncreaseTotal).toBe(20);
+      expect(s.unexplainedIncreaseSkus).toEqual([{ skuId: 'unexplained', productCode: 'unexplained', productName: 'unexplained', amount: 20 }]);
+    }
+  });
   it('excludes missing endpoints, new SKUs and zero-day intervals without daily fallback', () => {
     const rows = [
       row('exact', [obs('2026-09-01', 100), obs('2026-09-08', 70)], '2026-09-08', '2026-09-01'),
