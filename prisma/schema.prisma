@@ -109,6 +109,11 @@ model Sku {
   lastSeenDate  DateTime @db.Date
   isActive      Boolean  @default(true) // 가장 최근 활성 스냅샷에 존재하는지 (사라진 SKU 판별)
 
+  // 최신 업로드 목록에서 빠져 "품절"로 인식된 날짜(그 날짜의 스냅샷 기준). 재입고되어 다시
+  // 업로드 목록에 나타나면 null로 되돌아간다. null이 아니면 이 날짜로부터 1개월 동안은 최신
+  // 업로드에 없어도 대시보드에 마지막 관측 데이터 그대로 노출된다(휘발 방지).
+  soldOutDetectedDate DateTime? @db.Date
+
   // true면 대시보드(KPI/차트/재고 테이블/Action Center/리포트)에서 이 SKU를 완전히 제외한다.
   // 데이터 자체는 계속 쌓이며 설정 화면에서 언제든 다시 노출로 되돌릴 수 있다.
   isHiddenFromDashboard Boolean @default(false)

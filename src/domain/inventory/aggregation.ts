@@ -39,9 +39,11 @@ export function calculateSnapshotKpis(rows: InventoryRow[], compareFromDate?: st
     // 기준일에 실제 업로드가 없어 과거 스냅샷을 그대로 쓰는 SKU는 "현재 상태" 집계(보유/무재고/
     // 음수재고/평가금액)에서 완전히 제외한다 — 자료를 올리지 않은 날짜가 오늘 수치에 섞이지 않도록.
     // 다만 주말·공휴일은 매출이 발생해도 업로드가 없는 게 정상이므로, 그 전 마지막 영업일 관측치는
-    // stale로 보지 않고 그대로 인정한다.
+    // stale로 보지 않고 그대로 인정한다. 품절 인식 유예기간 중인 SKU도 "자료 미제출"이 아니라
+    // 품절이라는 확정된 사유가 있으므로 stale로 제외하지 않고, 품절 시점까지의 마지막 관측으로
+    // 정상 집계한다.
     const expectedObservationDate = mostRecentBusinessDayOnOrBefore(asOfDate, holidays);
-    if (latest.date < expectedObservationDate) {
+    if (!row.descriptor.isSoldOut && latest.date < expectedObservationDate) {
       result.staleSkuCount++;
     } else {
       result.observedSkuCount++;

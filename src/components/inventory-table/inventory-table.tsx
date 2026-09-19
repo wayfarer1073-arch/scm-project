@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, Building2, Download, FileSpreadsheet, Search, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Building2, Download, FileSpreadsheet, PackageX, Search, X } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -368,6 +368,17 @@ export function InventoryTableRow({ row: r, fromDate, onSelectSku }: { row: Inve
       <TableCell>
         <div className="flex items-center gap-1.5">
           <span className="font-medium">{r.descriptor.productName}</span>
+          {r.descriptor.isSoldOut && (
+            <>
+              <Badge variant="soldout" className="gap-1 px-1.5 py-0 text-[10px]">
+                <PackageX className="size-2.5" aria-hidden="true" />
+                품절
+              </Badge>
+              <InfoTooltip>
+                최신 업로드 목록에 없어 품절로 인식됐습니다. 품절 인식일({r.descriptor.soldOutDetectedDate})로부터 1개월간 마지막 관측 데이터로 대시보드에 노출됩니다.
+              </InfoTooltip>
+            </>
+          )}
           {r.descriptor.isB2B && (
             <>
               <Badge variant="outline" className="gap-1 px-1.5 py-0 text-[10px]">

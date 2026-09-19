@@ -1,3 +1,4 @@
+import { addMonths, format, parseISO } from 'date-fns';
 import { prisma } from '@/lib/prisma';
 import { dateOnlyToString } from '@/lib/date';
 import type { StockObservation } from '@/domain/inventory/types';
@@ -5,6 +6,36 @@ import { resolveInventoryCost } from '@/domain/inventory/costs';
 import type { Prisma } from '@prisma/client';
 import type { SkuDescriptor, DailyWarehouseTotal } from '@/domain/inventory/read-model';
 import { attachIntervalInbounds, type DatedInbound } from '@/domain/inventory/inbounds';
+
+/** 품절 인식일로부터 정확히 1개월 뒤(유예기간 종료일, 이 날짜부터는 더 이상 노출하지 않음). */
+function soldOutGraceEndDate(soldOutDetectedDateStr: string): string {
+  return format(addMonths(parseISO(soldOutDetectedDateStr), 1), 'yyyy-MM-dd');
+}
+
+/**
+ * 최신 업로드 목록에서 빠져 품절로 인식됐지만(soldOutDetectedDate), asOfDate 기준 아직 1개월
+ * 유예기간 이내인 SKU의 id를 돌려준다. 마지막 관측 데이터가 그대로 노출되도록(휘발 방지) 하는 게
+ * 목적이라 관측치 자체는 건드리지 않고, 어떤 SKU를 결과 집합에 추가로 포함할지만 결정한다.
+ */
+async function resolveSoldOutGraceSkuIds(warehouseId: string | undefined, asOfDate: string): Promise<Set<string>> {
+  const asOfDateOnly = new Date(`${asOfDate}T00:00:00.000Z`);
+  const graceWindowStart = new Date(`${format(addMonths(parseISO(asOfDate), -1), 'yyyy-MM-dd')}T00:00:00.000Z`);
+  const candidates = await prisma.sku.findMany({
+    where: {
+      ...(warehouseId ? { warehouseId } : {}),
+      isHiddenFromDashboard: false,
+      soldOutDetectedDate: { not: null, lte: asOfDateOnly, gte: graceWindowStart },
+    },
+    select: { id: true, soldOutDetectedDate: true },
+  });
+  const result = new Set<string>();
+  for (const c of candidates) {
+    if (!c.soldOutDetectedDate) continue;
+    const detectedStr = dateOnlyToString(c.soldOutDetectedDate);
+    if (asOfDate < soldOutGraceEndDate(detectedStr)) result.add(c.id);
+  }
+  return result;
+}
 
 /**
  * mock과 실데이터는 절대 같은 시계열에 섞이면 안 된다(README 참고). 창고별로 실데이터가
@@ -87,8 +118,12 @@ export async function loadActiveSkusWithSeries(
   });
   const activeSkuIds = [...new Set(latestItems.map((item) => item.skuId))];
 
+  // 최신 목록엔 없어도 품절 인식 1개월 유예기간 이내인 SKU는 계속 포함한다(휘발 방지).
+  const soldOutSkuIds = asOfDate ? await resolveSoldOutGraceSkuIds(warehouseId, asOfDate) : new Set<string>();
+  const combinedSkuIds = [...new Set([...activeSkuIds, ...soldOutSkuIds])];
+
   const skus = await prisma.sku.findMany({
-    where: { id: { in: activeSkuIds }, isHiddenFromDashboard: false, ...(warehouseId ? { warehouseId } : {}) },
+    where: { id: { in: combinedSkuIds }, isHiddenFromDashboard: false, ...(warehouseId ? { warehouseId } : {}) },
     include: { warehouse: { select: { id: true, code: true, name: true } } },
   });
   if (skus.length === 0) return [];
@@ -165,6 +200,8 @@ export async function loadActiveSkusWithSeries(
         expirationRiskDays: sku.expirationRiskDays,
         isB2B: sku.isB2B,
         firstSeenDate: dateOnlyToString(sku.firstSeenDate),
+        isSoldOut: soldOutSkuIds.has(sku.id),
+        soldOutDetectedDate: sku.soldOutDetectedDate ? dateOnlyToString(sku.soldOutDetectedDate) : null,
       },
       observations: attachIntervalInbounds(observationsBySku.get(sku.id) ?? [], inboundsBySku.get(sku.id) ?? []),
     };
@@ -233,9 +270,17 @@ export async function loadSkuWithSeries(
       ...(asOfDate ? { snapshotDate: { lte: new Date(`${asOfDate}T00:00:00.000Z`) } } : {}),
     }, orderBy: { snapshotDate: 'desc' }, select: { id: true },
   });
-  if (!latestSnapshot || !await prisma.inventoryItem.findUnique({
+  const isInLatestSnapshot = !!latestSnapshot && !!(await prisma.inventoryItem.findUnique({
     where: { snapshotId_skuId: { snapshotId: latestSnapshot.id, skuId } }, select: { id: true },
-  })) return null;
+  }));
+  // 최신 목록에는 없어도 품절 인식 1개월 유예기간 이내면(휘발 방지) 목록과 동일하게 계속 보여준다.
+  let isSoldOut = false;
+  if (!isInLatestSnapshot) {
+    if (!asOfDate || !sku.soldOutDetectedDate) return null;
+    const detectedStr = dateOnlyToString(sku.soldOutDetectedDate);
+    if (detectedStr > asOfDate || asOfDate >= soldOutGraceEndDate(detectedStr)) return null;
+    isSoldOut = true;
+  }
   const items = await prisma.inventoryItem.findMany({
     where: {
       skuId,
@@ -296,6 +341,8 @@ export async function loadSkuWithSeries(
       expirationRiskDays: sku.expirationRiskDays,
       isB2B: sku.isB2B,
       firstSeenDate: dateOnlyToString(sku.firstSeenDate),
+      isSoldOut,
+      soldOutDetectedDate: sku.soldOutDetectedDate ? dateOnlyToString(sku.soldOutDetectedDate) : null,
     },
     observations: attachIntervalInbounds(observations, inboundsBySku.get(skuId) ?? []),
   };

@@ -44,6 +44,8 @@ function buildRow(
       expirationRiskDays: null,
       isB2B: false,
       firstSeenDate: observations[0]?.date ?? asOfDate,
+      isSoldOut: false,
+      soldOutDetectedDate: null,
     },
     analysis,
     valueBreakdown,

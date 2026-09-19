@@ -48,6 +48,9 @@
   --status-increase-bg: oklch(0.95 0.03 221);
   --status-stagnant: oklch(0.55 0.01 260);
   --status-stagnant-bg: oklch(0.95 0.003 260);
+  /* 품절(유예기간 노출) 마커 — 위험(danger, 주황빛 레드)과 뚜렷이 구분되는 진분홍 */
+  --status-soldout: oklch(0.5 0.24 340);
+  --status-soldout-bg: oklch(0.95 0.05 340);
 
   /* 게시판 태그 전용 색상 — 재고 상태 색상(--status-*)과 의미가 겹치지 않도록 별도 토큰으로 관리 */
   --tag-notice: oklch(0.53 0.157 131.589);
@@ -104,6 +107,8 @@
   --color-status-increase-bg: var(--status-increase-bg);
   --color-status-stagnant: var(--status-stagnant);
   --color-status-stagnant-bg: var(--status-stagnant-bg);
+  --color-status-soldout: var(--status-soldout);
+  --color-status-soldout-bg: var(--status-soldout-bg);
 
   --color-tag-notice: var(--tag-notice);
   --color-tag-notice-bg: var(--tag-notice-bg);

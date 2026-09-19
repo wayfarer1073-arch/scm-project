@@ -116,6 +116,7 @@ export async function createSnapshot(input: CreateSnapshotInput) {
             "currentWarningQty" = CASE WHEN ${isLatestSnapshot} THEN r."warningQty" ELSE s."currentWarningQty" END,
             "currentDangerQty" = CASE WHEN ${isLatestSnapshot} THEN r."dangerQty" ELSE s."currentDangerQty" END,
             "isActive" = CASE WHEN ${isLatestSnapshot} THEN true ELSE s."isActive" END,
+            "soldOutDetectedDate" = CASE WHEN ${isLatestSnapshot} THEN NULL ELSE s."soldOutDetectedDate" END,
             "updatedAt" = NOW()
           FROM jsonb_to_recordset(${payload}::jsonb) AS r(
             "productCode" text, "productName" text, option text, barcode text, location text,
@@ -151,9 +152,11 @@ export async function createSnapshot(input: CreateSnapshotInput) {
       }
 
       if (isLatestSnapshot && touchedSkuIds.length > 0) {
+        // 직전까지 활성이던 SKU가 이번 최신 스냅샷에는 없다 — "다음 업로드 목록에서 빠짐" =
+        // 품절로 인식하고, 그 시점을 이 스냅샷의 기준일로 기록한다(유예기간 계산의 시작점).
         await tx.sku.updateMany({
           where: { warehouseId: input.warehouseId, isActive: true, id: { notIn: touchedSkuIds } },
-          data: { isActive: false },
+          data: { isActive: false, soldOutDetectedDate: input.snapshotDate },
         });
       }
 
@@ -201,12 +204,13 @@ export async function resetUploadForDate(warehouseId: string, snapshotDate: Date
             "currentWarningQty" = ii."warningQty",
             "currentDangerQty" = ii."dangerQty",
             "isActive" = true,
+            "soldOutDetectedDate" = NULL,
             "updatedAt" = NOW()
           FROM inventory_items ii
           WHERE ii."snapshotId" = ${newLatest.id} AND s.id = ii."skuId"
         `;
         await tx.$executeRaw`
-          UPDATE skus SET "isActive" = false, "updatedAt" = NOW()
+          UPDATE skus SET "isActive" = false, "soldOutDetectedDate" = ${newLatest.snapshotDate}, "updatedAt" = NOW()
           WHERE "warehouseId" = ${warehouseId}
             AND id NOT IN (SELECT "skuId" FROM inventory_items WHERE "snapshotId" = ${newLatest.id})
         `;

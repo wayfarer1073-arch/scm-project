@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Building2, Pencil, Plus, RotateCcw, Star, Trash2 } from 'lucide-react';
+import { Building2, PackageX, Pencil, Plus, RotateCcw, Star, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
@@ -256,6 +256,17 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
                   <Star className={isFavorited ? 'size-4 fill-amber-400 text-amber-400' : 'size-4'} aria-hidden="true" />
                 </button>
                 <SheetTitle>{detail.descriptor.productName}</SheetTitle>
+                {detail.descriptor.isSoldOut && (
+                  <>
+                    <Badge variant="soldout" className="gap-1">
+                      <PackageX className="size-3" aria-hidden="true" />
+                      품절
+                    </Badge>
+                    <InfoTooltip>
+                      최신 업로드 목록에 없어 품절로 인식됐습니다. 품절 인식일({formatKstDate(detail.descriptor.soldOutDetectedDate!)})로부터 1개월간 품절 시점까지의 마지막 데이터로 노출됩니다.
+                    </InfoTooltip>
+                  </>
+                )}
                 <Badge variant={riskBadgeVariant(detail.analysis.thresholdRisk.level)}>{riskLabel(detail.analysis.thresholdRisk.level)}</Badge>
                 {detail.descriptor.isB2B && (
                   <>
