@@ -9,6 +9,12 @@ export function KpiCards({ kpis, fromDate, asOfDate }: KpiCardsProps) {
   const percent = (value: number | null) => value === null ? '산정 불가' : `${(value * 100).toFixed(1)}%`;
   const quantity = (value: number | null) => value === null ? '비교 불가' : `${formatNumber(value)}개`;
   const periodLabel = fromDate ? `${fromDate} — ${asOfDate} 양 끝 관측 일치` : 'SKU별 직전 관측 대비';
+  // 집계 시작일: 특정 날짜 조회는 데이터가 실제로 처음 쌓이기 시작한 날짜(firstSeenDate 최솟값),
+  // 기간 조회는 선택한 시작일(fromDate) — 단 자료 자체가 그 시작일보다 늦게부터 쌓였다면(신규 SKU
+  // 집합 등) 실제로 확인 가능한 가장 이른 날짜로 보정한다.
+  const collectionStartDate = fromDate
+    ? (s.earliestFirstSeenDate && s.earliestFirstSeenDate > fromDate ? s.earliestFirstSeenDate : fromDate)
+    : s.earliestFirstSeenDate;
   return (
     <section className="overflow-hidden rounded-xl border border-border" aria-label="스냅샷 기반 재고 KPI">
       <div className="flex items-center gap-1.5 bg-sidebar px-5 py-3.5 text-sidebar-foreground">
@@ -40,7 +46,7 @@ export function KpiCards({ kpis, fromDate, asOfDate }: KpiCardsProps) {
               ? '입고로 설명되지 않는 증가가 관측되지 않았습니다.'
               : `해당 SKU 상품코드: ${s.unexplainedIncreaseSkus.slice(0, 8).map((x) => x.productCode).join(', ')}${s.unexplainedIncreaseSkus.length > 8 ? ` 외 ${s.unexplainedIncreaseSkus.length - 8}건` : ''}`}
           />
-          <Metric label="측정 기준일" value={s.newestObservationDate ?? '관측 없음'} detail={s.newestObservationDate ? `마지막 업로드 일자 · 집계 시작일 ${s.oldestObservationDate ?? s.newestObservationDate}` : undefined} />
+          <Metric label="측정 기준일" value={s.newestObservationDate ?? '관측 없음'} detail={s.newestObservationDate ? `마지막 업로드 일자 · 집계 시작일 ${collectionStartDate ?? s.newestObservationDate}` : undefined} />
           <Metric label="총 SKU" value={`${s.comparableSkuCount} / ${kpis.totalSkuCount}`} detail={periodLabel} />
         </div>
       </div>

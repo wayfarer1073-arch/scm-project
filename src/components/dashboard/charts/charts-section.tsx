@@ -65,12 +65,12 @@ export function ChartsSection({ rows, dailyTotals, warehouses, chartWarehouseId,
         </div>
         <Tabs value={chartWarehouseId} onValueChange={(v) => onChangeChartWarehouse(v)}>
           <TabsList>
-            <TabsTrigger value="ALL" className="bg-sidebar-hover-bg text-sidebar-muted-foreground data-[state=active]:bg-brand-accent data-[state=active]:text-brand-accent-foreground">전체</TabsTrigger>
+            <TabsTrigger value="ALL" className="border-sidebar-foreground/40 bg-sidebar-hover-bg text-sidebar-foreground data-[state=active]:border-transparent data-[state=active]:bg-brand-accent data-[state=active]:text-brand-accent-foreground">전체</TabsTrigger>
             {warehouses.map((w) => (
               <TabsTrigger
                 key={w.id}
                 value={w.id}
-                className="bg-sidebar-hover-bg text-sidebar-muted-foreground data-[state=active]:bg-brand-accent data-[state=active]:text-brand-accent-foreground"
+                className="border-sidebar-foreground/40 bg-sidebar-hover-bg text-sidebar-foreground data-[state=active]:border-transparent data-[state=active]:bg-brand-accent data-[state=active]:text-brand-accent-foreground"
               >
                 {w.name}
               </TabsTrigger>

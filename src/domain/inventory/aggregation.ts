@@ -13,12 +13,18 @@ export function calculateSnapshotKpis(rows: InventoryRow[], compareFromDate?: st
     knownInventoryValue: null, valuationCoverageRatio: null, staleSkuCount: 0,
     oldestObservationDate: null, newestObservationDate: null, comparableSkuCount: 0,
     observedDecrease: null, observedIncrease: null, recordedInbound: null, estimatedDepletion: null,
-    unexplainedIncreaseTotal: null, unexplainedIncreaseSkus: [],
+    unexplainedIncreaseTotal: null, unexplainedIncreaseSkus: [], earliestFirstSeenDate: null,
   };
   for (const row of rows) {
     const { latest, previous, asOfDate } = row.analysis;
     if (!result.oldestObservationDate || latest.date < result.oldestObservationDate) result.oldestObservationDate = latest.date;
     if (!result.newestObservationDate || latest.date > result.newestObservationDate) result.newestObservationDate = latest.date;
+    // SKU가 처음 관측된 날짜(DB에 고정된 firstSeenDate) 중 가장 이른 값 — "집계 시작일"은 이걸로
+    // 계산해야 한다. latest.date(직전 관측일) 기준으로는 대부분의 SKU가 최근 날짜에 몰려 있어
+    // "데이터를 언제부터 모으기 시작했는지"를 보여주지 못한다(oldestObservationDate와는 다른 값).
+    if (!result.earliestFirstSeenDate || row.descriptor.firstSeenDate < result.earliestFirstSeenDate) {
+      result.earliestFirstSeenDate = row.descriptor.firstSeenDate;
+    }
 
     // 목록 이탈은 품절의 증거가 아니다. 마지막 재고를 현재 자산으로 다시 집계하지 않는다.
     if (row.descriptor.isSoldOut) {

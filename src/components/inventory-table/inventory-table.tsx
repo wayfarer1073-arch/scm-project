@@ -213,10 +213,10 @@ export function InventoryTable({
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <span className="text-xs text-sidebar-muted-foreground">{sorted.length.toLocaleString('ko-KR')}건</span>
-          <Button variant="outline" size="sm" onClick={downloadCurrentView}>
+          <Button variant="outline" size="sm" className="text-foreground hover:text-brand-accent" onClick={downloadCurrentView}>
             <Download className="size-3.5" /> 현재 조회결과 다운로드
           </Button>
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline" size="sm" className="text-foreground hover:text-brand-accent" asChild>
             <a href={`/api/export/full-report?asOf=${asOfDate}${fromDate ? `&from=${fromDate}` : ''}`}>
               <FileSpreadsheet className="size-3.5" /> 전체 재고 리포트
             </a>

@@ -48,6 +48,16 @@ describe('directly observed snapshot KPIs', () => {
     });
     expect(s.inStockSkuRatio).toBeCloseTo(1 / 3);
   });
+  it('집계 시작일(earliestFirstSeenDate)은 최신 관측일이 아니라 SKU가 처음 관측된 날짜 중 최솟값이다', () => {
+    // 'old'는 8월부터 쌓인 SKU지만 오늘도 정상 업로드돼 latest.date는 다른 SKU와 동일하게 최신이다.
+    // oldestObservationDate(직전 관측일 기준)는 이 차이를 반영하지 못하지만 earliestFirstSeenDate는 반영해야 한다.
+    const old = row('old', [obs('2026-08-01', 100), obs('2026-09-08', 90)], '2026-09-08');
+    const recent = row('recent', [obs('2026-09-08', 50)], '2026-09-08');
+    const s = calculateSnapshotKpis([old, recent]);
+    expect(s.oldestObservationDate).toBe('2026-09-08');
+    expect(s.newestObservationDate).toBe('2026-09-08');
+    expect(s.earliestFirstSeenDate).toBe('2026-08-01');
+  });
   it('does not turn missing costs into known zero; honors uploaded total and explicit zero', () => {
     const missing = resolveInventoryCost({ normalStock: 10, unitCost: 0, unitCostProvided: false, totalCost: null }, null);
     const zero = resolveInventoryCost({ normalStock: 10, unitCost: 0, unitCostProvided: true, totalCost: null }, null);

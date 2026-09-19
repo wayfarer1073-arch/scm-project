@@ -181,6 +181,9 @@ export interface SnapshotKpis {
   staleSkuCount: number;
   oldestObservationDate: string | null;
   newestObservationDate: string | null;
+  /** 집계 시작일 — 이 SKU 집합에서 자료를 가장 먼저 관측한 날짜(SKU.firstSeenDate 최솟값).
+   * oldestObservationDate("가장 오래된 직전 관측일", latest.date 기준)와는 다른 값이다. */
+  earliestFirstSeenDate: string | null;
   comparableSkuCount: number;
   observedDecrease: number | null;
   observedIncrease: number | null;

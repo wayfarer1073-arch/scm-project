@@ -70,11 +70,11 @@ export function UploadCalendar({ warehouses, entries, holidays, isAdmin }: Uploa
           </p>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="outline" size="icon" onClick={() => setMonth((m) => subMonths(m, 1))} aria-label="이전 달">
+          <Button variant="outline" size="icon" className="text-foreground hover:text-brand-accent" onClick={() => setMonth((m) => subMonths(m, 1))} aria-label="이전 달">
             <ChevronLeft className="size-4" />
           </Button>
           <span className="w-24 text-center text-sm font-semibold tabular-nums">{format(month, 'yyyy년 M월')}</span>
-          <Button variant="outline" size="icon" onClick={() => setMonth((m) => addMonths(m, 1))} aria-label="다음 달">
+          <Button variant="outline" size="icon" className="text-foreground hover:text-brand-accent" onClick={() => setMonth((m) => addMonths(m, 1))} aria-label="다음 달">
             <ChevronRight className="size-4" />
           </Button>
         </div>
