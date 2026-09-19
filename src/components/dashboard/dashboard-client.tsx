@@ -132,7 +132,7 @@ export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows
         fromDate={fromDate}
         asOfDate={asOfDate}
       />
-      <FavoritesSummary rows={favoriteRows} />
+      <FavoritesSummary rows={favoriteRows} onSelectSku={setSelectedSkuId} fromDate={fromDate} />
       <div id="inventory-table-section">
         <InventoryTable
           rows={rows}

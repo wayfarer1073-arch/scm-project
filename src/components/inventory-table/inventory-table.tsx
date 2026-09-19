@@ -292,93 +292,7 @@ export function InventoryTable({
               </TableRow>
             )}
             {pageRows.map((r) => (
-              <TableRow
-                key={r.descriptor.skuId}
-                tabIndex={0}
-                role="button"
-                aria-label={`${r.descriptor.productName} 상세 보기`}
-                onClick={() => onSelectSku(r.descriptor.skuId)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    onSelectSku(r.descriptor.skuId);
-                  }
-                }}
-                className="cursor-pointer outline-none focus-visible:bg-muted/60 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
-              >
-                <TableCell className="font-mono text-xs text-muted-foreground">{r.descriptor.productCode}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-medium">{r.descriptor.productName}</span>
-                    {r.descriptor.isB2B && (
-                      <>
-                        <Badge variant="outline" className="gap-1 px-1.5 py-0 text-[10px]">
-                          <Building2 className="size-2.5" aria-hidden="true" />
-                          B2B
-                        </Badge>
-                        <InfoTooltip>B2B 상품의 경우 KPI의 신뢰도가 낮을 수 있습니다.</InfoTooltip>
-                      </>
-                    )}
-                  </div>
-                  {r.analysis.tags.length > 0 && (
-                    <div className="mt-0.5 flex flex-wrap gap-1">
-                      {r.analysis.tags.slice(0, 3).map((t) => (
-                        <span key={t} className="text-[10px] text-muted-foreground">{t}</span>
-                      ))}
-                    </div>
-                  )}
-                </TableCell>
-                <TableCell>{r.descriptor.warehouseCode}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatNumber(r.analysis.latest.normalStock)}</TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {fromDate ? (
-                    r.periodComparison ? (
-                      <div>
-                        <span className={r.periodComparison.netChange > 0 ? 'text-status-increase' : r.periodComparison.netChange < 0 ? 'text-status-warning' : ''}>
-                          {formatSigned(r.periodComparison.netChange)}
-                        </span>
-                        <div className="text-[10px] text-muted-foreground">감소 {formatNumber(r.periodComparison.totalDepletion)} · 증가 {formatNumber(r.periodComparison.totalIncrease)}</div>
-                      </div>
-                    ) : <span className="text-muted-foreground">비교 불가</span>
-                  ) : r.analysis.dailyChange === null ? <span className="text-muted-foreground">데이터 축적 중</span> : formatSigned(r.analysis.dailyChange)}
-                </TableCell>
-                <TableCell className="hidden text-right tabular-nums xl:table-cell">{formatNumber(r.analysis.window7.totalDepletion)}</TableCell>
-                <TableCell className="hidden text-right tabular-nums 2xl:table-cell">
-                  {r.analysis.window7.averageDailyDepletion === null ? '-' : formatNumber(r.analysis.window7.averageDailyDepletion)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {r.analysis.acceleration.accelerationRatePercent === null ? (
-                    <span className="text-muted-foreground">{r.analysis.acceleration.trend === 'NEW_DEPLETION' ? '신규 소진' : '-'}</span>
-                  ) : (
-                    <span className={r.analysis.acceleration.trend === 'ACCELERATING' ? 'text-status-danger' : r.analysis.acceleration.trend === 'DECELERATING' ? 'text-status-increase' : ''}>
-                      {formatSigned(r.analysis.acceleration.accelerationRatePercent)}%
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">{formatCoverageDays(r.analysis.coverage.coverageDays)}</TableCell>
-                <TableCell className="text-right text-xs">
-                  {r.analysis.forecast.expectedStockoutDate ? formatKstDate(r.analysis.forecast.expectedStockoutDate) : <span className="text-muted-foreground">데이터 축적 중</span>}
-                </TableCell>
-                <TableCell className="hidden text-right tabular-nums 2xl:table-cell">{formatNumber(r.analysis.latest.unitCost)}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatCurrency(r.valueBreakdown.normalStockValue)}</TableCell>
-                <TableCell className="hidden text-right tabular-nums xl:table-cell">
-                  {r.analysis.stagnation.isMeaningful ? `${r.analysis.stagnation.stagnantDays}일` : <span className="text-muted-foreground">-</span>}
-                </TableCell>
-                <TableCell>
-                  <span className="inline-flex items-center gap-1.5 text-xs font-medium">
-                    <span
-                      className={cn(
-                        'size-1.5 shrink-0 rounded-full',
-                        r.analysis.thresholdRisk.level === 'DANGER' && 'bg-status-danger',
-                        r.analysis.thresholdRisk.level === 'WARNING' && 'bg-status-warning',
-                        r.analysis.thresholdRisk.level === 'NORMAL' && 'bg-status-normal',
-                      )}
-                      aria-hidden="true"
-                    />
-                    {riskLabel(r.analysis.thresholdRisk.level)}
-                  </span>
-                </TableCell>
-              </TableRow>
+              <InventoryTableRow key={r.descriptor.skuId} row={r} fromDate={fromDate} onSelectSku={onSelectSku} />
             ))}
           </TableBody>
         </Table>
@@ -409,5 +323,119 @@ function SortableHead({ label, active, asc, onClick, className }: { label: strin
         {active ? asc ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" /> : <ArrowUpDown className="size-3 opacity-40" />}
       </button>
     </TableHead>
+  );
+}
+
+/** 정렬 불가능한 고정 헤더 — 즐겨찾기 등 전체 재고 현황과 같은 열 구성을 재사용하되 정렬 UI는 없는 곳에서 쓴다. */
+export function InventoryTableStaticHeader({ fromDate }: { fromDate: string | null }) {
+  return (
+    <TableRow>
+      <TableHead>상품코드</TableHead>
+      <TableHead className="min-w-[220px]">상품명</TableHead>
+      <TableHead>창고</TableHead>
+      <TableHead className="text-right">정상재고</TableHead>
+      <TableHead className="text-right">{fromDate ? '기간 변화' : '직전 관측 대비'}</TableHead>
+      <TableHead className="hidden text-right xl:table-cell">7일 소진량</TableHead>
+      <TableHead className="hidden text-right 2xl:table-cell">7일 일평균 소진</TableHead>
+      <TableHead className="text-right">7일 vs 이전 변화율</TableHead>
+      <TableHead className="text-right">Coverage</TableHead>
+      <TableHead className="text-right">예상 소진일</TableHead>
+      <TableHead className="hidden text-right 2xl:table-cell">단위원가</TableHead>
+      <TableHead className="text-right">재고금액</TableHead>
+      <TableHead className="hidden text-right xl:table-cell">정체일수</TableHead>
+      <TableHead>상태</TableHead>
+    </TableRow>
+  );
+}
+
+/** 전체 재고 현황 테이블의 행 하나. 같은 형식으로 즐겨찾기 등 다른 곳에서도 재사용한다. */
+export function InventoryTableRow({ row: r, fromDate, onSelectSku }: { row: InventoryRow; fromDate: string | null; onSelectSku: (skuId: string) => void }) {
+  return (
+    <TableRow
+      tabIndex={0}
+      role="button"
+      aria-label={`${r.descriptor.productName} 상세 보기`}
+      onClick={() => onSelectSku(r.descriptor.skuId)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onSelectSku(r.descriptor.skuId);
+        }
+      }}
+      className="cursor-pointer outline-none focus-visible:bg-muted/60 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
+    >
+      <TableCell className="font-mono text-xs text-muted-foreground">{r.descriptor.productCode}</TableCell>
+      <TableCell>
+        <div className="flex items-center gap-1.5">
+          <span className="font-medium">{r.descriptor.productName}</span>
+          {r.descriptor.isB2B && (
+            <>
+              <Badge variant="outline" className="gap-1 px-1.5 py-0 text-[10px]">
+                <Building2 className="size-2.5" aria-hidden="true" />
+                B2B
+              </Badge>
+              <InfoTooltip>B2B 상품의 경우 KPI의 신뢰도가 낮을 수 있습니다.</InfoTooltip>
+            </>
+          )}
+        </div>
+        {r.analysis.tags.length > 0 && (
+          <div className="mt-0.5 flex flex-wrap gap-1">
+            {r.analysis.tags.slice(0, 3).map((t) => (
+              <span key={t} className="text-[10px] text-muted-foreground">{t}</span>
+            ))}
+          </div>
+        )}
+      </TableCell>
+      <TableCell>{r.descriptor.warehouseCode}</TableCell>
+      <TableCell className="text-right tabular-nums">{formatNumber(r.analysis.latest.normalStock)}</TableCell>
+      <TableCell className="text-right tabular-nums">
+        {fromDate ? (
+          r.periodComparison ? (
+            <div>
+              <span className={r.periodComparison.netChange > 0 ? 'text-status-increase' : r.periodComparison.netChange < 0 ? 'text-status-warning' : ''}>
+                {formatSigned(r.periodComparison.netChange)}
+              </span>
+              <div className="text-[10px] text-muted-foreground">감소 {formatNumber(r.periodComparison.totalDepletion)} · 증가 {formatNumber(r.periodComparison.totalIncrease)}</div>
+            </div>
+          ) : <span className="text-muted-foreground">비교 불가</span>
+        ) : r.analysis.dailyChange === null ? <span className="text-muted-foreground">데이터 축적 중</span> : formatSigned(r.analysis.dailyChange)}
+      </TableCell>
+      <TableCell className="hidden text-right tabular-nums xl:table-cell">{formatNumber(r.analysis.window7.totalDepletion)}</TableCell>
+      <TableCell className="hidden text-right tabular-nums 2xl:table-cell">
+        {r.analysis.window7.averageDailyDepletion === null ? '-' : formatNumber(r.analysis.window7.averageDailyDepletion)}
+      </TableCell>
+      <TableCell className="text-right tabular-nums">
+        {r.analysis.acceleration.accelerationRatePercent === null ? (
+          <span className="text-muted-foreground">{r.analysis.acceleration.trend === 'NEW_DEPLETION' ? '신규 소진' : '-'}</span>
+        ) : (
+          <span className={r.analysis.acceleration.trend === 'ACCELERATING' ? 'text-status-danger' : r.analysis.acceleration.trend === 'DECELERATING' ? 'text-status-increase' : ''}>
+            {formatSigned(r.analysis.acceleration.accelerationRatePercent)}%
+          </span>
+        )}
+      </TableCell>
+      <TableCell className="text-right tabular-nums">{formatCoverageDays(r.analysis.coverage.coverageDays)}</TableCell>
+      <TableCell className="text-right text-xs">
+        {r.analysis.forecast.expectedStockoutDate ? formatKstDate(r.analysis.forecast.expectedStockoutDate) : <span className="text-muted-foreground">데이터 축적 중</span>}
+      </TableCell>
+      <TableCell className="hidden text-right tabular-nums 2xl:table-cell">{formatNumber(r.analysis.latest.unitCost)}</TableCell>
+      <TableCell className="text-right tabular-nums">{formatCurrency(r.valueBreakdown.normalStockValue)}</TableCell>
+      <TableCell className="hidden text-right tabular-nums xl:table-cell">
+        {r.analysis.stagnation.isMeaningful ? `${r.analysis.stagnation.stagnantDays}일` : <span className="text-muted-foreground">-</span>}
+      </TableCell>
+      <TableCell>
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium">
+          <span
+            className={cn(
+              'size-1.5 shrink-0 rounded-full',
+              r.analysis.thresholdRisk.level === 'DANGER' && 'bg-status-danger',
+              r.analysis.thresholdRisk.level === 'WARNING' && 'bg-status-warning',
+              r.analysis.thresholdRisk.level === 'NORMAL' && 'bg-status-normal',
+            )}
+            aria-hidden="true"
+          />
+          {riskLabel(r.analysis.thresholdRisk.level)}
+        </span>
+      </TableCell>
+    </TableRow>
   );
 }
