@@ -27,7 +27,7 @@ describe('buildInventorySheetRows', () => {
     expect(keys).toContain('상품코드');
     expect(keys).toContain('재고금액');
     expect(keys.some((k) => k.includes('판매량'))).toBe(false);
-    expect(sheetRows[0]['상태']).toBe('정상');
+    expect(sheetRows[0]['상태']).toBe('기준 내');
   });
 });
 

@@ -32,7 +32,15 @@ interface InventoryTableProps {
   fromDate: string | null;
 }
 
-type SortKey = 'stockoutFast' | 'coverageAsc' | 'depletionRateDesc' | 'accelerationDesc' | 'valueDesc' | 'stagnantDesc' | 'increaseDesc';
+type SortKey =
+  | 'stockoutFast'
+  | 'coverageAsc'
+  | 'depletionRateDesc'
+  | 'accelerationDesc'
+  | 'valueDesc'
+  | 'stagnantDesc'
+  | 'increaseDesc'
+  | 'netChangeDesc';
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'stockoutFast', label: '예상 소진 빠른 순' },
@@ -42,10 +50,15 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'valueDesc', label: '재고금액 높은 순' },
   { value: 'stagnantDesc', label: '정체일수 높은 순' },
   { value: 'increaseDesc', label: '전일 증가량 높은 순' },
+  { value: 'netChangeDesc', label: '직전 관측 대비 큰 순' },
 ];
 
 const PAGE_SIZE = 25;
 
+// 정렬 기준값은 반드시 해당 열에 실제로 표시되는 값과 같아야 한다 — 표시값과 다른 값으로 정렬하면
+// (예: 표시는 순증감인데 정렬은 증가분만 반영) 오름차순/내림차순을 눌러도 체감상 정렬이 바뀌지
+// 않는 것처럼 보이는 버그가 된다. 품절/B2B로 셀에 "-"·"0"·"원가 미상"을 표시하는 경우도 그 표시와
+// 일치하도록 null 또는 0을 반환한다.
 function sortValue(row: InventoryRow, key: SortKey): number | null {
   switch (key) {
     case 'stockoutFast':
@@ -53,10 +66,13 @@ function sortValue(row: InventoryRow, key: SortKey): number | null {
     case 'coverageAsc':
       return row.analysis.coverage.coverageDays;
     case 'depletionRateDesc':
+      if (row.descriptor.isB2B || row.descriptor.isSoldOut) return null;
       return row.analysis.window7.averageDailyDepletion;
     case 'accelerationDesc':
       return row.analysis.acceleration.accelerationRatePercent;
     case 'valueDesc':
+      if (row.descriptor.isSoldOut) return 0;
+      if (row.analysis.latest.valuationKnown === false) return null;
       return row.valueBreakdown.normalStockValue;
     case 'stagnantDesc':
       return row.analysis.stagnation.isMeaningful ? row.analysis.stagnation.stagnantDays : null;
@@ -64,6 +80,11 @@ function sortValue(row: InventoryRow, key: SortKey): number | null {
       return row.periodComparison
         ? row.periodComparison.totalIncrease
         : row.analysis.dailyChange !== null && row.analysis.dailyChange > 0 ? row.analysis.dailyChange : null;
+    // "직전 관측 대비"/"기간 변화" 열이 실제로 보여주는 값(순증감, 감소도 음수로 포함)과 동일한
+    // 기준으로 정렬한다. increaseDesc는 증가분만 보는 별도 지표(정렬 드롭다운 전용)라 이 열의
+    // 헤더 클릭 정렬에는 맞지 않는다 — 대부분의 행이 감소(null 처리)라 정렬이 안 먹는 것처럼 보였다.
+    case 'netChangeDesc':
+      return row.periodComparison ? row.periodComparison.netChange : row.analysis.dailyChange;
     default:
       return null;
   }
@@ -267,20 +288,68 @@ export function InventoryTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>상품코드</TableHead>
-              <TableHead className="min-w-[220px]">상품명</TableHead>
-              <TableHead>창고</TableHead>
-              <TableHead className="text-right">정상재고</TableHead>
-              <SortableHead label={fromDate ? '기간 변화' : '직전 관측 대비'} active={sortKey === 'increaseDesc'} asc={sortAsc} onClick={() => toggleSort('increaseDesc')} />
-              <TableHead className="hidden text-right xl:table-cell">7일 추정 소진</TableHead>
-              <SortableHead className="hidden 2xl:table-cell" label="출고일평균(7일)" active={sortKey === 'depletionRateDesc'} asc={sortAsc} onClick={() => toggleSort('depletionRateDesc')} />
-              <SortableHead label="7일 vs 이전 변화율" active={sortKey === 'accelerationDesc'} asc={sortAsc} onClick={() => toggleSort('accelerationDesc')} />
-              <SortableHead label="Coverage(출고일)" active={sortKey === 'coverageAsc'} asc={sortAsc} onClick={() => toggleSort('coverageAsc')} />
-              <SortableHead label="예상 소진일" active={sortKey === 'stockoutFast'} asc={sortAsc} onClick={() => toggleSort('stockoutFast')} />
-              <TableHead className="hidden text-right 2xl:table-cell">단위원가</TableHead>
-              <SortableHead label="재고금액" active={sortKey === 'valueDesc'} asc={sortAsc} onClick={() => toggleSort('valueDesc')} />
-              <SortableHead className="hidden xl:table-cell" label="무소진 출고일" active={sortKey === 'stagnantDesc'} asc={sortAsc} onClick={() => toggleSort('stagnantDesc')} />
-              <TableHead>상태</TableHead>
+              <TableHead className="px-2 py-1.5">상품코드</TableHead>
+              <TableHead className="min-w-[180px] px-2 py-1.5">상품명</TableHead>
+              <TableHead className="px-2 py-1.5">
+                <HeaderLabel label="상태" tooltip="재고 위험 수준입니다. 위험/경고 수량 기준(자동 계산 또는 수동 설정)에 따라 판정됩니다." />
+              </TableHead>
+              <TableHead className="px-2 py-1.5">창고</TableHead>
+              <TableHead className="px-2 py-1.5 text-right">정상재고</TableHead>
+              <SortableHead
+                label={fromDate ? '기간 변화' : '직전 관측 대비'}
+                tooltip={fromDate ? '선택한 기간 동안의 재고 순증감(증가분 - 감소분)입니다.' : '가장 최근 업로드 대비 재고 순증감입니다.'}
+                active={sortKey === 'netChangeDesc'}
+                asc={sortAsc}
+                onClick={() => toggleSort('netChangeDesc')}
+              />
+              <TableHead className="hidden px-2 py-1.5 text-right xl:table-cell">
+                <HeaderLabel label="7일 소진량" tooltip="최근 7일간 실제 관측된 총 소진(감소)량입니다." />
+              </TableHead>
+              <SortableHead
+                className="hidden 2xl:table-cell"
+                label="출고일평균(7일)"
+                tooltip="최근 7일 중 실제 출고 기록이 있었던 날만 기준으로 계산한 하루 평균 소진량입니다."
+                active={sortKey === 'depletionRateDesc'}
+                asc={sortAsc}
+                onClick={() => toggleSort('depletionRateDesc')}
+              />
+              <SortableHead
+                label="소진 가속률"
+                tooltip="최근 소진 속도가 이전 대비 얼마나 빨라졌는지(+) 또는 느려졌는지(-)를 나타냅니다."
+                active={sortKey === 'accelerationDesc'}
+                asc={sortAsc}
+                onClick={() => toggleSort('accelerationDesc')}
+              />
+              <SortableHead
+                label="Coverage(출고일)"
+                tooltip="현재 재고 ÷ 일평균 소진량으로 계산한, 앞으로 버틸 수 있는 출고일수입니다."
+                active={sortKey === 'coverageAsc'}
+                asc={sortAsc}
+                onClick={() => toggleSort('coverageAsc')}
+              />
+              <SortableHead
+                label="예상 소진일"
+                tooltip="현재 소진 속도가 유지된다고 가정했을 때 재고가 0이 되는 예상 날짜입니다."
+                active={sortKey === 'stockoutFast'}
+                asc={sortAsc}
+                onClick={() => toggleSort('stockoutFast')}
+              />
+              <TableHead className="hidden px-2 py-1.5 text-right 2xl:table-cell">단위원가</TableHead>
+              <SortableHead
+                label="재고금액"
+                tooltip="정상재고 × 단위원가로 계산한 평가금액입니다. 원가 정보가 없으면 '원가 미상'으로 표시됩니다."
+                active={sortKey === 'valueDesc'}
+                asc={sortAsc}
+                onClick={() => toggleSort('valueDesc')}
+              />
+              <SortableHead
+                className="hidden xl:table-cell"
+                label="정체일수"
+                tooltip="가장 최근 감소가 관측된 날 이후 며칠째 재고가 줄지 않았는지를 나타냅니다."
+                active={sortKey === 'stagnantDesc'}
+                asc={sortAsc}
+                onClick={() => toggleSort('stagnantDesc')}
+              />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -315,13 +384,40 @@ export function InventoryTable({
   );
 }
 
-function SortableHead({ label, active, asc, onClick, className }: { label: string; active: boolean; asc: boolean; onClick: () => void; className?: string }) {
+/** 헤더 라벨 + 선택적 느낌표 툴팁. 정렬 가능/불가능 헤더 양쪽에서 같은 형태로 재사용한다. */
+function HeaderLabel({ label, tooltip }: { label: string; tooltip?: string }) {
   return (
-    <TableHead className={`text-right ${className ?? ''}`}>
-      <button type="button" onClick={onClick} className="inline-flex items-center gap-1 hover:text-foreground">
-        {label}
-        {active ? asc ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" /> : <ArrowUpDown className="size-3 opacity-40" />}
-      </button>
+    <span className="inline-flex items-center gap-1">
+      {label}
+      {tooltip && <InfoTooltip>{tooltip}</InfoTooltip>}
+    </span>
+  );
+}
+
+function SortableHead({
+  label,
+  tooltip,
+  active,
+  asc,
+  onClick,
+  className,
+}: {
+  label: string;
+  tooltip?: string;
+  active: boolean;
+  asc: boolean;
+  onClick: () => void;
+  className?: string;
+}) {
+  return (
+    <TableHead className={cn('px-2 py-1.5 text-right', className)}>
+      <span className="inline-flex items-center gap-1">
+        <button type="button" onClick={onClick} className="inline-flex items-center gap-1 hover:text-foreground">
+          {label}
+          {active ? asc ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" /> : <ArrowUpDown className="size-3 opacity-40" />}
+        </button>
+        {tooltip && <InfoTooltip>{tooltip}</InfoTooltip>}
+      </span>
     </TableHead>
   );
 }
@@ -330,20 +426,20 @@ function SortableHead({ label, active, asc, onClick, className }: { label: strin
 export function InventoryTableStaticHeader({ fromDate }: { fromDate: string | null }) {
   return (
     <TableRow>
-      <TableHead>상품코드</TableHead>
-      <TableHead className="min-w-[220px]">상품명</TableHead>
-      <TableHead>창고</TableHead>
-      <TableHead className="text-right">정상재고</TableHead>
-      <TableHead className="text-right">{fromDate ? '기간 변화' : '직전 관측 대비'}</TableHead>
-      <TableHead className="hidden text-right xl:table-cell">7일 추정 소진</TableHead>
-      <TableHead className="hidden text-right 2xl:table-cell">출고일평균(7일)</TableHead>
-      <TableHead className="text-right">7일 vs 이전 변화율</TableHead>
-      <TableHead className="text-right">Coverage(출고일)</TableHead>
-      <TableHead className="text-right">예상 소진일</TableHead>
-      <TableHead className="hidden text-right 2xl:table-cell">단위원가</TableHead>
-      <TableHead className="text-right">재고금액</TableHead>
-      <TableHead className="hidden text-right xl:table-cell">무소진 출고일</TableHead>
-      <TableHead>상태</TableHead>
+      <TableHead className="px-2 py-1.5">상품코드</TableHead>
+      <TableHead className="min-w-[180px] px-2 py-1.5">상품명</TableHead>
+      <TableHead className="px-2 py-1.5">상태</TableHead>
+      <TableHead className="px-2 py-1.5">창고</TableHead>
+      <TableHead className="px-2 py-1.5 text-right">정상재고</TableHead>
+      <TableHead className="px-2 py-1.5 text-right">{fromDate ? '기간 변화' : '직전 관측 대비'}</TableHead>
+      <TableHead className="hidden px-2 py-1.5 text-right xl:table-cell">7일 소진량</TableHead>
+      <TableHead className="hidden px-2 py-1.5 text-right 2xl:table-cell">출고일평균(7일)</TableHead>
+      <TableHead className="px-2 py-1.5 text-right">소진 가속률</TableHead>
+      <TableHead className="px-2 py-1.5 text-right">Coverage(출고일)</TableHead>
+      <TableHead className="px-2 py-1.5 text-right">예상 소진일</TableHead>
+      <TableHead className="hidden px-2 py-1.5 text-right 2xl:table-cell">단위원가</TableHead>
+      <TableHead className="px-2 py-1.5 text-right">재고금액</TableHead>
+      <TableHead className="hidden px-2 py-1.5 text-right xl:table-cell">정체일수</TableHead>
     </TableRow>
   );
 }
@@ -364,8 +460,8 @@ export function InventoryTableRow({ row: r, fromDate, onSelectSku }: { row: Inve
       }}
       className="cursor-pointer outline-none focus-visible:bg-muted/60 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
     >
-      <TableCell className="font-mono text-xs text-muted-foreground">{r.descriptor.productCode}</TableCell>
-      <TableCell>
+      <TableCell className="px-2 py-1.5 font-mono text-xs text-muted-foreground">{r.descriptor.productCode}</TableCell>
+      <TableCell className="px-2 py-1.5">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="font-medium">{r.descriptor.productName}</span>
           {r.descriptor.isSoldOut && (
@@ -397,43 +493,7 @@ export function InventoryTableRow({ row: r, fromDate, onSelectSku }: { row: Inve
           </div>
         )}
       </TableCell>
-      <TableCell>{r.descriptor.warehouseCode}</TableCell>
-      <TableCell className="text-right tabular-nums">{r.descriptor.isSoldOut ? "0" : formatNumber(r.analysis.latest.normalStock)}</TableCell>
-      <TableCell className="text-right tabular-nums">
-        {fromDate ? (
-          r.periodComparison ? (
-            <div>
-              <span className={r.periodComparison.netChange > 0 ? 'text-status-increase' : r.periodComparison.netChange < 0 ? 'text-status-warning' : ''}>
-                {formatSigned(r.periodComparison.netChange)}
-              </span>
-              <div className="text-[10px] text-muted-foreground">추정 소진 {formatNumber(r.periodComparison.totalDepletion)} · 미설명 증가 {formatNumber(r.periodComparison.totalIncrease)}</div>
-            </div>
-          ) : <span className="text-muted-foreground">비교 불가</span>
-        ) : r.analysis.dailyChange === null ? <span className="text-muted-foreground">데이터 축적 중</span> : formatSigned(r.analysis.dailyChange)}
-      </TableCell>
-      <TableCell className="hidden text-right tabular-nums xl:table-cell"><div>{r.descriptor.isSoldOut || r.analysis.window7.observedIntervalDays === 0 ? "—" : formatNumber(r.analysis.window7.totalDepletion)}</div><div className="text-[10px] text-muted-foreground">{r.analysis.window7.observedIntervalDays}출고일 관측</div></TableCell>
-      <TableCell className="hidden text-right tabular-nums 2xl:table-cell">
-        {r.descriptor.isB2B || r.descriptor.isSoldOut || r.analysis.window7.averageDailyDepletion === null ? '-' : formatNumber(r.analysis.window7.averageDailyDepletion)}
-      </TableCell>
-      <TableCell className="text-right tabular-nums">
-        {r.analysis.acceleration.accelerationRatePercent === null ? (
-          <span className="text-muted-foreground">{r.analysis.acceleration.trend === 'NEW_DEPLETION' ? '신규 소진' : '-'}</span>
-        ) : (
-          <span className={r.analysis.acceleration.trend === 'ACCELERATING' ? 'text-status-danger' : r.analysis.acceleration.trend === 'DECELERATING' ? 'text-status-increase' : ''}>
-            {formatSigned(r.analysis.acceleration.accelerationRatePercent)}%
-          </span>
-        )}
-      </TableCell>
-      <TableCell className="text-right tabular-nums"><div>{r.analysis.coverage.coverageDays === null ? "—" : `${formatNumber(r.analysis.coverage.coverageDays)}출고일`}</div><div className="text-[10px] text-muted-foreground">{r.analysis.operating?.reason ?? `최근 ${r.analysis.operating?.basisWindowDays ?? 7}일 근거`}</div></TableCell>
-      <TableCell className="text-right text-xs">
-        {r.analysis.forecast.expectedStockoutDate ? formatKstDate(r.analysis.forecast.expectedStockoutDate) : <span className="text-muted-foreground">산정 불가</span>}
-      </TableCell>
-      <TableCell className="hidden text-right tabular-nums 2xl:table-cell">{formatNumber(r.analysis.latest.unitCost)}</TableCell>
-      <TableCell className="text-right tabular-nums">{r.descriptor.isSoldOut ? "0" : r.analysis.latest.valuationKnown === false ? "원가 미상" : formatCurrency(r.valueBreakdown.normalStockValue)}</TableCell>
-      <TableCell className="hidden text-right tabular-nums xl:table-cell">
-        {r.analysis.stagnation.isMeaningful ? `${r.analysis.stagnation.stagnantDays}출고일` : <span className="text-muted-foreground">-</span>}
-      </TableCell>
-      <TableCell>
+      <TableCell className="px-2 py-1.5">
         <span className="inline-flex items-center gap-1.5 text-xs font-medium">
           <span
             className={cn(
@@ -447,6 +507,42 @@ export function InventoryTableRow({ row: r, fromDate, onSelectSku }: { row: Inve
           />
           {analysisStatusLabel(r.analysis)}
         </span>
+      </TableCell>
+      <TableCell className="px-2 py-1.5">{r.descriptor.warehouseCode}</TableCell>
+      <TableCell className="px-2 py-1.5 text-right tabular-nums">{r.descriptor.isSoldOut ? "0" : formatNumber(r.analysis.latest.normalStock)}</TableCell>
+      <TableCell className="px-2 py-1.5 text-right tabular-nums">
+        {fromDate ? (
+          r.periodComparison ? (
+            <div>
+              <span className={r.periodComparison.netChange > 0 ? 'text-status-increase' : r.periodComparison.netChange < 0 ? 'text-status-warning' : ''}>
+                {formatSigned(r.periodComparison.netChange)}
+              </span>
+              <div className="text-[10px] text-muted-foreground">추정 소진 {formatNumber(r.periodComparison.totalDepletion)} · 미설명 증가 {formatNumber(r.periodComparison.totalIncrease)}</div>
+            </div>
+          ) : <span className="text-muted-foreground">비교 불가</span>
+        ) : r.analysis.dailyChange === null ? <span className="text-muted-foreground">데이터 축적 중</span> : formatSigned(r.analysis.dailyChange)}
+      </TableCell>
+      <TableCell className="hidden px-2 py-1.5 text-right tabular-nums xl:table-cell"><div>{r.descriptor.isSoldOut || r.analysis.window7.observedIntervalDays === 0 ? "—" : formatNumber(r.analysis.window7.totalDepletion)}</div><div className="text-[10px] text-muted-foreground">{r.analysis.window7.observedIntervalDays}출고일 관측</div></TableCell>
+      <TableCell className="hidden px-2 py-1.5 text-right tabular-nums 2xl:table-cell">
+        {r.descriptor.isB2B || r.descriptor.isSoldOut || r.analysis.window7.averageDailyDepletion === null ? '-' : formatNumber(r.analysis.window7.averageDailyDepletion)}
+      </TableCell>
+      <TableCell className="px-2 py-1.5 text-right tabular-nums">
+        {r.analysis.acceleration.accelerationRatePercent === null ? (
+          <span className="text-muted-foreground">{r.analysis.acceleration.trend === 'NEW_DEPLETION' ? '신규 소진' : '-'}</span>
+        ) : (
+          <span className={r.analysis.acceleration.trend === 'ACCELERATING' ? 'text-status-danger' : r.analysis.acceleration.trend === 'DECELERATING' ? 'text-status-increase' : ''}>
+            {formatSigned(r.analysis.acceleration.accelerationRatePercent)}%
+          </span>
+        )}
+      </TableCell>
+      <TableCell className="px-2 py-1.5 text-right tabular-nums"><div>{r.analysis.coverage.coverageDays === null ? "—" : `${formatNumber(r.analysis.coverage.coverageDays)}출고일`}</div><div className="text-[10px] text-muted-foreground">{r.analysis.operating?.reason ?? `최근 ${r.analysis.operating?.basisWindowDays ?? 7}일 근거`}</div></TableCell>
+      <TableCell className="px-2 py-1.5 text-right text-xs">
+        {r.analysis.forecast.expectedStockoutDate ? formatKstDate(r.analysis.forecast.expectedStockoutDate) : <span className="text-muted-foreground">산정 불가</span>}
+      </TableCell>
+      <TableCell className="hidden px-2 py-1.5 text-right tabular-nums 2xl:table-cell">{formatNumber(r.analysis.latest.unitCost)}</TableCell>
+      <TableCell className="px-2 py-1.5 text-right tabular-nums">{r.descriptor.isSoldOut ? "0" : r.analysis.latest.valuationKnown === false ? "원가 미상" : formatCurrency(r.valueBreakdown.normalStockValue)}</TableCell>
+      <TableCell className="hidden px-2 py-1.5 text-right tabular-nums xl:table-cell">
+        {r.analysis.stagnation.isMeaningful ? `${r.analysis.stagnation.stagnantDays}출고일` : <span className="text-muted-foreground">-</span>}
       </TableCell>
     </TableRow>
   );
