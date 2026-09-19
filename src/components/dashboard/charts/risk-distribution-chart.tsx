@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { PieChart as PieChartIcon } from 'lucide-react';
 import { formatNumber } from '@/lib/format';
@@ -13,6 +14,20 @@ interface RiskDistributionChartProps {
 
 const RADIAN = Math.PI / 180;
 
+/** 좁은 화면에서는 리드선이 카드 폭을 넘어가 라벨 글자가 잘린다. sm 미만에서는 도넛을
+ * 작게, 리드선을 짧게 그려 라벨이 카드 안쪽에 들어오게 한다. */
+function useIsCompactChart() {
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const update = () => setCompact(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  return compact;
+}
+
 interface LeaderLabelProps {
   cx: number;
   cy: number;
@@ -22,6 +37,7 @@ interface LeaderLabelProps {
   percent: number;
   name: string;
   fill: string;
+  compact: boolean;
 }
 
 /**
@@ -33,7 +49,7 @@ interface LeaderLabelProps {
 const SMALL_SLICE_THRESHOLD = 0.08;
 const SMALL_SLICE_NUDGE: Record<string, number> = { 위험: -16, 주의: 16 };
 
-function LeaderLineLabel({ cx, cy, midAngle, outerRadius, value, percent, name, fill }: LeaderLabelProps) {
+function LeaderLineLabel({ cx, cy, midAngle, outerRadius, value, percent, name, fill, compact }: LeaderLabelProps) {
   if (value === 0) return null;
   const cos = Math.cos(-RADIAN * midAngle);
   const sin = Math.sin(-RADIAN * midAngle);
@@ -45,24 +61,27 @@ function LeaderLineLabel({ cx, cy, midAngle, outerRadius, value, percent, name, 
 
   // 굽는 지점은 기본적으로 조각의 실제 각도를 따라간다. 작은 조각일 때만 겹침 방지용 고정
   // 오프셋을 쓰고, 그 오프셋도 링 반지름 범위 안으로 clamp해 차트 밖으로 나가지 않게 한다.
-  const bendRadius = outerRadius + 22;
+  // 좁은 화면(compact)에서는 리드선을 짧게 그려 라벨이 카드 폭 안에 들어오게 한다.
+  const bendRadius = outerRadius + (compact ? 12 : 22);
   const naturalEy = cy + bendRadius * sin;
-  const maxOffset = outerRadius + 30;
+  const maxOffset = outerRadius + (compact ? 18 : 30);
   const ey = percent < SMALL_SLICE_THRESHOLD && name in SMALL_SLICE_NUDGE
-    ? cy + SMALL_SLICE_NUDGE[name]
+    ? cy + SMALL_SLICE_NUDGE[name] * (compact ? 0.75 : 1)
     : Math.min(cy + maxOffset, Math.max(cy - maxOffset, naturalEy));
-  const ex = cx + dir * (outerRadius + 44);
-  const mx = ex - dir * 14;
+  const ex = cx + dir * (outerRadius + (compact ? 24 : 44));
+  const mx = ex - dir * (compact ? 8 : 14);
   const textAnchor = side === 'right' ? 'start' : 'end';
+  const nameFontSize = compact ? 10 : 12;
+  const detailFontSize = compact ? 9 : 11;
 
   return (
     <g>
       <path d={`M${sx},${sy} L${mx},${ey} L${ex},${ey}`} stroke={fill} strokeWidth={1.5} fill="none" />
       <circle cx={sx} cy={sy} r={2.5} fill={fill} />
-      <text x={ex + dir * 4} y={ey - 3} textAnchor={textAnchor} fontSize={12} fontWeight={600} fill="var(--color-foreground)">
+      <text x={ex + dir * 4} y={ey - 3} textAnchor={textAnchor} fontSize={nameFontSize} fontWeight={600} fill="var(--color-foreground)">
         {name}
       </text>
-      <text x={ex + dir * 4} y={ey + 12} textAnchor={textAnchor} fontSize={11} fill="var(--color-muted-foreground)">
+      <text x={ex + dir * 4} y={ey + (compact ? 10 : 12)} textAnchor={textAnchor} fontSize={detailFontSize} fill="var(--color-muted-foreground)">
         {`${value.toLocaleString('ko-KR')}건 · ${Math.round(percent * 100)}%`}
       </text>
     </g>
@@ -77,6 +96,7 @@ export function RiskDistributionChart({ danger, warning, normal, unknown = 0 }: 
     { name: '개별 확인', value: unknown, color: 'var(--color-muted-foreground)' },
   ];
   const total = danger + warning + normal + unknown;
+  const compact = useIsCompactChart();
 
   return (
     <div className="px-5 py-4">
@@ -89,13 +109,13 @@ export function RiskDistributionChart({ danger, warning, normal, unknown = 0 }: 
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart margin={{ top: 32, right: 96, bottom: 32, left: 72 }}>
+            <PieChart margin={compact ? { top: 24, right: 52, bottom: 24, left: 40 } : { top: 32, right: 96, bottom: 32, left: 72 }}>
               <Pie
                 data={data}
                 dataKey="value"
                 nameKey="name"
-                innerRadius={52}
-                outerRadius={76}
+                innerRadius={compact ? 40 : 52}
+                outerRadius={compact ? 58 : 76}
                 paddingAngle={3}
                 stroke="var(--color-card)"
                 strokeWidth={2}
@@ -110,6 +130,7 @@ export function RiskDistributionChart({ danger, warning, normal, unknown = 0 }: 
                     percent={props.percent}
                     name={props.name}
                     fill={data[props.index].color}
+                    compact={compact}
                   />
                 )}
                 labelLine={false}
