@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { ExpirationManagement } from '@/components/settings/expiration-management';
 import { HolidayManagement } from '@/components/settings/holiday-management';
+import { PROTECTED_ADMIN_EMAIL } from '@/lib/constants';
 import type { RiskThresholdSettings } from '@/domain/inventory/types';
 
 interface SkuVisibilityRow {
@@ -418,6 +419,8 @@ function UserManagement({
         <div className="space-y-2">
           {users.map((u) => {
             const isSelf = u.id === currentUserId;
+            const isProtected = u.email.trim().toLowerCase() === PROTECTED_ADMIN_EMAIL;
+            const disabledReason = isProtected ? '최초 관리자 계정은 삭제할 수 없습니다.' : isSelf ? '본인 계정은 삭제할 수 없습니다.' : undefined;
             return (
               <div key={u.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
                 <div>
@@ -429,10 +432,10 @@ function UserManagement({
                     size="icon"
                     variant="ghost"
                     className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive disabled:text-muted-foreground"
-                    disabled={isSelf || deletingUserId === u.id}
+                    disabled={isSelf || isProtected || deletingUserId === u.id}
                     onClick={() => removeUser(u)}
                     aria-label={`${u.name} 계정 삭제`}
-                    title={isSelf ? '본인 계정은 삭제할 수 없습니다.' : undefined}
+                    title={disabledReason}
                   >
                     <Trash2 className="size-3.5" />
                   </Button>

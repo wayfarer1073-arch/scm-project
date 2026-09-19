@@ -11,7 +11,7 @@ export function listUsers() {
 }
 
 export function getUserRole(userId: string) {
-  return prisma.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true } });
+  return prisma.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true, email: true } });
 }
 
 export function countActiveAdmins() {
