@@ -60,7 +60,7 @@ export function analyzeOperationalSku(
   const staleDays = shippingDaysBetween(latest.date, latestShippingDay(asOfDate, holidays), holidays);
   const invalid = sorted.some(o => o.date >= shiftDate(latest.date, -30) && o.normalStock < 0);
   const uncertainMovement = !!basis && (basis.inconsistent || basis.unexplainedIncrease > 0);
-  const reason = context.isMissing ? '최근 목록 미관측' : context.isB2B ? 'B2B 개별 판단'
+  const reason = context.isMissing ? '품절' : context.isB2B ? 'B2B 개별 판단'
     : staleDays > 0 ? '자료 갱신 필요' : invalid ? '재고 정합성 확인'
       : uncertainMovement ? '입고·조정 확인' : latest.normalStock === 0 ? '관측 무재고' : !basis ? '관측 자료 부족'
         : basis.averageDailyDepletion === 0 ? '소진 미관측' : null;

@@ -54,7 +54,7 @@ it('preserves departed-SKU history but excludes its last balance from current as
     snapshotDate: new Date('2026-09-21'), sourceFileName: 'metrics.xlsx', fileHash: 'departed', rows: [row('B', 20)] });
   const rows = await getInventoryRows({ warehouseId: fixture.warehouse.id, asOfDate: '2026-09-21' });
   const missing = rows.find(r => r.descriptor.productCode === 'A')!;
-  expect(missing.analysis.operating?.reason).toBe('최근 목록 미관측');
+  expect(missing.analysis.operating?.reason).toBe('품절');
   expect(missing.analysis.latest.normalStock).toBe(100);
   expect(missing.analysis.forecast.expectedStockoutDate).toBeNull();
   const kpis = calculateCompanyKpis(rows, 30);

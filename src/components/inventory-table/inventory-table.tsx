@@ -372,10 +372,10 @@ export function InventoryTableRow({ row: r, fromDate, onSelectSku }: { row: Inve
             <>
               <Badge variant="soldout" className="gap-1 px-1.5 py-0 text-[10px]">
                 <PackageX className="size-2.5" aria-hidden="true" />
-                목록 미관측
+                품절
               </Badge>
               <InfoTooltip>
-                최근 목록에서 빠진 상품입니다. 품절·판매 종료·일시 누락을 구분할 수 없어 확인이 필요합니다. {r.descriptor.soldOutDetectedDate}부터 1개월간 이력 확인용으로 표시하며 현재 재고 집계에서는 제외합니다.
+                최근 업로드 목록에서 빠져 품절로 분류한 상품입니다. {r.descriptor.soldOutDetectedDate}부터 1개월간 이력 확인용으로 표시하며 현재 재고 집계에서는 제외합니다.
               </InfoTooltip>
             </>
           )}
@@ -398,7 +398,7 @@ export function InventoryTableRow({ row: r, fromDate, onSelectSku }: { row: Inve
         )}
       </TableCell>
       <TableCell>{r.descriptor.warehouseCode}</TableCell>
-      <TableCell className="text-right tabular-nums">{r.descriptor.isSoldOut ? "미확인" : formatNumber(r.analysis.latest.normalStock)}</TableCell>
+      <TableCell className="text-right tabular-nums">{r.descriptor.isSoldOut ? "0" : formatNumber(r.analysis.latest.normalStock)}</TableCell>
       <TableCell className="text-right tabular-nums">
         {fromDate ? (
           r.periodComparison ? (
@@ -429,7 +429,7 @@ export function InventoryTableRow({ row: r, fromDate, onSelectSku }: { row: Inve
         {r.analysis.forecast.expectedStockoutDate ? formatKstDate(r.analysis.forecast.expectedStockoutDate) : <span className="text-muted-foreground">산정 불가</span>}
       </TableCell>
       <TableCell className="hidden text-right tabular-nums 2xl:table-cell">{formatNumber(r.analysis.latest.unitCost)}</TableCell>
-      <TableCell className="text-right tabular-nums">{r.descriptor.isSoldOut ? "미확인" : r.analysis.latest.valuationKnown === false ? "원가 미상" : formatCurrency(r.valueBreakdown.normalStockValue)}</TableCell>
+      <TableCell className="text-right tabular-nums">{r.descriptor.isSoldOut ? "0" : r.analysis.latest.valuationKnown === false ? "원가 미상" : formatCurrency(r.valueBreakdown.normalStockValue)}</TableCell>
       <TableCell className="hidden text-right tabular-nums xl:table-cell">
         {r.analysis.stagnation.isMeaningful ? `${r.analysis.stagnation.stagnantDays}출고일` : <span className="text-muted-foreground">-</span>}
       </TableCell>

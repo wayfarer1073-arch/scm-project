@@ -90,12 +90,13 @@ describe('shipping-day trading inventory', () => {
   it('keeps actual zero stock separate from a SKU absent in the latest list', () => {
     expect(analyzeOperationalSku([obs('2026-09-18', 0)], '2026-09-18')!.thresholdRisk.level).toBe('DANGER');
     const a = analyzeOperationalSku(daily(), '2026-09-18', undefined, undefined, undefined, { isMissing: true })!;
+    expect(a.operating?.reason).toBe('품절');
     const row: InventoryRow = { descriptor: { skuId: 'x', warehouseId: 'w', warehouseCode: 'A', warehouseName: 'A', productCode: 'x', productName: 'x',
       option: null, barcode: null, location: null, manualDangerQty: null, manualWarningQty: null, expirationDate: null, expirationRiskDays: null,
       isB2B: false, isSoldOut: true, firstSeenDate: '2026-09-04', soldOutDetectedDate: '2026-09-18' },
       analysis: a, periodComparison: null, valueBreakdown: calculateInventoryValueBreakdown(a.latest) };
     expect(calculateSnapshotKpis([row])).toMatchObject({ observedSkuCount: 0, staleSkuCount: 1, comparableSkuCount: 0, knownInventoryValue: null });
     expect(buildRiskSheetRows([{ ...row, ...row.descriptor }])).toEqual([]);
-    expect(buildInventorySheetRows([{ ...row, ...row.descriptor }])[0].재고금액).toBe('미관측');
+    expect(buildInventorySheetRows([{ ...row, ...row.descriptor }])[0].재고금액).toBe(0);
   });
 });

@@ -260,10 +260,10 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
                   <>
                     <Badge variant="soldout" className="gap-1">
                       <PackageX className="size-3" aria-hidden="true" />
-                      목록 미관측
+                      품절
                     </Badge>
                     <InfoTooltip>
-                      최근 목록 미관측 상품입니다. 품절인지 판매 종료인지는 확인이 필요합니다. 아래 수량·금액은 마지막 관측값이며 현재 집계에서는 제외됩니다.
+                      최근 업로드 목록에서 빠져 품절로 분류한 상품입니다. 아래 수량·금액은 마지막 관측값이며 현재 집계에서는 제외됩니다.
                     </InfoTooltip>
                   </>
                 )}
