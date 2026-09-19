@@ -80,7 +80,7 @@ export function HolidayManagement({ isAdmin, initialHolidays }: HolidayManagemen
       <CardHeader>
         <div className="flex items-center gap-1.5">
           <CardTitle>공휴일 관리</CardTitle>
-          <InfoTooltip>
+          <InfoTooltip className="text-brand-accent hover:text-brand-accent/80">
             여기서 지정한 날짜는 주말처럼 취급돼요. 업로드 화면에서 회색으로 표시되고 그 날짜엔 자료를 올릴 수 없습니다. 다만 매출·판매는
             공휴일에도 계속 일어난다고 보기 때문에, 통계에서 &quot;자료 없음&quot;으로 빼지 않고 바로 전 영업일 자료를 그대로 사용합니다.
           </InfoTooltip>

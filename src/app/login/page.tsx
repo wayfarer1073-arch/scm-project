@@ -1,14 +1,17 @@
 import { Suspense } from 'react';
 import { LoginForm } from '@/components/auth/login-form';
-import { StockBoardLogoLockup } from '@/components/layout/stock-board-logo';
+import { StockBoardLogo } from '@/components/layout/stock-board-logo';
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-sidebar px-4">
       <div className="w-full max-w-sm space-y-8">
         <div className="flex flex-col items-center gap-3 text-center">
-          <StockBoardLogoLockup iconSize={56} className="flex-col gap-2" textClassName="text-2xl" />
-          <p className="text-sm text-muted-foreground">사내 계정으로 로그인하세요</p>
+          <span className="flex size-14 items-center justify-center rounded-2xl bg-brand-accent text-brand-accent-foreground">
+            <StockBoardLogo size={32} />
+          </span>
+          <p className="text-2xl font-semibold tracking-tight text-sidebar-foreground">StockBoard</p>
+          <p className="text-sm text-sidebar-muted-foreground">사내 계정으로 로그인하세요</p>
         </div>
         <Suspense fallback={null}>
           <LoginForm />

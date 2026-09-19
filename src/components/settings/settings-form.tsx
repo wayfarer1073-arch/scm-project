@@ -100,7 +100,7 @@ export function SettingsForm({ isAdmin, currentUserId, warehouses, settings, use
         <CardHeader>
           <div className="flex items-center gap-1.5">
             <CardTitle>창고명</CardTitle>
-            <InfoTooltip>화면에 보이는 이름만 바뀌어요. 창고 A/B/C는 각각 다른 상품을 관리하는 별도의 공간이라, 이름을 바꿔도 재고가 서로 합쳐지지 않습니다.</InfoTooltip>
+            <InfoTooltip className="text-brand-accent hover:text-brand-accent/80">화면에 보이는 이름만 바뀌어요. 창고 A/B/C는 각각 다른 상품을 관리하는 별도의 공간이라, 이름을 바꿔도 재고가 서로 합쳐지지 않습니다.</InfoTooltip>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -130,7 +130,7 @@ export function SettingsForm({ isAdmin, currentUserId, warehouses, settings, use
         <CardHeader>
           <div className="flex items-center gap-1.5">
             <CardTitle>위험 / 정체 판단 기준</CardTitle>
-            <InfoTooltip>
+            <InfoTooltip className="text-brand-accent hover:text-brand-accent/80">
               상품마다 위험/경고 수량을 직접 정할 수 있어요. 따로 정하지 않으면, 아래 &quot;품절 임박 기준&quot;·&quot;관리 필요 경계&quot;에 입력한
               일수를 그 상품의 최근 판매 속도에 맞춰 자동으로 계산합니다. 이 기준은 재고가 앞으로 며칠 버틸 수 있는지, 오래 안 팔린 상품인지,
               너무 많이 쌓인 상품인지를 판단할 때도 똑같이 쓰여요.
@@ -238,7 +238,7 @@ function SkuVisibilityManagement({ isAdmin, initialSkus }: { isAdmin: boolean; i
       <CardHeader>
         <div className="flex items-center gap-1.5">
           <CardTitle>SKU 대시보드 노출 관리</CardTitle>
-          <InfoTooltip>
+          <InfoTooltip className="text-brand-accent hover:text-brand-accent/80">
             특정 상품을 화면(요약 숫자·그래프·재고 표·알림·다운로드 파일)에서 안 보이게 숨길 수 있어요. 업로드한 자료는 그대로 남아 있고,
             언제든 다시 보이게 되돌릴 수 있습니다.
           </InfoTooltip>

@@ -60,11 +60,11 @@ export function UploadCalendar({ warehouses, entries, holidays, isAdmin }: Uploa
   }, [month]);
 
   return (
-    <section className="rounded-xl border border-border">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3.5">
+    <section className="overflow-hidden rounded-xl border border-border">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-sidebar px-5 py-3.5 text-sidebar-foreground">
         <div>
           <h2 className="text-base font-semibold">업로드 현황 캘린더</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="mt-0.5 text-xs text-sidebar-muted-foreground">
             날짜별로 어떤 창고가 자료를 올렸는지 한눈에 확인하고, 블록을 눌러 바로 업로드하거나 교체할 수 있습니다. 주말·공휴일(옅은 회색)은
             업로드할 수 없지만 KPI 계산에는 직전 영업일 자료가 그대로 포함됩니다.
           </p>

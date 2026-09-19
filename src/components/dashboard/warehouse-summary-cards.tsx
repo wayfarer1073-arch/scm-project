@@ -36,10 +36,10 @@ const ROWS: { label: string; format: (s: WarehouseSummary) => string }[] = [
 export function WarehouseSummaryCards({ summaries: summariesInput, activeWarehouseId, onSelect, latestUploads }: WarehouseSummaryCardsProps) {
   const summaries = [...summariesInput].sort((a, b) => a.warehouseCode.localeCompare(b.warehouseCode));
   return (
-    <section className="rounded-xl border border-border">
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-5 py-3.5">
+    <section className="overflow-hidden rounded-xl border border-border">
+      <div className="flex flex-wrap items-center gap-1.5 bg-sidebar px-5 py-3.5 text-sidebar-foreground">
         <h2 className="text-base font-semibold">창고별 요약</h2>
-        <InfoTooltip>창고 A/B/C는 서로 다른 상품을 관리하는 별개의 공간이에요. 어느 창고가 더 잘하고 있는지 비교하는 표가 아닙니다.</InfoTooltip>
+        <InfoTooltip className="text-brand-accent hover:text-brand-accent/80">창고 A/B/C는 서로 다른 상품을 관리하는 별개의 공간이에요. 어느 창고가 더 잘하고 있는지 비교하는 표가 아닙니다.</InfoTooltip>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm" style={{ minWidth: 560 }}>

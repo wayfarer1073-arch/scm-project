@@ -11,12 +11,13 @@ interface FavoritesSummaryProps {
 
 export function FavoritesSummary({ rows, onSelectSku, fromDate }: FavoritesSummaryProps) {
   return (
-    <section className="space-y-3 rounded-xl border border-border p-4 sm:p-5">
-      <div className="flex items-center gap-1.5">
-        <Star className="size-4 fill-amber-400 text-amber-400" aria-hidden="true" />
+    <section className="overflow-hidden rounded-xl border border-border">
+      <div className="flex items-center gap-1.5 bg-sidebar px-5 py-3.5 text-sidebar-foreground">
+        <Star className="size-4 fill-brand-accent text-brand-accent" aria-hidden="true" />
         <h2 className="text-base font-semibold">즐겨찾기</h2>
-        <span className="text-xs text-muted-foreground">{rows.length}개</span>
+        <span className="text-xs text-sidebar-muted-foreground">{rows.length}개</span>
       </div>
+      <div className="p-4 sm:p-5">
       {rows.length === 0 ? (
         <p className="text-xs text-muted-foreground">
           아래 목록에서 상품을 클릭한 뒤 SKU 상세의 별표를 누르면 이곳에 즐겨찾기한 SKU의 KPI 현황이 표시됩니다.
@@ -35,6 +36,7 @@ export function FavoritesSummary({ rows, onSelectSku, fromDate }: FavoritesSumma
           </Table>
         </div>
       )}
+      </div>
     </section>
   );
 }

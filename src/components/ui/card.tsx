@@ -2,11 +2,11 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 function Card({ className, ...props }: React.ComponentProps<'div'>) {
-  return <div data-slot="card" className={cn('rounded-xl border border-border bg-card text-card-foreground', className)} {...props} />;
+  return <div data-slot="card" className={cn('overflow-hidden rounded-xl border border-border bg-card text-card-foreground', className)} {...props} />;
 }
 
 function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
-  return <div data-slot="card-header" className={cn('flex flex-col gap-1 border-b border-border px-5 py-3.5', className)} {...props} />;
+  return <div data-slot="card-header" className={cn('flex flex-col gap-1 bg-sidebar px-5 py-3.5 text-sidebar-foreground', className)} {...props} />;
 }
 
 function CardTitle({ className, ...props }: React.ComponentProps<'div'>) {
@@ -14,7 +14,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<'div'>) {
 }
 
 function CardDescription({ className, ...props }: React.ComponentProps<'div'>) {
-  return <div data-slot="card-description" className={cn('text-xs text-muted-foreground', className)} {...props} />;
+  return <div data-slot="card-description" className={cn('text-xs text-sidebar-muted-foreground', className)} {...props} />;
 }
 
 function CardAction({ className, ...props }: React.ComponentProps<'div'>) {

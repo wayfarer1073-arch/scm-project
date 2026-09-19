@@ -321,7 +321,7 @@ export function ExpirationManagement({ isAdmin, warehouses, initialEntries }: Ex
       <CardHeader>
         <div className="flex items-center gap-1.5">
           <CardTitle>소비기한 관리</CardTitle>
-          <InfoTooltip>
+          <InfoTooltip className="text-brand-accent hover:text-brand-accent/80">
             엑셀 파일(상품코드·상품명·로트·소비기한)을 올리면 그 창고에 등록된 상품에 소비기한을 자동으로 반영해요. 로트 번호를 비워두면 소비기한이
             빠른 순서대로 A, B, C…가 자동으로 붙습니다. 목록에 없는 상품코드는 그냥 건너뜁니다. 엑셀 없이 아래에서 하나씩 직접 추가·수정·삭제할
             수도 있어요.

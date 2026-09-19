@@ -50,9 +50,9 @@ export function KpiCards({ kpis, fromDate, asOfDate }: KpiCardsProps) {
         <Metric label="기록된 입고량" value={quantity(s.recordedInbound)} detail="동일 비교 구간 · 미기록 입고 제외" />
         <Metric label="입고 보정 추정 소진" value={quantity(s.estimatedDepletion)} detail="구간별 max(이전 재고 + 입고 − 현재 재고, 0)" />
       </div>
-      <div className="flex items-center gap-1.5 bg-sidebar px-5 py-3 text-sidebar-foreground">
-        <p className="text-xs text-sidebar-muted-foreground">추정치 해석 유의사항</p>
-        <InfoTooltip className="text-brand-accent hover:text-brand-accent/80">
+      <div className="flex items-center gap-1.5 border-t border-border px-5 py-3">
+        <p className="text-xs text-muted-foreground">추정치 해석 유의사항</p>
+        <InfoTooltip>
           여기 나온 소진량은 재고가 줄어든 만큼을 계산한 추정치예요. 반품, 창고 간 이동, 재고 조정, 기록되지 않은 입고 등이 섞여 있을 수 있어
           실제 판매량과는 다를 수 있습니다. 정확한 회전율이나 품절 시점 예측에는 이 숫자만으로는 충분하지 않아요.
         </InfoTooltip>

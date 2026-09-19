@@ -58,16 +58,20 @@ export function ChartsSection({ rows, dailyTotals, warehouses, chartWarehouseId,
 
   return (
     <section className="overflow-hidden rounded-xl border border-border">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-sidebar px-5 py-3.5 text-sidebar-foreground">
         <div>
           <h2 className="text-base font-semibold">재고 흐름</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">선택한 조회 범위와 창고 필터를 반영합니다.</p>
+          <p className="mt-0.5 text-xs text-sidebar-muted-foreground">선택한 조회 범위와 창고 필터를 반영합니다.</p>
         </div>
         <Tabs value={chartWarehouseId} onValueChange={(v) => onChangeChartWarehouse(v)}>
           <TabsList>
-            <TabsTrigger value="ALL">전체</TabsTrigger>
+            <TabsTrigger value="ALL" className="bg-sidebar-hover-bg text-sidebar-muted-foreground data-[state=active]:bg-brand-accent data-[state=active]:text-brand-accent-foreground">전체</TabsTrigger>
             {warehouses.map((w) => (
-              <TabsTrigger key={w.id} value={w.id}>
+              <TabsTrigger
+                key={w.id}
+                value={w.id}
+                className="bg-sidebar-hover-bg text-sidebar-muted-foreground data-[state=active]:bg-brand-accent data-[state=active]:text-brand-accent-foreground"
+              >
                 {w.name}
               </TabsTrigger>
             ))}
