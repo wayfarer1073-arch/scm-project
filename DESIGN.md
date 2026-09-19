@@ -13,6 +13,10 @@ colors:
   risk-normal: "oklch(0.55 0.14 150)"
   risk-normal-bg: "oklch(0.96 0.04 150)"
   risk-stagnant: "oklch(0.55 0.01 260)"
+  sidebar: "oklch(0.18 0.014 258)"
+  sidebar-foreground: "oklch(0.94 0.004 260)"
+  brand-accent: "oklch(0.85 0.19 126)"
+  brand-accent-foreground: "oklch(0.22 0.03 130)"
 typography:
   display:
     fontFamily: "Noto Sans KR, ui-sans-serif, system-ui, sans-serif"
@@ -80,12 +84,24 @@ StockBoard의 메인 대시보드는 경영진이 매일 훑어보는 재고 브
 
 ## Colors
 
-팔레트는 거의 전부 중립이다 — 의도적으로 "조용한" 배경 위에 위험 신호만 도드라지게 한다.
+팔레트는 거의 전부 중립이다 — 의도적으로 "조용한" 배경 위에 위험 신호만 도드라지게 한다. 메인
+대시보드에는 여기에 더해 좌측 사이드바 + 네온 라임 브랜드 액센트(아래 "Sidebar & Brand Accent")가
+얹혀 있다 — 사용자가 직접 핀한 참고 레퍼런스("Vault" 재고관리 대시보드 템플릿)의 시각 언어를 이식한
+것으로, 기존의 "위험 신호 전용 단일 악센트" 원칙 위에 "브랜드/내비게이션 전용의 두 번째 악센트"를
+추가한 형태다. 둘은 색상환에서 뚜렷이 분리되어 있고 절대 서로의 의미를 침범하지 않는다.
 
 ### Primary
-- **위험 레드 (Risk Danger)** (`oklch(0.55 0.22 25)`): 이 시스템의 유일한 강한 악센트. Action
+- **위험 레드 (Risk Danger)** (`oklch(0.55 0.22 25)`): 실제 위험 신호 전용의 강한 악센트. Action
   Center 헤드라인 숫자, KPI의 "위험 SKU" 수치, 재고 위험상태 분포 도넛의 위험 조각, 재고 테이블의
   위험 상태 점에만 쓴다. 그 외의 곳에는 절대 확장하지 않는다.
+
+### Sidebar & Brand Accent (신규 — 대시보드 좌측 내비게이션 전용)
+- **사이드바 (Sidebar)** (`oklch(0.18 0.014 258)`): 좌측 고정 240px 내비게이션의 배경. 본문(페이퍼,
+  흰색)과 분리된 별도 다크 영역 — 본문 패널 배경은 절대 다크로 바꾸지 않는다.
+- **브랜드 액센트 (Brand Accent)** (`oklch(0.85 0.19 126)`, 네온 라임): 사이드바 활성 메뉴 필,
+  로고 아이콘 칩, Action Center 헤드라인 카드의 아이콘 배경, 재고수량/재고자산 추이 선(중립적인
+  추세 데이터 강조)에 쓴다. 위험(빨강)/주의(주황)/정상(초록)/정체(회색) 신호 색상과는 색상환에서
+  분리된 노랑-초록(hue 126)이라 혼동되지 않으며, **위험 신호 의미로는 절대 쓰지 않는다.**
 
 ### Neutral
 - **잉크 (Ink)** (`oklch(0.19 0.018 260)`): 본문 텍스트, 헤드라인, 차트 라인(추세는 위험이 아니므로
@@ -104,9 +120,11 @@ StockBoard의 메인 대시보드는 경영진이 매일 훑어보는 재고 브
   있다. 이 색들은 재고 상태 신호 전용이며, 다른 용도(장식, 브랜드 강조 등)로 재사용하지 않는다.
 
 ### Named Rules
-**The One Signal Rule.** 강한 악센트(위험 레드)는 실제 위험을 가리킬 때만 쓴다. 순위·추세·구분 같은
-중립적 정보에 색을 입히면 위험 신호의 신뢰도가 떨어진다 — TOP7 소진량 막대나 재고수량/자산 추이
-선은 색이 아니라 순서·굵기·위치로 구분한다.
+**The Two Signal Rule** (구 The One Signal Rule에서 확장). 위험 레드는 실제 위험을 가리킬 때만
+쓴다. 브랜드 액센트(네온 라임)는 위험과 무관한 "이 제품의 정체성·강조"를 가리킬 때만 쓴다 — 둘을
+섞으면 위험 신호의 신뢰도가 떨어진다. TOP7 소진량 막대처럼 항목 간 순위/구분이 목적인 곳은 여전히
+색이 아니라 순서·굵기·위치로 구분한다(재고수량/자산 **추이** 선은 예외로 브랜드 액센트를 쓴다 —
+값의 오르내림 자체를 강조하는 단일 계열 라인이라 순위 구분 문제가 없다).
 
 ## Typography
 
@@ -166,12 +184,30 @@ dot)과 랭크 뱃지(TOP7 차트의 값 원)에만 쓴다.
 - **내부 구분:** 콘텐츠 블록 사이는 `divide-y`(세로) 또는 `divide-x`(가로, 2열 이상)만 쓰고 중첩
   카드를 만들지 않는다.
 
-### Action Center Lead + List (신규)
-- **Lead row:** 가장 심각한 카테고리 하나를 헤드라인으로 — 큰 숫자(`text-4xl tabular-nums`, 위험
-  레드) + 제목 + 대표 SKU 목록. 위험이 없으면 조용한 안내 문구로 대체(체크 아이콘, 중립색).
-- **List rows:** 나머지 카테고리는 아이콘 + 라벨 + 숫자 + 대표 SKU + 화살표 한 줄. 클릭 시 재고
-  표로 필터가 바로 적용된다.
-- **State:** `hover:bg-muted/40`, count가 0이면 `opacity-50`.
+### Sidebar Navigation (신규 — 앱 전체 공통 chrome)
+- 좌측 고정 `w-60`(240px) 다크 패널(`bg-sidebar`), `sm` 미만에서는 숨기고 기존 햄버거 드로어
+  (`MobileNav`)로 대체.
+- 상단: 브랜드 액센트 배경의 아이콘 칩 + "StockBoard" 워드마크.
+- 메뉴: 아이콘 + 라벨, 활성 항목만 브랜드 액센트 배경 필(`rounded-xl bg-brand-accent
+  text-brand-accent-foreground`), 비활성은 `text-sidebar-muted-foreground` + hover 시
+  `bg-sidebar-hover-bg`.
+- 하단: 사용자명/역할 + 로그아웃.
+- 본문 영역(`<main>`)은 그대로 페이퍼(흰 배경) — 다크는 사이드바에만 한정된다.
+
+### Action Center Card Grid (재구성 — "Vault" 레퍼런스 카드 언어)
+- **Hero card:** 가장 심각한 카테고리 하나를 다크(사이드바와 동일한 `bg-sidebar`) 카드로 — 브랜드
+  액센트 원형 아이콘 칩 + 큰 숫자 + 제목 + 대표 SKU. 2칸을 차지(`col-span-2`). 위험이 없으면 체크
+  아이콘 + 안내 문구로 대체.
+- **나머지 카드:** 동일 높이의 흰 카드(`rounded-2xl border border-border`) — 상단에 아이콘 원형 칩
+  (상태색 배경, 예: `bg-status-danger-bg text-status-danger`) + 우상단 모서리에 작은 화살표
+  (`ArrowUpRight`), 하단에 라벨 + 숫자 + 대표 SKU. 참고 레퍼런스의 "same-size icon+heading+number"
+  카드 그리드를 의도적으로 그대로 받아들인 것 — 사용자가 핀한 레퍼런스이므로 craft-floor의 일반
+  카드-그리드 회피 규칙보다 우선한다.
+- **Grid:** `grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7` — 좁은 화면에서 카드가
+  겹치거나 페이지 전체가 가로로 밀리지 않도록 hero(2칸)+5장이 한 줄에 꽉 차는 `2xl`까지는 여러 줄로
+  감싼다.
+- **State:** `hover:-translate-y-0.5`(뜨는 느낌), count가 0이면 `opacity-60`. 클릭 시 재고 표로
+  필터가 바로 적용된다.
 
 ### KPI Strip (신규, 카드 그리드 대체)
 - **좌측:** 헤드라인 지표(총 재고자산) — 가장 큰 숫자.
@@ -194,19 +230,21 @@ dot)과 랭크 뱃지(TOP7 차트의 값 원)에만 쓴다.
   의미(빨강 계열=위험이라는 사이트 전역의 색 규칙)와는 이 차트에서만 의도적으로 갈라진다.
 - 랭크 막대: 캡슐형 바 + 끝에 원형 값 뱃지. 순위색은 무지개가 아니라 단일 중립 잉크 램프
   (`oklch(L 0.02 260)`, L은 짙은 값→옅은 값)로, 위험 레드는 쓰지 않는다(순위는 위험이 아니다).
-- 시계열 라인: 색은 중립 잉크. 위험 레드를 트렌드 라인에 쓰지 않는다(The One Signal Rule).
+- 시계열 라인(전체 재고수량/재고자산 추이): 색은 브랜드 액센트(네온 라임, `--color-brand-accent`).
+  위험 레드는 트렌드 라인에 쓰지 않는다(The Two Signal Rule) — 추이는 위험 신호가 아니라 브랜드
+  강조 대상이다. 툴팁은 사이드바와 동일한 다크 필(`bg-sidebar`)로 표시한다.
 
 ### Table (기존 유지, 상태 표시만 변경)
 - **Status:** shadcn Badge 대신 점(`size-1.5 rounded-full`, 상태색) + 텍스트로 표시 — 보고서의
   각주 표기에 가깝다.
 - 그 외 구조(밀도, 정렬, 필터, 페이지네이션)는 유지.
 
-### Tabs (공유 프리미티브 — Action Center 탭, 창고 필터, 소비기한 창고 탭 등)
-- `TabsList`의 회색 pill 배경(`bg-muted p-1`)을 제거했다. 탭 버튼은 `gap-2`로 서로 살짝
-  떨어뜨려 배열하고, 컨테이너 자체는 배경이 없다.
-- 활성 탭은 `bg-primary text-primary-foreground`(잉크 채움 + 흰 글씨), 비활성은
-  `text-muted-foreground`. `shadow-sm`은 제거했다(Flat Paper Rule) — 토글/탭 버튼과 동일한
-  색 언어.
+### Tabs (공유 프리미티브 — 전체 재고 현황 빠른 필터, 창고 필터, 소비기한 창고 탭 등)
+- `TabsTrigger` 개별 버튼이 항상 필 형태(`rounded-full bg-muted`)로 보인다 — 레퍼런스의 태그
+  필터 pill 행("Fast Moving/Discounted/…")을 이식한 형태. `TabsList` 컨테이너 자체는 배경 없이
+  버튼들을 `gap-2`로 나열한다.
+- 활성 탭은 `bg-primary text-primary-foreground`(잉크 채움 + 흰 글씨), 비활성은 `bg-muted
+  text-muted-foreground`. `shadow-sm`은 쓰지 않는다(Flat Paper Rule).
 
 ### 업로드 캘린더 배지
 - 업로드된 A/B/C 배지는 창고별 파스텔 색 대신 `bg-foreground text-background`(잉크 채움 +

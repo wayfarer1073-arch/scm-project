@@ -75,8 +75,8 @@ export function ChartsSection({ rows, dailyTotals, warehouses, chartWarehouseId,
         </Tabs>
       </div>
       <div className="grid grid-cols-1 divide-y divide-border lg:grid-cols-2 lg:divide-x">
-        <TrendLineChart title="전체 재고수량 추이" data={stockSeries} valueFormatter={(v) => `${formatNumber(v)}개`} color="var(--color-foreground)" />
-        <TrendLineChart title="전체 재고자산 추이" data={valueSeries} valueFormatter={(v) => formatCurrency(v)} color="var(--color-foreground)" />
+        <TrendLineChart title="전체 재고수량 추이" data={stockSeries} valueFormatter={(v) => `${formatNumber(v)}개`} />
+        <TrendLineChart title="전체 재고자산 추이" data={valueSeries} valueFormatter={(v) => formatCurrency(v)} />
         <RiskDistributionChart {...riskCounts} />
         <TopDepletionChart items={topDepletion} />
       </div>

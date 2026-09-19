@@ -11,7 +11,7 @@ interface TrendLineChartProps {
   color?: string;
 }
 
-export function TrendLineChart({ title, data, valueFormatter, color = 'var(--color-foreground)' }: TrendLineChartProps) {
+export function TrendLineChart({ title, data, valueFormatter, color = 'var(--color-brand-accent)' }: TrendLineChartProps) {
   const gradientId = `trend-fill-${title.replace(/[^a-zA-Z0-9가-힣]+/g, '-')}`;
   return (
     <div className="px-5 py-4">
@@ -53,9 +53,11 @@ export function TrendLineChart({ title, data, valueFormatter, color = 'var(--col
                 formatter={(value) => [valueFormatter(Number(value)), title]}
                 labelFormatter={(d) => formatKstDate(String(d))}
                 cursor={{ stroke: 'var(--color-border)', strokeWidth: 1, strokeDasharray: '3 3' }}
-                contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: 'var(--color-border)', background: 'var(--color-card)' }}
+                contentStyle={{ fontSize: 12, borderRadius: 10, border: 'none', background: 'var(--color-sidebar)', color: 'var(--color-sidebar-foreground)' }}
+                labelStyle={{ color: 'var(--color-sidebar-muted-foreground)' }}
+                itemStyle={{ color: 'var(--color-sidebar-foreground)' }}
               />
-              <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2} fill={`url(#${gradientId})`} dot={false} activeDot={{ r: 4, stroke: 'var(--color-card)', strokeWidth: 2 }} />
+              <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2} fill={`url(#${gradientId})`} dot={false} activeDot={{ r: 4, stroke: 'var(--color-card)', strokeWidth: 2, fill: color }} />
             </AreaChart>
           </ResponsiveContainer>
         )}

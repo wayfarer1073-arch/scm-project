@@ -74,6 +74,20 @@
 
   --today-highlight-bg: oklch(0.94 0.03 221);
   --today-highlight-border: oklch(0.75 0.08 221);
+
+  /* 좌측 사이드바 전용 다크 팔레트 — 본문(밝은 페이퍼)과 분리된 별도의 네비게이션 영역. */
+  --sidebar: oklch(0.18 0.014 258);
+  --sidebar-foreground: oklch(0.94 0.004 260);
+  --sidebar-muted-foreground: oklch(0.62 0.014 260);
+  --sidebar-border: oklch(0.28 0.016 260);
+  --sidebar-hover-bg: oklch(0.25 0.016 260);
+
+  /* 브랜드 액센트(네온 라임) — 사이드바 활성 항목, 아이콘 칩, 차트 강조, 게이지에만 쓴다.
+     기존 위험(빨강)/주의(주황)/정상(녹색)/정체(회색) 신호 색상과는 색상환에서 분리된
+     노랑-초록(hue 125)이라 혼동되지 않는다. 신호색의 의미는 재해석하지 않고 그대로 둔다. */
+  --brand-accent: oklch(0.85 0.19 126);
+  --brand-accent-foreground: oklch(0.22 0.03 130);
+  --brand-accent-bg: oklch(0.96 0.045 126);
 }
 
 @theme inline {
@@ -130,6 +144,16 @@
 
   --color-today-highlight-bg: var(--today-highlight-bg);
   --color-today-highlight-border: var(--today-highlight-border);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-hover-bg: var(--sidebar-hover-bg);
+
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-foreground: var(--brand-accent-foreground);
+  --color-brand-accent-bg: var(--brand-accent-bg);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

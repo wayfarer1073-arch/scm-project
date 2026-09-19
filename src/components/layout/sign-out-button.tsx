@@ -6,8 +6,9 @@ import { signOut } from 'next-auth/react';
 import { LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
-export function SignOutButton() {
+export function SignOutButton({ className }: { className?: string } = {}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -30,7 +31,7 @@ export function SignOutButton() {
   }
 
   return (
-    <Button variant="ghost" size="sm" onClick={handleSignOut} disabled={loading}>
+    <Button variant="ghost" size="sm" onClick={handleSignOut} disabled={loading} className={cn(className)}>
       <LogOut className="size-4" />
       로그아웃
     </Button>
