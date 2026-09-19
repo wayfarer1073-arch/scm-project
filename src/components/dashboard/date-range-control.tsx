@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { CalendarDays, LoaderCircle, MoveRight } from 'lucide-react';
+import { LoaderCircle, MoveRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -53,10 +53,7 @@ export function DateRangeControl({ asOfDate, fromDate, maxDate }: DateRangeContr
       </div>
 
       {mode === 'day' ? (
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <CalendarDays className="size-3.5" aria-hidden="true" />
-          <input type="date" value={day} max={maxDate} onChange={(event) => setDay(event.target.value)} className="h-8 rounded-md border border-border bg-background px-2.5 text-sm tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring" />
-        </label>
+        <input type="date" value={day} max={maxDate} onChange={(event) => setDay(event.target.value)} className="h-8 rounded-md border border-border bg-background px-2.5 text-sm tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring" />
       ) : (
         <div className="flex items-center gap-1.5">
           <input type="date" value={start} max={maxDate} onChange={(event) => setStart(event.target.value)} aria-label="비교 시작일" className="h-8 rounded-md border border-border bg-background px-2.5 text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring" />

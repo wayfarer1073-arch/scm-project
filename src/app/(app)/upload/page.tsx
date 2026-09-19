@@ -39,7 +39,7 @@ export default async function UploadPage() {
       <div>
         <h1 className="text-lg font-semibold">재고 스냅샷 업로드</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          캘린더에서 날짜·창고 칸을 눌러 재고 Excel(.xls, .xlsx)을 업로드하세요. 각 창고는 서로 다른 품목군을 관리하는 독립 재고 Pool입니다.
+          캘린더에서 날짜·창고 칸을 눌러 재고 Excel(.xls, .xlsx)을 업로드하세요.
         </p>
       </div>
       <UploadCalendar

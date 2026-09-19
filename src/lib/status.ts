@@ -51,6 +51,12 @@ export function isEstimateCaveatTag(tag: string): boolean {
   return tag === '[입고 보정 추정·반품/조정 미분리]';
 }
 
+/** "[최근 7일 중 5출고일]" 형태의 근거 기간 태그인지. 신뢰도(상/중/하) 표시가 같은 정보를 이미
+ * 전달하므로 화면에서는 걸러낸다 — 엑셀 내보내기 원본에는 그대로 남는다. */
+export function isBasisWindowTag(tag: string): boolean {
+  return /^\[최근 \d+일 중 \d+출고일\]$/.test(tag);
+}
+
 /**
  * SKU 행에 붙는 "[...]" 요약 태그를 물류 용어를 몰라도 바로 이해할 수 있는 짧은 문구로 바꿔서
  * 보여준다. 빠른 필터("장기 정체"·"신규 위험")와 엑셀 내보내기는 원본 태그 문자열을 그대로 매칭에
