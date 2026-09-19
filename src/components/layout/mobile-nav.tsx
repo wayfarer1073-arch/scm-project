@@ -3,13 +3,12 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, LogOut, LayoutDashboard, UploadCloud, MessagesSquare, Settings } from 'lucide-react';
+import { Menu, LogOut, LayoutDashboard, UploadCloud, MessagesSquare, Settings, Boxes } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { StockBoardLogoLockup } from '@/components/layout/stock-board-logo';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -53,7 +52,12 @@ export function MobileNav({ userName, userRole }: MobileNavProps) {
       <SheetContent side="left" className="w-72 max-w-[85vw] p-0">
         <SheetHeader>
           <SheetTitle asChild>
-            <StockBoardLogoLockup iconSize={26} textClassName="text-base" />
+            <span className="inline-flex items-center gap-2.5">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-accent text-brand-accent-foreground">
+                <Boxes className="size-5" aria-hidden="true" />
+              </span>
+              <span className="text-base font-semibold tracking-tight">StockBoard</span>
+            </span>
           </SheetTitle>
           <SheetDescription className="sr-only">사이트 이동 메뉴</SheetDescription>
         </SheetHeader>
