@@ -21,14 +21,17 @@ export function riskBadgeVariant(level: RiskLevel): 'danger' | 'warning' | 'norm
 export type DataReliability = 'HIGH' | 'MEDIUM' | 'LOW';
 
 /**
- * 이 SKU의 소진량 추정에 쓰인 데이터가 얼마나 충분한지 상/중/하로 나눈다. 최근 7일 자료만으로
- * 계산했으면 상, 자료가 부족해 14일까지 넓혀야 했으면 중, 30일까지 넓혔거나 그마저도 근거가 없으면
- * 하 — basisWindowDays는 이미 계산되어 있는 값이라 그대로 재사용한다.
+ * 이 SKU의 소진량 추정이 얼마나 믿을 만한 관측 근거를 갖고 있는지 상/중/하로 나눈다.
+ * "자료 갱신 필요"·"재고 정합성 확인"·"입고·조정 확인" 등 추정 자체가 불가능한 사유(reason)가
+ * 있으면, 설령 예전에 쌓인 window 자료가 있더라도 지금은 근거가 없는 것이므로 무조건 하다.
+ * 정상적으로 추정 가능할 때만 basisWindowDays(7/14/30일 중 실제로 근거로 쓴 기간)로 나눈다 —
+ * 최근 7일 자료만으로 계산했으면 상, 14일까지 넓혀야 했으면 중, 30일까지 넓혔으면 하.
  */
 export function dataReliabilityLevel(analysis: SkuAnalysis): DataReliability {
-  const basisWindowDays = analysis.operating?.basisWindowDays;
-  if (basisWindowDays === 7) return 'HIGH';
-  if (basisWindowDays === 14) return 'MEDIUM';
+  const operating = analysis.operating;
+  if (!operating || operating.reason !== null) return 'LOW';
+  if (operating.basisWindowDays === 7) return 'HIGH';
+  if (operating.basisWindowDays === 14) return 'MEDIUM';
   return 'LOW';
 }
 
@@ -37,13 +40,19 @@ export function dataReliabilityLabel(level: DataReliability): string {
 }
 
 export function dataReliabilityClassName(level: DataReliability): string {
-  return level === 'HIGH' ? 'text-muted-foreground' : level === 'MEDIUM' ? 'text-status-warning' : 'text-status-danger';
+  return level === 'HIGH' ? 'text-status-normal' : level === 'MEDIUM' ? 'text-status-warning' : 'text-status-danger';
 }
 
 /** "[관측 2026-09-18]" 형태의 날짜 태그인지. 화면에는 이제 신뢰도(상/중/하)로 대체해 보여주므로
  * 별도로 걸러낼 수 있게 분리했다 — 엑셀 내보내기(analysis.tags 원본)에는 그대로 남는다. */
 export function isObservedDateTag(tag: string): boolean {
   return /^\[관측 \d{4}-\d{2}-\d{2}\]$/.test(tag);
+}
+
+/** 모든 행에 항상 붙던 "[입고 보정 추정·반품/조정 미분리]" 안내 태그인지. 신뢰도(상/중/하) 표시가
+ * 같은 정보를 더 짧게 전달하므로 화면에서는 걸러낸다 — 엑셀 내보내기 원본에는 그대로 남는다. */
+export function isEstimateCaveatTag(tag: string): boolean {
+  return tag === '[입고 보정 추정·반품/조정 미분리]';
 }
 
 /**
