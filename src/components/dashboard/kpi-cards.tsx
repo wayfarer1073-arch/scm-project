@@ -1,10 +1,11 @@
+import { PanelRightOpen } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/lib/format';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import type { CompanyKpis } from '@/domain/inventory/types';
 
-interface KpiCardsProps { kpis: CompanyKpis; fromDate: string | null; asOfDate: string; }
+interface KpiCardsProps { kpis: CompanyKpis; fromDate: string | null; asOfDate: string; onOpenSoldOutList?: () => void; }
 
-export function KpiCards({ kpis, fromDate, asOfDate }: KpiCardsProps) {
+export function KpiCards({ kpis, fromDate, asOfDate, onOpenSoldOutList }: KpiCardsProps) {
   const s = kpis.snapshot;
   const percent = (value: number | null) => value === null ? '산정 불가' : `${(value * 100).toFixed(1)}%`;
   const quantity = (value: number | null) => value === null ? '비교 불가' : `${formatNumber(value)}개`;
@@ -37,6 +38,17 @@ export function KpiCards({ kpis, fromDate, asOfDate }: KpiCardsProps) {
             value={`${s.soldOutSkuCount}개`}
             emphasis={s.soldOutSkuCount ? 'warning' : undefined}
             tooltip="최신 업로드 목록에서 빠져 품절로 인식된 뒤, 아직 1개월 유예기간이 지나지 않은 SKU 수입니다."
+            action={
+              <button
+                type="button"
+                onClick={onOpenSoldOutList}
+                disabled={s.soldOutSkuCount === 0}
+                aria-label="품절 SKU 목록 보기"
+                className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+              >
+                <PanelRightOpen className="size-3.5" aria-hidden="true" />
+              </button>
+            }
           />
           <Metric
             label="미입고재고"
@@ -66,7 +78,7 @@ export function KpiCards({ kpis, fromDate, asOfDate }: KpiCardsProps) {
     </section>
   );
 }
-function Metric({ label, value, detail, emphasis, tooltip }: { label: string; value: string; detail?: string; emphasis?: 'danger' | 'warning'; tooltip?: React.ReactNode }) {
+function Metric({ label, value, detail, emphasis, tooltip, action }: { label: string; value: string; detail?: string; emphasis?: 'danger' | 'warning'; tooltip?: React.ReactNode; action?: React.ReactNode }) {
   const valueClass = emphasis === 'danger' ? 'text-status-danger' : emphasis === 'warning' ? 'text-status-warning' : 'text-foreground';
   return (
     <div>
@@ -74,7 +86,10 @@ function Metric({ label, value, detail, emphasis, tooltip }: { label: string; va
         <p className="text-[11px] text-muted-foreground">{label}</p>
         {tooltip && <InfoTooltip>{tooltip}</InfoTooltip>}
       </div>
-      <p className={`mt-1 text-lg font-semibold tabular-nums ${valueClass}`}>{value}</p>
+      <div className="mt-1 flex items-center gap-1">
+        <p className={`text-lg font-semibold tabular-nums ${valueClass}`}>{value}</p>
+        {action}
+      </div>
       {detail && <p className="mt-0.5 text-[11px] text-muted-foreground">{detail}</p>}
     </div>
   );

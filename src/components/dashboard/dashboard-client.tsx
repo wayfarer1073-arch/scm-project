@@ -13,6 +13,7 @@ import { FavoritesSummary } from '@/components/dashboard/favorites-summary';
 import { ChartsSection } from '@/components/dashboard/charts/charts-section';
 import { InventoryTable } from '@/components/inventory-table/inventory-table';
 import { SkuDetailSheet } from '@/components/inventory-table/sku-detail-sheet';
+import { SoldOutSkuSheet } from '@/components/dashboard/sold-out-sku-sheet';
 import { calculateCompanyKpis, calculateWarehouseSummaries, buildActionCenterCards } from '@/domain/inventory/aggregation';
 import type { InventoryRow } from '@/domain/inventory/read-model';
 import type { RiskThresholdSettings } from '@/domain/inventory/types';
@@ -45,6 +46,7 @@ export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows
   const [tableTab, setTableTab] = useState<TableTab>('ALL');
   const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
   const [selectedSkuId, setSelectedSkuId] = useState<string | null>(null);
+  const [soldOutPanelOpen, setSoldOutPanelOpen] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(() => new Set(favoriteSkuIds));
 
   const holidaySet = useMemo(() => new Set(holidays), [holidays]);
@@ -52,6 +54,7 @@ export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows
   const warehouseSummaries = useMemo(() => calculateWarehouseSummaries(rows, settings.stagnantDays, holidaySet), [rows, settings.stagnantDays, holidaySet]);
   const actionCenterCards = useMemo(() => buildActionCenterCards(rows, settings.stagnantDays), [rows, settings.stagnantDays]);
   const favoriteRows = useMemo(() => rows.filter((r) => favorites.has(r.descriptor.skuId)), [rows, favorites]);
+  const soldOutRows = useMemo(() => rows.filter((r) => r.descriptor.isSoldOut), [rows]);
 
   async function toggleFavorite(skuId: string, next: boolean) {
     setFavorites((prev) => {
@@ -121,7 +124,7 @@ export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows
         </div>
         <DateRangeControl key={`${fromDate ?? 'day'}-${asOfDate}`} asOfDate={asOfDate} fromDate={fromDate} maxDate={todayKstDateString()} />
       </div>
-      <KpiCards kpis={kpis} fromDate={fromDate} asOfDate={asOfDate} />
+      <KpiCards kpis={kpis} fromDate={fromDate} asOfDate={asOfDate} onOpenSoldOutList={() => setSoldOutPanelOpen(true)} />
       <OperatingSummary rows={rows} />
       <ActionCenter cards={actionCenterCards} onSelect={handleActionCenterSelect} />
       <WarehouseSummaryCards summaries={warehouseSummaries} activeWarehouseId={warehouseFilter} onSelect={setWarehouseFilter} latestUploads={latestUploads} />
@@ -153,6 +156,15 @@ export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows
           fromDate={fromDate}
         />
       </div>
+      <SoldOutSkuSheet
+        rows={soldOutRows}
+        open={soldOutPanelOpen}
+        onOpenChange={setSoldOutPanelOpen}
+        onSelectSku={(skuId) => {
+          setSoldOutPanelOpen(false);
+          setSelectedSkuId(skuId);
+        }}
+      />
       <SkuDetailSheet
         skuId={selectedSkuId}
         asOfDate={asOfDate}

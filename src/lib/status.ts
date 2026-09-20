@@ -75,6 +75,12 @@ export function isStaleDepletionTag(tag: string): boolean {
   return tag === '[소진 미관측]';
 }
 
+/** "[B2B 개별 판단]" 태그인지. 상품명 옆에 이미 B2B 뱃지가 뜨므로 같은 의미를 태그로 다시 보여줄
+ * 필요가 없다 — 엑셀 내보내기 원본에는 그대로 남는다. */
+export function isB2BTag(tag: string): boolean {
+  return tag === '[B2B 개별 판단]';
+}
+
 /** 소비기한까지 남은 일수를 "D-7"/"D-DAY"/"D+3"(이미 지남) 형태로 표시한다. */
 export function formatExpirationDday(daysUntilExpiration: number): string {
   if (daysUntilExpiration > 0) return `D-${daysUntilExpiration}`;
