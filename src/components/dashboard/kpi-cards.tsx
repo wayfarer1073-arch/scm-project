@@ -1,4 +1,3 @@
-import { PanelRightOpen } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/lib/format';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import type { CompanyKpis } from '@/domain/inventory/types';
@@ -44,9 +43,9 @@ export function KpiCards({ kpis, fromDate, asOfDate, onOpenSoldOutList }: KpiCar
                 onClick={onOpenSoldOutList}
                 disabled={s.soldOutSkuCount === 0}
                 aria-label="품절 SKU 목록 보기"
-                className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                className="rounded px-1 text-[11px] text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
               >
-                <PanelRightOpen className="size-3.5" aria-hidden="true" />
+                상세보기
               </button>
             }
           />
