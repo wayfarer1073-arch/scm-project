@@ -268,7 +268,9 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
                     </InfoTooltip>
                   </>
                 )}
-                <Badge variant={riskBadgeVariant(detail.analysis.thresholdRisk.level)}>{analysisStatusLabel(detail.analysis)}</Badge>
+                {!detail.descriptor.isSoldOut && (
+                  <Badge variant={riskBadgeVariant(detail.analysis.thresholdRisk.level)}>{analysisStatusLabel(detail.analysis)}</Badge>
+                )}
                 {detail.descriptor.isB2B && (
                   <>
                     <Badge variant="outline" className="gap-1">
