@@ -268,7 +268,7 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
                     </InfoTooltip>
                   </>
                 )}
-                {!detail.descriptor.isSoldOut && (
+                {!detail.descriptor.isSoldOut && !detail.descriptor.isB2B && (
                   <Badge variant={riskBadgeVariant(detail.analysis.thresholdRisk.level)}>{analysisStatusLabel(detail.analysis)}</Badge>
                 )}
                 {detail.descriptor.isB2B && (
