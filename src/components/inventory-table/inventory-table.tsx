@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, Building2, Columns3, Download, FileSpreadsheet, PackageX, Search, X } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -133,6 +134,8 @@ export function InventoryTable({
   const [coverageMax, setCoverageMax] = useState('');
   const [costMin, setCostMin] = useState('');
   const [costMax, setCostMax] = useState('');
+  const [showNormal, setShowNormal] = useState(true);
+  const [showB2B, setShowB2B] = useState(true);
   const [trendFilter, setTrendFilter] = useState<'ALL' | 'ACCELERATING' | 'DECELERATING'>('ALL');
   const [sortKey, setSortKey] = useState<SortKey>('coverageAsc');
   const [sortAsc, setSortAsc] = useState(true);
@@ -162,9 +165,11 @@ export function InventoryTable({
       if (costMin && r.analysis.latest.unitCost < Number(costMin)) return false;
       if (costMax && r.analysis.latest.unitCost > Number(costMax)) return false;
       if (trendFilter !== 'ALL' && r.analysis.acceleration.trend !== trendFilter) return false;
+      if (!showNormal && !r.descriptor.isB2B) return false;
+      if (!showB2B && r.descriptor.isB2B) return false;
       return true;
     });
-  }, [rows, warehouseFilter, tab, quickFilter, search, riskFilter, coverageMin, coverageMax, costMin, costMax, trendFilter]);
+  }, [rows, warehouseFilter, tab, quickFilter, search, riskFilter, coverageMin, coverageMax, costMin, costMax, trendFilter, showNormal, showB2B]);
 
   const sorted = useMemo(() => {
     const withValue = filtered.map((r) => ({ row: r, value: sortValue(r, sortKey) }));
@@ -306,6 +311,17 @@ export function InventoryTable({
           <Input value={costMin} onChange={(e) => setCostMin(e.target.value)} placeholder="min" className="h-8 w-20 text-xs" inputMode="numeric" />
           ~
           <Input value={costMax} onChange={(e) => setCostMax(e.target.value)} placeholder="max" className="h-8 w-20 text-xs" inputMode="numeric" />
+        </div>
+
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <label className="flex items-center gap-1.5">
+            <Checkbox checked={showNormal} onCheckedChange={(c) => setShowNormal(c === true)} />
+            일반/B2C
+          </label>
+          <label className="flex items-center gap-1.5">
+            <Checkbox checked={showB2B} onCheckedChange={(c) => setShowB2B(c === true)} />
+            B2B
+          </label>
         </div>
 
         <div className="ml-auto flex items-center gap-2">
