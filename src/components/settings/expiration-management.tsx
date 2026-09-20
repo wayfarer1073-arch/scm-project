@@ -511,7 +511,7 @@ export function ExpirationManagement({ isAdmin, warehouses, initialEntries }: Ex
               const badge = expirationBadge(daysUntil(entry.expirationDate));
               const riskDaysLabel = `위험판정 D-${entry.expirationRiskDays ?? DEFAULT_EXPIRATION_RISK_DAYS}`;
               return (
-                <div key={entry.lotId} className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
+                <div key={entry.lotId} className="flex flex-col gap-2 rounded-md border px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 flex-1 items-center gap-2">
                     {isAdmin && (
                       <Checkbox
@@ -535,7 +535,7 @@ export function ExpirationManagement({ isAdmin, warehouses, initialEntries }: Ex
                       <div className="mt-0.5 text-xs text-muted-foreground">{entry.productCode}</div>
                     </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                     {isEditing ? (
                       <>
                         <Input
