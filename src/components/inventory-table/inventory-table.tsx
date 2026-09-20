@@ -13,7 +13,7 @@ import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatNumber, formatSigned } from '@/lib/format';
 import { formatKstDate } from '@/lib/date';
-import { analysisStatusLabel, dataReliabilityClassName, dataReliabilityLabel, dataReliabilityLevel, humanizeTag, isBasisWindowTag, isEstimateCaveatTag, isObservedDateTag } from '@/lib/status';
+import { analysisStatusLabel, dataReliabilityClassName, dataReliabilityLabel, dataReliabilityLevel, formatExpirationDday, humanizeTag, isBasisWindowTag, isEstimateCaveatTag, isExpirationRiskTag, isObservedDateTag } from '@/lib/status';
 import { TABLE_TABS, matchesQuickFilter, matchesTab, type QuickFilter, type TableTab } from '@/lib/inventory-filters';
 import { buildInventorySheetRows, type ExportRowInput } from '@/domain/excel/export';
 import { downloadSheetsAsExcel } from '@/lib/xlsx-download';
@@ -582,8 +582,13 @@ export function InventoryTableRow({
           <span className={cn('shrink-0 text-[10px] font-medium whitespace-nowrap', dataReliabilityClassName(dataReliabilityLevel(r.analysis)))}>
             신뢰도 {dataReliabilityLabel(dataReliabilityLevel(r.analysis))}
           </span>
+          {r.analysis.expirationRisk.isAtRisk && r.analysis.expirationRisk.daysUntilExpiration !== null && (
+            <Badge variant="soldout" className="shrink-0 px-1.5 py-0 text-[10px] font-semibold">
+              {formatExpirationDday(r.analysis.expirationRisk.daysUntilExpiration)}
+            </Badge>
+          )}
           {r.analysis.tags
-            .filter((t) => !isObservedDateTag(t) && !isEstimateCaveatTag(t) && !isBasisWindowTag(t))
+            .filter((t) => !isObservedDateTag(t) && !isEstimateCaveatTag(t) && !isBasisWindowTag(t) && !isExpirationRiskTag(t))
             .slice(0, 2)
             .map((t) => (
               <span key={t} className="shrink-0 text-[10px] whitespace-nowrap text-muted-foreground">{humanizeTag(t)}</span>

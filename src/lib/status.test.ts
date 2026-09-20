@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dataReliabilityLevel, humanizeTag, isEstimateCaveatTag, isObservedDateTag } from './status';
+import { dataReliabilityLevel, formatExpirationDday, humanizeTag, isEstimateCaveatTag, isExpirationRiskTag, isObservedDateTag } from './status';
 import { analyzeOperationalSku } from '@/domain/inventory/operational-analysis';
 import { isShippingDay, shiftDate } from '@/domain/inventory/shipping-calendar';
 import type { StockObservation } from '@/domain/inventory/types';
@@ -39,6 +39,21 @@ describe('isObservedDateTag / isEstimateCaveatTag', () => {
     expect(isObservedDateTag('[관측 무재고]')).toBe(false);
     expect(isEstimateCaveatTag('[입고 보정 추정·반품/조정 미분리]')).toBe(true);
     expect(isEstimateCaveatTag('[재고 정체 12출고일]')).toBe(false);
+  });
+});
+
+describe('isExpirationRiskTag', () => {
+  it('"[소비기한 확인 필요]" 태그만 식별한다', () => {
+    expect(isExpirationRiskTag('[소비기한 확인 필요]')).toBe(true);
+    expect(isExpirationRiskTag('[소비기한 임박]')).toBe(false);
+  });
+});
+
+describe('formatExpirationDday', () => {
+  it('남은 일수를 D-n/D-DAY/D+n(경과)으로 표시한다', () => {
+    expect(formatExpirationDday(7)).toBe('D-7');
+    expect(formatExpirationDday(0)).toBe('D-DAY');
+    expect(formatExpirationDday(-3)).toBe('D+3');
   });
 });
 

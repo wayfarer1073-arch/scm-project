@@ -57,6 +57,19 @@ export function isBasisWindowTag(tag: string): boolean {
   return /^\[최근 \d+일 중 \d+출고일\]$/.test(tag);
 }
 
+/** "[소비기한 확인 필요]" 태그인지. 화면에는 이 태그 대신 진분홍 디데이(D-n)를 직접 보여주므로
+ * 걸러낼 수 있게 분리했다 — 엑셀 내보내기 원본에는 그대로 남는다. */
+export function isExpirationRiskTag(tag: string): boolean {
+  return tag === '[소비기한 확인 필요]';
+}
+
+/** 소비기한까지 남은 일수를 "D-7"/"D-DAY"/"D+3"(이미 지남) 형태로 표시한다. */
+export function formatExpirationDday(daysUntilExpiration: number): string {
+  if (daysUntilExpiration > 0) return `D-${daysUntilExpiration}`;
+  if (daysUntilExpiration === 0) return 'D-DAY';
+  return `D+${Math.abs(daysUntilExpiration)}`;
+}
+
 /**
  * SKU 행에 붙는 "[...]" 요약 태그를 물류 용어를 몰라도 바로 이해할 수 있는 짧은 문구로 바꿔서
  * 보여준다. 빠른 필터("장기 정체"·"신규 위험")와 엑셀 내보내기는 원본 태그 문자열을 그대로 매칭에
