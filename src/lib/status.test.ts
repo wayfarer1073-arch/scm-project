@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dataReliabilityLevel, formatExpirationDday, humanizeTag, isEstimateCaveatTag, isExpirationRiskTag, isObservedDateTag } from './status';
+import { dataReliabilityLevel, formatExpirationDday, humanizeTag, isEstimateCaveatTag, isExpirationRiskTag, isObservedDateTag, isSoldOutTag, isStaleDepletionTag } from './status';
 import { analyzeOperationalSku } from '@/domain/inventory/operational-analysis';
 import { isShippingDay, shiftDate } from '@/domain/inventory/shipping-calendar';
 import type { StockObservation } from '@/domain/inventory/types';
@@ -54,6 +54,15 @@ describe('formatExpirationDday', () => {
     expect(formatExpirationDday(7)).toBe('D-7');
     expect(formatExpirationDday(0)).toBe('D-DAY');
     expect(formatExpirationDday(-3)).toBe('D+3');
+  });
+});
+
+describe('isSoldOutTag / isStaleDepletionTag', () => {
+  it('상품명 옆 뱃지·정체 일수 태그와 중복되는 두 태그를 정확히 식별한다', () => {
+    expect(isSoldOutTag('[품절]')).toBe(true);
+    expect(isSoldOutTag('[관측 무재고]')).toBe(false);
+    expect(isStaleDepletionTag('[소진 미관측]')).toBe(true);
+    expect(isStaleDepletionTag('[재고 정체 34출고일]')).toBe(false);
   });
 });
 

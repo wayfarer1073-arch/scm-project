@@ -63,6 +63,18 @@ export function isExpirationRiskTag(tag: string): boolean {
   return tag === '[소비기한 확인 필요]';
 }
 
+/** "[품절]" 태그인지. 상품명 옆에 이미 품절 뱃지가 뜨므로 같은 의미를 태그로 다시 보여줄 필요가
+ * 없다 — 엑셀 내보내기 원본에는 그대로 남는다. */
+export function isSoldOutTag(tag: string): boolean {
+  return tag === '[품절]';
+}
+
+/** "[소진 미관측]" 태그인지. 재고 정체 일수 태그("[N일째 재고 변화 없음]")와 의미가 겹치므로
+ * 화면에서는 걸러낸다 — 엑셀 내보내기 원본에는 그대로 남는다. */
+export function isStaleDepletionTag(tag: string): boolean {
+  return tag === '[소진 미관측]';
+}
+
 /** 소비기한까지 남은 일수를 "D-7"/"D-DAY"/"D+3"(이미 지남) 형태로 표시한다. */
 export function formatExpirationDday(daysUntilExpiration: number): string {
   if (daysUntilExpiration > 0) return `D-${daysUntilExpiration}`;
