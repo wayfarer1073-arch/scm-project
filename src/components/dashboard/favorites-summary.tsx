@@ -1,13 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Star } from 'lucide-react';
 import { Table, TableBody, TableHeader } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { InventoryTableRow, InventoryTableStaticHeader } from '@/components/inventory-table/inventory-table';
 import type { InventoryRow } from '@/domain/inventory/read-model';
+import type { RiskLevel } from '@/domain/inventory/types';
 
 const PAGE_SIZE = 7;
+
+// 위험 > 주의 > 개별 확인 > 기준 내 순 — 더 급하게 봐야 할 SKU가 위로 오도록.
+const RISK_DISPLAY_RANK: Record<RiskLevel, number> = { DANGER: 0, WARNING: 1, UNKNOWN: 2, NORMAL: 3 };
 
 interface FavoritesSummaryProps {
   rows: InventoryRow[];
@@ -17,9 +21,13 @@ interface FavoritesSummaryProps {
 
 export function FavoritesSummary({ rows, onSelectSku, fromDate }: FavoritesSummaryProps) {
   const [page, setPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const sortedRows = useMemo(
+    () => [...rows].sort((a, b) => RISK_DISPLAY_RANK[a.analysis.thresholdRisk.level] - RISK_DISPLAY_RANK[b.analysis.thresholdRisk.level]),
+    [rows],
+  );
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
-  const pageRows = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageRows = sortedRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <section className="overflow-hidden rounded-xl border border-border">
