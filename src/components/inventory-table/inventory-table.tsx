@@ -583,7 +583,7 @@ export function InventoryTableRow({
             신뢰도 {dataReliabilityLabel(dataReliabilityLevel(r.analysis))}
           </span>
           {r.analysis.expirationRisk.isAtRisk && r.analysis.expirationRisk.daysUntilExpiration !== null && (
-            <Badge variant="soldout" className="shrink-0 px-1.5 py-0 text-[10px] font-semibold">
+            <Badge variant="warning" className="shrink-0 px-1.5 py-0 text-[10px] font-semibold">
               {formatExpirationDday(r.analysis.expirationRisk.daysUntilExpiration)}
             </Badge>
           )}

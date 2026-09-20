@@ -57,7 +57,7 @@ export function isBasisWindowTag(tag: string): boolean {
   return /^\[최근 \d+일 중 \d+출고일\]$/.test(tag);
 }
 
-/** "[소비기한 확인 필요]" 태그인지. 화면에는 이 태그 대신 진분홍 디데이(D-n)를 직접 보여주므로
+/** "[소비기한 확인 필요]" 태그인지. 화면에는 이 태그 대신 주황색 디데이(D-n)를 직접 보여주므로
  * 걸러낼 수 있게 분리했다 — 엑셀 내보내기 원본에는 그대로 남는다. */
 export function isExpirationRiskTag(tag: string): boolean {
   return tag === '[소비기한 확인 필요]';
