@@ -396,10 +396,10 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
               <section>
                 <h3 className="mb-2 text-sm font-semibold">추세 · 출고 영업일 기준</h3><p className="mb-3 text-xs text-muted-foreground">{detail.analysis.operating?.reason ?? "관측 추세 참고"} · 최근 {detail.analysis.operating?.basisWindowDays ?? "—"}일 중 {detail.analysis.operating?.observedShippingDays ?? 0}출고일 · 마지막 관측 {detail.analysis.latest.date}. 반품·조정은 분리되지 않으며 B2B는 커버리지 예측 대상에서 제외합니다.</p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                  <Field label="7일 출고일평균 추정" value={fmtRate(detail.analysis.window7.averageDailyDepletion)} />
-                  <Field label="7일 입고 반영" value={`${formatNumber(detail.analysis.window7.totalInboundQuantity ?? 0)}개`} />
-                  <Field label="14일 출고일평균 추정" value={fmtRate(detail.analysis.window14.averageDailyDepletion)} />
-                  <Field label="30일 출고일평균 추정" value={fmtRate(detail.analysis.window30.averageDailyDepletion)} />
+                  <Field label="최근 7일 평균 일일 소진량" value={fmtRate(detail.analysis.window7.averageDailyDepletion)} />
+                  <Field label="최근 7일 입고량" value={`${formatNumber(detail.analysis.window7.totalInboundQuantity ?? 0)}개`} />
+                  <Field label="최근 14일 평균 일일 소진량" value={fmtRate(detail.analysis.window14.averageDailyDepletion)} />
+                  <Field label="최근 30일 평균 일일 소진량" value={fmtRate(detail.analysis.window30.averageDailyDepletion)} />
                   <Field label="소진 가속/둔화" value={accelerationText(detail.analysis)} />
                   <Field label="관측 근거 수준" value={confidenceLabel(detail.analysis.forecast.confidence)} />
                 </div>
