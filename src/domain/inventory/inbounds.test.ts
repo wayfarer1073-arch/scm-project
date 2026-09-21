@@ -21,21 +21,22 @@ it('handles no observations and no inbound entries', () => {
   expect(attachIntervalInbounds([observation('2026-09-10')], [])[0].inboundQuantity).toBe(0);
 });
 
-it('credits an inbound registered one day AFTER the latest observation (late registration grace period)', () => {
+it('credits an inbound registered one business day AFTER the latest observation (late registration grace period)', () => {
+  // 2026-09-16/17 are both weekdays (Wed/Thu), so the next shipping day is the plain calendar next day.
   const rows = [observation('2026-09-16', 100), observation('2026-09-17', 748)];
   const result = attachIntervalInbounds(rows, [{ date: '2026-09-18', quantity: 648 }]);
   expect(result.map((r) => r.inboundQuantity)).toEqual([0, 648]);
 });
 
-it('does not grace an inbound registered two or more days after the latest observation', () => {
+it('does not grace an inbound registered two or more business days after the latest observation', () => {
   const rows = [observation('2026-09-16', 100), observation('2026-09-17', 748)];
   const result = attachIntervalInbounds(rows, [{ date: '2026-09-19', quantity: 648 }]);
   expect(result.map((r) => r.inboundQuantity)).toEqual([0, 0]);
 });
 
-it('reassigns an inbound registered one day EARLY to the next interval when the earlier interval had no increase to explain', () => {
+it('reassigns an inbound registered one business day EARLY to the next interval when the earlier interval had no increase to explain', () => {
   // 9/16→9/17 stock is flat (100→100): the 9/16-dated inbound explains nothing there.
-  // 9/17→9/18 is where the real +648 jump was observed, exactly one day later.
+  // 9/17→9/18 is where the real +648 jump was observed, exactly the next business day.
   const rows = [observation('2026-09-16', 100), observation('2026-09-17', 100), observation('2026-09-18', 748)];
   const result = attachIntervalInbounds(rows, [{ date: '2026-09-17', quantity: 648 }]);
   expect(result.map((r) => r.inboundQuantity)).toEqual([0, 0, 648]);
@@ -49,7 +50,7 @@ it('does NOT reassign an early-dated inbound when its own interval genuinely nee
   expect(result.map((r) => r.inboundQuantity)).toEqual([0, 648, 0]);
 });
 
-it('does NOT reassign across a gap larger than one day — the entry stays with its strict (correct) interval', () => {
+it('does NOT reassign across a gap larger than one business day — the entry stays with its strict (correct) interval', () => {
   const rows = [observation('2026-09-10', 100), observation('2026-09-12', 100), observation('2026-09-18', 748)];
   const result = attachIntervalInbounds(rows, [{ date: '2026-09-12', quantity: 648 }]);
   expect(result.map((r) => r.inboundQuantity)).toEqual([0, 648, 0]);
@@ -59,4 +60,35 @@ it('does not reassign when the next interval has nothing to explain either', () 
   const rows = [observation('2026-09-16', 100), observation('2026-09-17', 100), observation('2026-09-18', 100)];
   const result = attachIntervalInbounds(rows, [{ date: '2026-09-17', quantity: 648 }]);
   expect(result.map((r) => r.inboundQuantity)).toEqual([0, 648, 0]);
+});
+
+it('reassigns across a weekend when uploads only happen on business days (2026-09-18 Fri → 2026-09-21 Mon)', () => {
+  // Registration lands on Friday, the interval ending Friday is flat, and the real jump only
+  // shows up in Monday's snapshot (Sat/Sun are skipped entirely — no upload happens then).
+  // A raw ±1 CALENDAR day tolerance would have missed this (Mon is 3 calendar days after Fri);
+  // the ±1 BUSINESS day tolerance must still catch it.
+  const rows = [observation('2026-09-17', 100), observation('2026-09-18', 100), observation('2026-09-21', 748)];
+  const result = attachIntervalInbounds(rows, [{ date: '2026-09-18', quantity: 648 }]);
+  expect(result.map((r) => r.inboundQuantity)).toEqual([0, 0, 648]);
+});
+
+it('credits a late registration made on the next business day across a weekend (Fri observation, Mon registration)', () => {
+  const rows = [observation('2026-09-17', 100), observation('2026-09-18', 748)];
+  const result = attachIntervalInbounds(rows, [{ date: '2026-09-21', quantity: 648 }]);
+  expect(result.map((r) => r.inboundQuantity)).toEqual([0, 648]);
+});
+
+it('does not grace a registration two business days after the latest observation, even across a weekend', () => {
+  const rows = [observation('2026-09-17', 100), observation('2026-09-18', 748)];
+  const result = attachIntervalInbounds(rows, [{ date: '2026-09-22', quantity: 648 }]);
+  expect(result.map((r) => r.inboundQuantity)).toEqual([0, 0]);
+});
+
+it('treats a configured holiday like a non-shipping day when computing the ±1 business day window', () => {
+  // 2026-09-21 (Mon) is declared a holiday, so the next shipping day after Friday 9/18 becomes
+  // Tuesday 9/22 instead of Monday — the registration on 9/22 should now be graced, not 9/21.
+  const holidays = new Set(['2026-09-21']);
+  const rows = [observation('2026-09-17', 100), observation('2026-09-18', 748)];
+  const result = attachIntervalInbounds(rows, [{ date: '2026-09-22', quantity: 648 }], holidays);
+  expect(result.map((r) => r.inboundQuantity)).toEqual([0, 648]);
 });

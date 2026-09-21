@@ -6,6 +6,7 @@ import { resolveInventoryCost } from '@/domain/inventory/costs';
 import type { Prisma } from '@prisma/client';
 import type { SkuDescriptor, DailyWarehouseTotal } from '@/domain/inventory/read-model';
 import { attachIntervalInbounds, type DatedInbound } from '@/domain/inventory/inbounds';
+import { NO_HOLIDAYS } from '@/domain/inventory/shipping-calendar';
 
 /** 품절 인식일로부터 정확히 1개월 뒤(유예기간 종료일, 이 날짜부터는 더 이상 노출하지 않음). */
 function soldOutGraceEndDate(soldOutDetectedDateStr: string): string {
@@ -89,6 +90,7 @@ const observationSelect = {
 export async function loadActiveSkusWithSeries(
   warehouseId?: string,
   asOfDate?: string,
+  holidays: ReadonlySet<string> = NO_HOLIDAYS,
 ): Promise<{ descriptor: SkuDescriptor; observations: StockObservation[] }[]> {
   const mockFilter = await resolveMockFilter(warehouseId, asOfDate);
   const latestSnapshots = await prisma.inventorySnapshot.findMany({
@@ -203,7 +205,7 @@ export async function loadActiveSkusWithSeries(
         isSoldOut: soldOutSkuIds.has(sku.id),
         soldOutDetectedDate: sku.soldOutDetectedDate ? dateOnlyToString(sku.soldOutDetectedDate) : null,
       },
-      observations: attachIntervalInbounds(observationsBySku.get(sku.id) ?? [], inboundsBySku.get(sku.id) ?? []),
+      observations: attachIntervalInbounds(observationsBySku.get(sku.id) ?? [], inboundsBySku.get(sku.id) ?? [], holidays),
     };
   });
 }
@@ -259,6 +261,7 @@ export async function loadDailyWarehouseTotals(asOfDate?: string): Promise<Daily
 export async function loadSkuWithSeries(
   skuId: string,
   asOfDate?: string,
+  holidays: ReadonlySet<string> = NO_HOLIDAYS,
 ): Promise<{ descriptor: SkuDescriptor; observations: StockObservation[] } | null> {
   const sku = await prisma.sku.findUnique({ where: { id: skuId }, include: { warehouse: { select: { id: true, code: true, name: true } } } });
   if (!sku || sku.isHiddenFromDashboard) return null;
@@ -344,7 +347,7 @@ export async function loadSkuWithSeries(
       isSoldOut,
       soldOutDetectedDate: sku.soldOutDetectedDate ? dateOnlyToString(sku.soldOutDetectedDate) : null,
     },
-    observations: attachIntervalInbounds(observations, inboundsBySku.get(skuId) ?? []),
+    observations: attachIntervalInbounds(observations, inboundsBySku.get(skuId) ?? [], holidays),
   };
 }
 

@@ -10,8 +10,8 @@ import type { InventoryRow } from '@/domain/inventory/read-model';
 
 export async function getInventoryRows(options: { warehouseId?: string; asOfDate: string; compareFromDate?: string; settings?: RiskThresholdSettings }): Promise<InventoryRow[]> {
   const settings = options.settings ?? (await getSettings());
-  const skusWithSeries = await loadActiveSkusWithSeries(options.warehouseId, options.asOfDate);
   const holidays = new Set(await listHolidayDateStrings());
+  const skusWithSeries = await loadActiveSkusWithSeries(options.warehouseId, options.asOfDate, holidays);
 
   const rows: InventoryRow[] = [];
   for (const { descriptor, observations } of skusWithSeries) {
@@ -35,9 +35,9 @@ export async function getInventoryRows(options: { warehouseId?: string; asOfDate
 
 export async function getSkuDetail(skuId: string, asOfDate: string, settings?: RiskThresholdSettings) {
   const resolvedSettings = settings ?? (await getSettings());
-  const result = await loadSkuWithSeries(skuId, asOfDate);
-  if (!result) return null;
   const holidays = new Set(await listHolidayDateStrings());
+  const result = await loadSkuWithSeries(skuId, asOfDate, holidays);
+  if (!result) return null;
   const analysis = analyzeSku(
     result.observations,
     asOfDate,
