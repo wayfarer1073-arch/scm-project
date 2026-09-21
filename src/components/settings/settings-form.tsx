@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -193,23 +194,49 @@ function ThresholdField({ label, value, onChange, disabled }: { label: string; v
   );
 }
 
+const HIDDEN_SKU_PAGE_SIZE = 7;
+
 function SkuVisibilityManagement({ isAdmin, initialSkus }: { isAdmin: boolean; initialSkus: SkuVisibilityRow[] }) {
   const [skus, setSkus] = useState(initialSkus);
   const [query, setQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [selected, setSelected] = useState<SkuVisibilityRow | null>(null);
   const [updatingSkuId, setUpdatingSkuId] = useState<string | null>(null);
+  const [hiddenPage, setHiddenPage] = useState(1);
+  const searchWrapperRef = useRef<HTMLDivElement>(null);
+  const [dropdownRect, setDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
 
   const hiddenSkus = useMemo(
     () => skus.filter((s) => s.isHiddenFromDashboard).sort((a, b) => a.warehouseCode.localeCompare(b.warehouseCode) || a.productCode.localeCompare(b.productCode)),
     [skus],
   );
+  const hiddenTotalPages = Math.max(1, Math.ceil(hiddenSkus.length / HIDDEN_SKU_PAGE_SIZE));
+  const hiddenCurrentPage = Math.min(hiddenPage, hiddenTotalPages);
+  const hiddenPageSkus = hiddenSkus.slice((hiddenCurrentPage - 1) * HIDDEN_SKU_PAGE_SIZE, hiddenCurrentPage * HIDDEN_SKU_PAGE_SIZE);
 
   const searchResults = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     return skus.filter((s) => !s.isHiddenFromDashboard && (s.productCode.toLowerCase().includes(q) || s.productName.toLowerCase().includes(q))).slice(0, 20);
   }, [skus, query]);
+
+  const dropdownVisible = showDropdown && !selected && query.trim() !== '';
+
+  // 드롭다운을 Card의 overflow-hidden 클리핑 밖으로 포털링하기 위해 뷰포트 기준 위치를 계산한다.
+  useEffect(() => {
+    if (!dropdownVisible) return;
+    function updatePosition() {
+      const rect = searchWrapperRef.current?.getBoundingClientRect();
+      if (rect) setDropdownRect({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    }
+    updatePosition();
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [dropdownVisible]);
 
   async function setHidden(skuId: string, hidden: boolean) {
     setUpdatingSkuId(skuId);
@@ -250,11 +277,26 @@ function SkuVisibilityManagement({ isAdmin, initialSkus }: { isAdmin: boolean; i
           {hiddenSkus.length === 0 ? (
             <p className="text-xs text-muted-foreground">숨김 처리된 SKU가 없습니다.</p>
           ) : (
-            <div className="space-y-1.5">
-              {hiddenSkus.map((sku) => (
-                <SkuVisibilityItem key={sku.skuId} sku={sku} isAdmin={isAdmin} updating={updatingSkuId === sku.skuId} onToggle={(hidden) => setHidden(sku.skuId, hidden)} />
-              ))}
-            </div>
+            <>
+              <div className="space-y-1.5">
+                {hiddenPageSkus.map((sku) => (
+                  <SkuVisibilityItem key={sku.skuId} sku={sku} isAdmin={isAdmin} updating={updatingSkuId === sku.skuId} onToggle={(hidden) => setHidden(sku.skuId, hidden)} />
+                ))}
+              </div>
+              {hiddenTotalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 text-sm">
+                  <Button variant="outline" size="sm" disabled={hiddenCurrentPage <= 1} onClick={() => setHiddenPage(hiddenCurrentPage - 1)}>
+                    이전
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {hiddenCurrentPage} / {hiddenTotalPages}
+                  </span>
+                  <Button variant="outline" size="sm" disabled={hiddenCurrentPage >= hiddenTotalPages} onClick={() => setHiddenPage(hiddenCurrentPage + 1)}>
+                    다음
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -264,7 +306,7 @@ function SkuVisibilityManagement({ isAdmin, initialSkus }: { isAdmin: boolean; i
             <div className="space-y-2">
               <Label htmlFor="sku-visibility-search">상품코드 또는 상품명으로 검색해서 숨기기</Label>
               <div className="flex max-w-sm items-start gap-2">
-                <div className="relative min-w-0 flex-1">
+                <div ref={searchWrapperRef} className="min-w-0 flex-1">
                   <Input
                     id="sku-visibility-search"
                     placeholder="예: 00001 또는 상품명 일부"
@@ -277,29 +319,36 @@ function SkuVisibilityManagement({ isAdmin, initialSkus }: { isAdmin: boolean; i
                     onFocus={() => setShowDropdown(true)}
                     onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
                   />
-                  {showDropdown && !selected && query.trim() !== '' && (
-                    <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border bg-popover shadow-md">
-                      {searchResults.length === 0 ? (
-                        <p className="p-2 text-xs text-muted-foreground">일치하는 SKU가 없습니다.</p>
-                      ) : (
-                        searchResults.map((sku) => (
-                          <button
-                            key={sku.skuId}
-                            type="button"
-                            className="block w-full px-2.5 py-1.5 text-left text-xs hover:bg-muted"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              setSelected(sku);
-                              setShowDropdown(false);
-                            }}
-                          >
-                            <span className="mr-1 rounded bg-muted px-1 py-0.5 text-[10px] font-medium text-muted-foreground">{sku.warehouseCode}</span>
-                            <span className="font-medium">{sku.productName}</span> <span className="text-muted-foreground">{sku.productCode}</span>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  )}
+                  {dropdownVisible &&
+                    dropdownRect &&
+                    typeof document !== 'undefined' &&
+                    createPortal(
+                      <div
+                        className="fixed z-50 max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md"
+                        style={{ top: dropdownRect.top, left: dropdownRect.left, width: dropdownRect.width }}
+                      >
+                        {searchResults.length === 0 ? (
+                          <p className="p-2 text-xs text-muted-foreground">일치하는 SKU가 없습니다.</p>
+                        ) : (
+                          searchResults.map((sku) => (
+                            <button
+                              key={sku.skuId}
+                              type="button"
+                              className="block w-full px-2.5 py-1.5 text-left text-xs hover:bg-muted"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setSelected(sku);
+                                setShowDropdown(false);
+                              }}
+                            >
+                              <span className="mr-1 rounded bg-muted px-1 py-0.5 text-[10px] font-medium text-muted-foreground">{sku.warehouseCode}</span>
+                              <span className="font-medium">{sku.productName}</span> <span className="text-muted-foreground">{sku.productCode}</span>
+                            </button>
+                          ))
+                        )}
+                      </div>,
+                      document.body,
+                    )}
                 </div>
                 <Button
                   type="button"
