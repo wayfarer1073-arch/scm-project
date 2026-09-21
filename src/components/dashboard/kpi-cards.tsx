@@ -55,7 +55,7 @@ export function KpiCards({ kpis, fromDate, asOfDate, onOpenSoldOutList }: KpiCar
             detail="입고 특이사항으로 등록되지 않아 늘어난 재고"
             tooltip={s.unexplainedIncreaseSkus.length === 0
               ? '입고로 설명되지 않는 증가가 관측되지 않았습니다.'
-              : `해당 SKU 상품코드: ${s.unexplainedIncreaseSkus.slice(0, 8).map((x) => x.productCode).join(', ')}${s.unexplainedIncreaseSkus.length > 8 ? ` 외 ${s.unexplainedIncreaseSkus.length - 8}건` : ''}`}
+              : `해당 SKU(관측일): ${s.unexplainedIncreaseSkus.slice(0, 8).map((x) => `${x.productCode}(${x.observedDate})`).join(', ')}${s.unexplainedIncreaseSkus.length > 8 ? ` 외 ${s.unexplainedIncreaseSkus.length - 8}건` : ''} · 입고 특이사항은 이 관측일(직전 관측일 초과~이 날짜 이내)로 등록해야 반영됩니다.`}
           />
           <Metric label="측정 기준일" value={s.newestObservationDate ?? '관측 없음'} detail={s.newestObservationDate ? `마지막 업로드 일자 · 집계 시작일 ${collectionStartDate ?? s.newestObservationDate}` : undefined} />
           <Metric label="총 SKU" value={`${s.comparableSkuCount} / ${kpis.totalSkuCount}`} detail={periodLabel} />

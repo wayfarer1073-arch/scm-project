@@ -68,7 +68,8 @@ export function calculateSnapshotKpis(rows: InventoryRow[], compareFromDate?: st
     const unexplainedIncrease = compareFromDate ? period!.totalIncrease : delta!.increase;
     if (unexplainedIncrease > 0) {
       result.unexplainedIncreaseTotal = (result.unexplainedIncreaseTotal ?? 0) + unexplainedIncrease;
-      result.unexplainedIncreaseSkus.push({ skuId: row.descriptor.skuId, productCode: row.descriptor.productCode, productName: row.descriptor.productName, amount: unexplainedIncrease });
+      const observedDate = compareFromDate ? period!.actualEndDate : delta!.toDate;
+      result.unexplainedIncreaseSkus.push({ skuId: row.descriptor.skuId, productCode: row.descriptor.productCode, productName: row.descriptor.productName, amount: unexplainedIncrease, observedDate });
     }
   }
   if (result.observedSkuCount) {

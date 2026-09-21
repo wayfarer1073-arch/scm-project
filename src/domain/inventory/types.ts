@@ -193,8 +193,10 @@ export interface SnapshotKpis {
   estimatedDepletion: number | null;
   /** 입고로 설명되지 않는 증가(재고가 늘었지만 입고 기록에 없는 양)의 합. */
   unexplainedIncreaseTotal: number | null;
-  /** 위 합계에 기여한 SKU 목록(0보다 큰 것만) — 툴팁에서 상품코드 확인용. */
-  unexplainedIncreaseSkus: { skuId: string; productCode: string; productName: string; amount: number }[];
+  /** 위 합계에 기여한 SKU 목록(0보다 큰 것만) — 툴팁에서 상품코드 확인용.
+   * observedDate: 증가가 관측된 스냅샷 날짜. 입고 특이사항은 이 날짜(직전 관측일 초과 ~ 이 날짜 이내)로
+   * 등록해야 반영된다 — 등록일이 이보다 늦으면(예: 실제 입고는 9/17에 반영됐는데 9/18로 등록) 계속 미입고로 남는다. */
+  unexplainedIncreaseSkus: { skuId: string; productCode: string; productName: string; amount: number; observedDate: string }[];
 }
 
 export interface CompanyKpis {

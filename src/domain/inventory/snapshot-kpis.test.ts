@@ -80,7 +80,7 @@ describe('directly observed snapshot KPIs', () => {
     for (const from of [undefined, '2026-09-01']) {
       const s = calculateSnapshotKpis([explained, unexplained], from);
       expect(s.unexplainedIncreaseTotal).toBe(20);
-      expect(s.unexplainedIncreaseSkus).toEqual([{ skuId: 'unexplained', productCode: 'unexplained', productName: 'unexplained', amount: 20 }]);
+      expect(s.unexplainedIncreaseSkus).toEqual([{ skuId: 'unexplained', productCode: 'unexplained', productName: 'unexplained', amount: 20, observedDate: '2026-09-08' }]);
     }
   });
   it('excludes missing endpoints, new SKUs and zero-day intervals without daily fallback', () => {
