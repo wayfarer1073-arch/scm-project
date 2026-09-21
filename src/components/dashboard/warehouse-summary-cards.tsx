@@ -24,7 +24,6 @@ const ROWS: { label: string; format: (s: WarehouseSummary) => string }[] = [
   { label: '관리 SKU', format: (s) => `${formatNumber(s.skuCount)}개` },
   { label: '평가 가능한 재고금액', format: (s) => s.snapshot.knownInventoryValue === null ? '평가 불가' : formatCurrency(s.snapshot.knownInventoryValue) },
   { label: '평가 가능한 SKU 비율', format: (s) => s.snapshot.valuationCoverageRatio === null ? '산정 불가' : formatPercent(s.snapshot.valuationCoverageRatio) },
-  { label: '재고 보유 SKU 비율', format: (s) => s.snapshot.inStockSkuRatio === null ? '산정 불가' : formatPercent(s.snapshot.inStockSkuRatio) },
   { label: '품절 SKU', format: (s) => `${s.snapshot.soldOutSkuCount}개` },
   { label: '위험 SKU', format: (s) => `${formatNumber(s.dangerSkuCount)}개 (${formatPercent(s.dangerRatio)})` },
   { label: '설정 기간 내 소진 추정', format: (s) => formatPercent(s.stockoutSoon30dRatio) },
