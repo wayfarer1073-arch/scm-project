@@ -2,9 +2,14 @@
 
 import { useState, useTransition } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { addDays, format, parseISO } from 'date-fns';
 import { LoaderCircle, MoveRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
+function shiftDay(date: string, days: number): string {
+  return format(addDays(parseISO(date), days), 'yyyy-MM-dd');
+}
 
 interface DateRangeControlProps {
   asOfDate: string;
@@ -21,6 +26,8 @@ export function DateRangeControl({ asOfDate, fromDate, maxDate }: DateRangeContr
   const [start, setStart] = useState(fromDate ?? asOfDate);
   const [end, setEnd] = useState(asOfDate);
 
+  const yesterday = shiftDay(maxDate, -1);
+
   function apply() {
     const query = new URLSearchParams();
     if (mode === 'day') {
@@ -33,8 +40,28 @@ export function DateRangeControl({ asOfDate, fromDate, maxDate }: DateRangeContr
     startTransition(() => router.push(`${pathname}?${query.toString()}`));
   }
 
+  function goToDay(date: string) {
+    setMode('day');
+    setDay(date);
+    const query = new URLSearchParams();
+    query.set('date', date);
+    startTransition(() => router.push(`${pathname}?${query.toString()}`));
+  }
+
+  const isToday = mode === 'day' && day === maxDate;
+  const isYesterday = mode === 'day' && day === yesterday;
+
   return (
     <div className="flex flex-col items-start gap-2.5 sm:flex-row sm:items-center sm:justify-end">
+      <div className="inline-flex items-center gap-1.5">
+        <Button size="sm" variant={isToday ? 'default' : 'outline'} onClick={() => goToDay(maxDate)} disabled={pending}>
+          오늘
+        </Button>
+        <Button size="sm" variant={isYesterday ? 'default' : 'outline'} onClick={() => goToDay(yesterday)} disabled={pending}>
+          어제
+        </Button>
+      </div>
+
       <div className="inline-flex items-center gap-1 rounded-md p-0.5 text-xs" aria-label="조회 방식">
         <button
           type="button"
