@@ -55,7 +55,8 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'netChangeDesc', label: '직전대비 큰 순' },
 ];
 
-const PAGE_SIZE = 7;
+const DEFAULT_PAGE_SIZE = 7;
+const PAGE_SIZE_OPTIONS = [7, 10, 20, 50, 100];
 
 /** 상품코드·상품명(항상 표시)을 제외한, 표시/숨김을 고를 수 있는 열. 검색 필터 바 우측 드롭다운에서 고른다. */
 type ColumnKey =
@@ -140,6 +141,7 @@ export function InventoryTable({
   const [sortKey, setSortKey] = useState<SortKey>('coverageAsc');
   const [sortAsc, setSortAsc] = useState(true);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [hiddenColumns, setHiddenColumns] = useState<Set<ColumnKey>>(new Set());
 
   function toggleColumn(key: ColumnKey) {
@@ -182,11 +184,11 @@ export function InventoryTable({
     return withValue.map((w) => w.row);
   }, [filtered, sortKey, sortAsc]);
 
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   // 필터를 바꿔 전체 페이지 수가 줄어들면(예: 3페이지 보던 중 1페이지 분량만 남음) page state가
   // 미처 갱신되지 않아 범위 밖 페이지를 slice해 빈 화면이 나올 수 있다. 항상 유효 범위로 고정한다.
   const currentPage = Math.min(page, totalPages);
-  const pageRows = sorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageRows = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -458,19 +460,34 @@ export function InventoryTable({
         </Table>
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 text-sm">
-          <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>
-            이전
-          </Button>
-          <span className="text-xs text-muted-foreground">
-            {currentPage} / {totalPages}
-          </span>
-          <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>
-            다음
-          </Button>
+      <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>페이지당 행수</span>
+          <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
+            <SelectTrigger className="h-8 w-[84px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <SelectItem key={n} value={String(n)}>{n}개</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      )}
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2 text-sm">
+            <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>
+              이전
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              {currentPage} / {totalPages}
+            </span>
+            <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>
+              다음
+            </Button>
+          </div>
+        )}
+      </div>
       </div>
     </section>
   );
