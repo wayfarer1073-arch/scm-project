@@ -53,13 +53,23 @@ export function DateRangeControl({ asOfDate, fromDate, maxDate }: DateRangeContr
 
   return (
     <div className="flex flex-col items-start gap-2.5 sm:flex-row sm:items-center sm:justify-end">
-      <div className="inline-flex items-center gap-1.5">
-        <Button size="sm" variant={isToday ? 'default' : 'outline'} onClick={() => goToDay(maxDate)} disabled={pending}>
+      <div className="inline-flex items-center gap-1 rounded-md p-0.5 text-xs" aria-label="빠른 날짜 선택">
+        <button
+          type="button"
+          onClick={() => goToDay(maxDate)}
+          disabled={pending}
+          className={cn('rounded px-2.5 py-1 font-medium transition-colors', isToday ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
+        >
           오늘
-        </Button>
-        <Button size="sm" variant={isYesterday ? 'default' : 'outline'} onClick={() => goToDay(yesterday)} disabled={pending}>
+        </button>
+        <button
+          type="button"
+          onClick={() => goToDay(yesterday)}
+          disabled={pending}
+          className={cn('rounded px-2.5 py-1 font-medium transition-colors', isYesterday ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
+        >
           어제
-        </Button>
+        </button>
       </div>
 
       <div className="inline-flex items-center gap-1 rounded-md p-0.5 text-xs" aria-label="조회 방식">
