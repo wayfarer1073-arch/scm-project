@@ -55,8 +55,8 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'netChangeDesc', label: '직전대비 큰 순' },
 ];
 
-const DEFAULT_PAGE_SIZE = 7;
-const PAGE_SIZE_OPTIONS = [7, 10, 20, 50, 100];
+const DEFAULT_PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 /** 상품코드·상품명(항상 표시)을 제외한, 표시/숨김을 고를 수 있는 열. 검색 필터 바 우측 드롭다운에서 고른다. */
 type ColumnKey =

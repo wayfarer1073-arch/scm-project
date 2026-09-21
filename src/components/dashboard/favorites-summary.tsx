@@ -4,11 +4,13 @@ import { useMemo, useState } from 'react';
 import { Star } from 'lucide-react';
 import { Table, TableBody, TableHeader } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { InventoryTableRow, InventoryTableStaticHeader } from '@/components/inventory-table/inventory-table';
 import type { InventoryRow } from '@/domain/inventory/read-model';
 import type { RiskLevel } from '@/domain/inventory/types';
 
-const PAGE_SIZE = 7;
+const DEFAULT_PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 // 위험 > 주의 > 개별 확인 > 기준 내 순 — 더 급하게 봐야 할 SKU가 위로 오도록.
 const RISK_DISPLAY_RANK: Record<RiskLevel, number> = { DANGER: 0, WARNING: 1, UNKNOWN: 2, NORMAL: 3 };
@@ -21,13 +23,14 @@ interface FavoritesSummaryProps {
 
 export function FavoritesSummary({ rows, onSelectSku, fromDate }: FavoritesSummaryProps) {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const sortedRows = useMemo(
     () => [...rows].sort((a, b) => RISK_DISPLAY_RANK[a.analysis.thresholdRisk.level] - RISK_DISPLAY_RANK[b.analysis.thresholdRisk.level]),
     [rows],
   );
-  const totalPages = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const pageRows = sortedRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageRows = sortedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <section className="overflow-hidden rounded-xl border border-border">
@@ -55,19 +58,34 @@ export function FavoritesSummary({ rows, onSelectSku, fromDate }: FavoritesSumma
               </TableBody>
             </Table>
           </div>
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 text-sm">
-              <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>
-                이전
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                {currentPage} / {totalPages}
-              </span>
-              <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>
-                다음
-              </Button>
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>페이지당 행수</span>
+              <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
+                <SelectTrigger className="h-8 w-[84px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAGE_SIZE_OPTIONS.map((n) => (
+                    <SelectItem key={n} value={String(n)}>{n}개</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          )}
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2 text-sm">
+                <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>
+                  이전
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {currentPage} / {totalPages}
+                </span>
+                <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>
+                  다음
+                </Button>
+              </div>
+            )}
+          </div>
         </>
       )}
       </div>
