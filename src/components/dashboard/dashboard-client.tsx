@@ -54,6 +54,8 @@ export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows
   const warehouseSummaries = useMemo(() => calculateWarehouseSummaries(rows, settings.stagnantDays, holidaySet), [rows, settings.stagnantDays, holidaySet]);
   const actionCenterCards = useMemo(() => buildActionCenterCards(rows, settings.stagnantDays), [rows, settings.stagnantDays]);
   const favoriteRows = useMemo(() => rows.filter((r) => favorites.has(r.descriptor.skuId)), [rows, favorites]);
+  // 즐겨찾기한 SKU는 위쪽 즐겨찾기 섹션에서 보이므로, 아래 전체 재고 표에서는 중복 노출하지 않는다.
+  const tableRows = useMemo(() => rows.filter((r) => !favorites.has(r.descriptor.skuId)), [rows, favorites]);
   const soldOutRows = useMemo(() => rows.filter((r) => r.descriptor.isSoldOut), [rows]);
 
   async function toggleFavorite(skuId: string, next: boolean) {
@@ -140,7 +142,7 @@ export function DashboardClient({ asOfDate, fromDate, warehouses, settings, rows
       <FavoritesSummary rows={favoriteRows} onSelectSku={setSelectedSkuId} fromDate={fromDate} />
       <div id="inventory-table-section">
         <InventoryTable
-          rows={rows}
+          rows={tableRows}
           warehouses={warehouses}
           warehouseFilter={warehouseFilter}
           onChangeWarehouseFilter={setWarehouseFilter}
