@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, UploadCloud, MessagesSquare, Settings, Boxes } from 'lucide-react';
+import { LayoutDashboard, UploadCloud, MessagesSquare, Settings, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SignOutButton } from '@/components/layout/sign-out-button';
 
@@ -30,8 +30,8 @@ export function AppSidebar({ userName, userRole, className }: AppSidebarProps) {
       )}
     >
       <div className="flex items-center gap-2.5 px-5 py-6">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-accent text-brand-accent-foreground">
-          <Boxes className="size-5" aria-hidden="true" />
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-accent text-brand-accent-foreground">
+          <Package className="size-5" aria-hidden="true" />
         </span>
         <span className="text-base font-semibold tracking-tight">StockBoard</span>
       </div>

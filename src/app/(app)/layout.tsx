@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { Boxes } from 'lucide-react';
+import { Package } from 'lucide-react';
 import { auth } from '@/server/auth';
 import { AppSidebar } from '@/components/layout/app-sidebar';
 import { MobileNav } from '@/components/layout/mobile-nav';
@@ -16,8 +16,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b bg-background/90 px-4 backdrop-blur-xl supports-[backdrop-filter]:bg-background/75 sm:hidden">
           <MobileNav userName={session.user.name ?? ''} userRole={roleLabel} />
           <span className="inline-flex items-center gap-2.5">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-accent text-brand-accent-foreground">
-              <Boxes className="size-4" aria-hidden="true" />
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-accent text-brand-accent-foreground">
+              <Package className="size-4" aria-hidden="true" />
             </span>
             <span className="text-sm font-semibold tracking-tight text-foreground">StockBoard</span>
           </span>
