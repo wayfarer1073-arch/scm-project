@@ -24,6 +24,10 @@ export interface SkuDescriptor {
   isSoldOut: boolean;
   /** 품절로 인식된 날짜(그 날짜의 업로드 목록에서 처음 빠짐). isSoldOut이 false면 null. */
   soldOutDetectedDate: string | null;
+  /** 설정 화면의 "SKU 추가 정보 관리" Excel 업로드로만 갱신되는 비유동 참고 정보. */
+  eaPerBox: number | null;
+  eaPerPallet: number | null;
+  packagingBarcode: string | null;
 }
 
 export interface DailyWarehouseTotal {

@@ -102,7 +102,8 @@ describe('shipping-day trading inventory', () => {
     expect(a.operating?.reason).toBe('품절');
     const row: InventoryRow = { descriptor: { skuId: 'x', warehouseId: 'w', warehouseCode: 'A', warehouseName: 'A', productCode: 'x', productName: 'x',
       option: null, barcode: null, location: null, manualDangerQty: null, manualWarningQty: null, expirationDate: null, expirationRiskDays: null,
-      isB2B: false, isSoldOut: true, firstSeenDate: '2026-09-04', soldOutDetectedDate: '2026-09-18' },
+      isB2B: false, isSoldOut: true, firstSeenDate: '2026-09-04', soldOutDetectedDate: '2026-09-18',
+      eaPerBox: null, eaPerPallet: null, packagingBarcode: null },
       analysis: a, periodComparison: null, valueBreakdown: calculateInventoryValueBreakdown(a.latest) };
     expect(calculateSnapshotKpis([row])).toMatchObject({ observedSkuCount: 0, staleSkuCount: 1, comparableSkuCount: 0, knownInventoryValue: null });
     expect(buildRiskSheetRows([{ ...row, ...row.descriptor }])).toEqual([]);

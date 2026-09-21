@@ -1,6 +1,7 @@
 import { calculateInventoryValueBreakdown, calculatePeriodComparison } from '@/domain/inventory/calculations';
 import { analyzeOperationalSku as analyzeSku } from '@/domain/inventory/operational-analysis';
 import { listHolidayDateStrings } from '@/server/repositories/holiday-repository';
+import { listExpirationLotsForSku } from '@/server/repositories/expiration-repository';
 import type { RiskThresholdSettings } from '@/domain/inventory/types';
 
 import { loadActiveSkusWithSeries, loadSkuWithSeries } from '@/server/repositories/inventory-repository';
@@ -48,5 +49,6 @@ export async function getSkuDetail(skuId: string, asOfDate: string, settings?: R
   );
   if (!analysis) return null;
   const valueBreakdown = calculateInventoryValueBreakdown(analysis.latest);
-  return { descriptor: result.descriptor, analysis, valueBreakdown, observations: result.observations };
+  const expirationLots = await listExpirationLotsForSku(skuId);
+  return { descriptor: result.descriptor, analysis, valueBreakdown, observations: result.observations, expirationLots };
 }

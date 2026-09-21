@@ -107,6 +107,14 @@ export async function listExpirationLots(): Promise<ExpirationLotRow[]> {
   }));
 }
 
+export interface SkuExpirationLotSummary { lot: string; expirationDate: string }
+
+/** SKU 상세 화면의 "상품 추가 정보" 카드용 — 이 SKU에 등록된 로트를 소비기한 오름차순으로 나열한다. */
+export async function listExpirationLotsForSku(skuId: string): Promise<SkuExpirationLotSummary[]> {
+  const lots = await prisma.skuExpirationLot.findMany({ where: { skuId }, orderBy: { expirationDate: 'asc' } });
+  return lots.map((l) => ({ lot: l.lot, expirationDate: dateOnlyToString(l.expirationDate) }));
+}
+
 export interface ApplyExpirationResult {
   updatedCount: number;
   unmatchedProductCodes: string[];

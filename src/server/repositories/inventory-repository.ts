@@ -204,6 +204,9 @@ export async function loadActiveSkusWithSeries(
         firstSeenDate: dateOnlyToString(sku.firstSeenDate),
         isSoldOut: soldOutSkuIds.has(sku.id),
         soldOutDetectedDate: sku.soldOutDetectedDate ? dateOnlyToString(sku.soldOutDetectedDate) : null,
+        eaPerBox: sku.eaPerBox,
+        eaPerPallet: sku.eaPerPallet,
+        packagingBarcode: sku.packagingBarcode,
       },
       observations: attachIntervalInbounds(observationsBySku.get(sku.id) ?? [], inboundsBySku.get(sku.id) ?? [], holidays),
     };
@@ -346,6 +349,9 @@ export async function loadSkuWithSeries(
       firstSeenDate: dateOnlyToString(sku.firstSeenDate),
       isSoldOut,
       soldOutDetectedDate: sku.soldOutDetectedDate ? dateOnlyToString(sku.soldOutDetectedDate) : null,
+      eaPerBox: sku.eaPerBox,
+      eaPerPallet: sku.eaPerPallet,
+      packagingBarcode: sku.packagingBarcode,
     },
     observations: attachIntervalInbounds(observations, inboundsBySku.get(skuId) ?? [], holidays),
   };

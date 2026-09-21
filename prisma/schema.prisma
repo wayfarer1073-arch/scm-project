@@ -63,6 +63,7 @@ model User {
   eventHistories    EventHistory[]
   posts             Post[]
   favorites         SkuFavorite[]
+  packagingUploads  SkuPackagingUpload[]
 
   @@map("users")
 }
@@ -75,9 +76,10 @@ model Warehouse {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  skus      Sku[]
-  snapshots InventorySnapshot[]
-  events    InventoryEvent[]
+  skus             Sku[]
+  snapshots        InventorySnapshot[]
+  events           InventoryEvent[]
+  packagingUpload  SkuPackagingUpload?
 
   @@map("warehouses")
 }
@@ -127,6 +129,13 @@ model Sku {
   // 소비기한 관리 화면에서 항목별로, 또는 여러 항목을 선택해 한 번에 설정할 수 있다.
   expirationRiskDays Int?
 
+  // 상품 추가 정보(포장 단위·바코드) — 자주 바뀌지 않는 참고 정보라 화면에서 하나씩 편집하지
+  // 않고, 설정 화면에서 창고별 Excel 업로드로만 갱신한다(SkuPackagingUpload가 그 최근 업로드
+  // 이력을 기록). 값이 없는 셀로 업로드해도 기존 값을 지우지 않고 그대로 둔다.
+  eaPerBox         Int?
+  eaPerPallet      Int?
+  packagingBarcode String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -157,6 +166,21 @@ model SkuExpirationLot {
   @@unique([skuId, lot])
   @@index([skuId])
   @@map("sku_expiration_lots")
+}
+
+/// 창고별 "SKU 추가 정보(EA/BOX·EA/PLT·상품바코드)" Excel 업로드 이력. 값 자체는 Sku에 바로
+/// 반영되고, 여기는 창고당 한 행만 유지하며 "언제 마지막으로 업데이트됐는지" 확인용으로만 쓴다.
+model SkuPackagingUpload {
+  id             String    @id @default(cuid())
+  warehouseId    String    @unique
+  warehouse      Warehouse @relation(fields: [warehouseId], references: [id])
+  sourceFileName String
+  rowCount       Int
+  uploadedById   String
+  uploadedBy     User      @relation(fields: [uploadedById], references: [id])
+  uploadedAt     DateTime  @default(now())
+
+  @@map("sku_packaging_uploads")
 }
 
 model InventorySnapshot {

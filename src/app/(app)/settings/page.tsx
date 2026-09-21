@@ -5,19 +5,21 @@ import { listUsers } from '@/server/repositories/user-repository';
 import { listAllSkusForVisibilityAdmin } from '@/server/repositories/inventory-repository';
 import { listExpirationLots } from '@/server/repositories/expiration-repository';
 import { listHolidays } from '@/server/repositories/holiday-repository';
+import { listPackagingUploadStatus } from '@/server/repositories/packaging-repository';
 import { SettingsForm } from '@/components/settings/settings-form';
 
 export default async function SettingsPage() {
   const session = await auth();
   const isAdmin = session?.user.role === 'ADMIN';
 
-  const [warehouses, settings, users, skus, expirations, holidays] = await Promise.all([
+  const [warehouses, settings, users, skus, expirations, holidays, packagingStatuses] = await Promise.all([
     listWarehouses(),
     getSettings(),
     isAdmin ? listUsers() : Promise.resolve([]),
     listAllSkusForVisibilityAdmin(),
     listExpirationLots(),
     listHolidays(),
+    listPackagingUploadStatus(),
   ]);
 
   return (
@@ -35,6 +37,7 @@ export default async function SettingsPage() {
         skus={skus}
         expirations={expirations}
         holidays={holidays}
+        packagingStatuses={packagingStatuses}
       />
     </div>
   );

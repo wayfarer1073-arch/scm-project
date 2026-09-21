@@ -27,6 +27,7 @@ interface SkuDetailResponse {
   analysis: SkuAnalysis;
   valueBreakdown: InventoryValueBreakdown;
   observations: StockObservation[];
+  expirationLots: { lot: string; expirationDate: string }[];
 }
 
 interface EventItem {
@@ -289,6 +290,10 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
                 {detail.descriptor.option ? ` · ${detail.descriptor.option}` : ''}
                 {' · 최초 인식 '}
                 {formatKstDate(detail.descriptor.firstSeenDate)}
+                {' '}
+                <span className={`rounded-md bg-muted px-2 py-0.5 text-xs font-medium ${dataReliabilityClassName(dataReliabilityLevel(detail.analysis))}`}>
+                  신뢰도 {dataReliabilityLabel(dataReliabilityLevel(detail.analysis))}
+                </span>
               </SheetDescription>
             </SheetHeader>
 
@@ -298,14 +303,36 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
                   {isInitialObservation && (
                     <span className="rounded-md bg-status-increase-bg px-2 py-0.5 text-xs text-status-increase">[초기재고]</span>
                   )}
-                  <span className={`rounded-md bg-muted px-2 py-0.5 text-xs font-medium ${dataReliabilityClassName(dataReliabilityLevel(detail.analysis))}`}>
-                    신뢰도 {dataReliabilityLabel(dataReliabilityLevel(detail.analysis))}
-                  </span>
                   {detail.analysis.tags.filter((t) => !isObservedDateTag(t) && !isEstimateCaveatTag(t) && !isBasisWindowTag(t) && !isSoldOutTag(t) && !isStaleDepletionTag(t) && !isB2BTag(t)).map((t) => (
                     <span key={t} className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">{humanizeTag(t)}</span>
                   ))}
                 </div>
               )}
+
+              <section className="rounded-xl border bg-muted/30 p-3">
+                <h3 className="mb-2 text-xs font-semibold">상품 추가 정보</h3>
+                <div className="space-y-2">
+                  <div>
+                    <div className="text-xs text-muted-foreground">로트별 소비기한</div>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {detail.expirationLots.length === 0 ? (
+                        <span className="text-sm text-muted-foreground">등록된 로트 없음</span>
+                      ) : (
+                        detail.expirationLots.map((lot) => (
+                          <span key={lot.lot} className="rounded-md bg-card px-2 py-0.5 text-xs">
+                            {lot.lot} {formatKstDate(lot.expirationDate)}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-x-3 gap-y-1 text-sm">
+                    <Field label="EA/BOX" value={detail.descriptor.eaPerBox !== null ? `${formatNumber(detail.descriptor.eaPerBox)}개` : '미등록'} />
+                    <Field label="EA/PLT" value={detail.descriptor.eaPerPallet !== null ? `${formatNumber(detail.descriptor.eaPerPallet)}개` : '미등록'} />
+                    <Field label="상품바코드" value={detail.descriptor.packagingBarcode ?? '미등록'} />
+                  </div>
+                </div>
+              </section>
 
               <section className="grid grid-cols-2 gap-2">
                 <MetricCard label={detail.descriptor.isSoldOut ? '마지막 관측 재고' : '관측 재고'} value={`${formatNumber(detail.analysis.latest.availableStock)}개`} />

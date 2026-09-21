@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { ExpirationManagement } from '@/components/settings/expiration-management';
+import { SkuPackagingManagement } from '@/components/settings/sku-packaging-management';
 import { HolidayManagement } from '@/components/settings/holiday-management';
 import { PROTECTED_ADMIN_EMAIL } from '@/lib/constants';
 import type { RiskThresholdSettings } from '@/domain/inventory/types';
@@ -43,6 +44,13 @@ interface ExpirationLotRow {
   expirationRiskDays: number | null;
 }
 
+interface PackagingUploadStatus {
+  warehouseId: string;
+  warehouseCode: string;
+  warehouseName: string;
+  lastUpload: { uploadedAt: string; uploadedByName: string; sourceFileName: string; rowCount: number } | null;
+}
+
 interface SettingsFormProps {
   isAdmin: boolean;
   currentUserId: string | null;
@@ -52,9 +60,10 @@ interface SettingsFormProps {
   skus: SkuVisibilityRow[];
   expirations: ExpirationLotRow[];
   holidays: { id: string; date: string; name: string }[];
+  packagingStatuses: PackagingUploadStatus[];
 }
 
-export function SettingsForm({ isAdmin, currentUserId, warehouses, settings, users: initialUsers, skus, expirations, holidays }: SettingsFormProps) {
+export function SettingsForm({ isAdmin, currentUserId, warehouses, settings, users: initialUsers, skus, expirations, holidays, packagingStatuses }: SettingsFormProps) {
   const [warehouseNames, setWarehouseNames] = useState(Object.fromEntries(warehouses.map((w) => [w.id, w.name])));
   const [thresholds, setThresholds] = useState(settings);
   const [users, setUsers] = useState(initialUsers);
@@ -176,6 +185,8 @@ export function SettingsForm({ isAdmin, currentUserId, warehouses, settings, use
       <SkuVisibilityManagement isAdmin={isAdmin} initialSkus={skus} />
 
       <ExpirationManagement isAdmin={isAdmin} warehouses={warehouses} initialEntries={expirations} />
+
+      <SkuPackagingManagement isAdmin={isAdmin} warehouses={warehouses} initialStatuses={packagingStatuses} />
 
       <HolidayManagement isAdmin={isAdmin} initialHolidays={holidays} />
 
