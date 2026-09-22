@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, UploadCloud, MessagesSquare, Settings, Package } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, MessagesSquare, Settings, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SignOutButton } from '@/components/layout/sign-out-button';
 import { postTagLabel, postTagDotClassName, type PostTagValue } from '@/lib/post-tags';
 
 const NAV_ITEMS = [
   { href: '/', label: '대시보드', icon: LayoutDashboard },
-  { href: '/upload', label: '업로드', icon: UploadCloud },
+  { href: '/upload', label: '캘린더', icon: CalendarDays },
   { href: '/board', label: '게시판', icon: MessagesSquare },
   { href: '/settings', label: '설정', icon: Settings },
 ];

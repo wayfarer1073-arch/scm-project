@@ -179,11 +179,11 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
                         disabled={isFuture}
                         onClick={() => setSelectedDate(dateStr)}
                         className={cn(
-                          'flex aspect-[6/5] flex-col border-r border-b border-border p-2 text-left transition-colors',
+                          'group flex aspect-[6/5] flex-col border-r border-b border-border p-2 text-left transition-colors',
                           inMonth ? 'bg-background' : 'bg-muted/30',
                           isBlocked && !isToday && 'bg-muted/60',
                           isToday && 'bg-foreground',
-                          isFuture ? 'cursor-default' : 'cursor-pointer hover:bg-muted',
+                          isFuture ? 'cursor-default' : isToday ? 'cursor-pointer hover:bg-lime-300' : 'cursor-pointer hover:bg-muted',
                         )}
                       >
                         <div className="flex h-4 items-start justify-between gap-1">
@@ -192,19 +192,29 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
                               className={cn(
                                 'text-xs tabular-nums',
                                 inMonth ? 'text-foreground' : 'text-muted-foreground/60',
-                                isToday && 'font-semibold text-background',
+                                isToday && 'font-semibold text-background group-hover:text-black',
                               )}
                             >
                               {format(day, 'd')}
                             </span>
                             {uploadedCodes.length > 0 && (
-                              <span className={cn('text-[9px] font-semibold', isToday ? 'text-background/80' : 'text-muted-foreground')}>
+                              <span
+                                className={cn(
+                                  'text-[9px] font-semibold',
+                                  isToday ? 'text-background/80 group-hover:text-black/70' : 'text-muted-foreground',
+                                )}
+                              >
                                 {uploadedCodes.join(' ')}
                               </span>
                             )}
                           </div>
                           {holidayName && (
-                            <span className={cn('truncate text-[9px] font-medium', isToday ? 'text-background/80' : 'text-muted-foreground')}>
+                            <span
+                              className={cn(
+                                'truncate text-[9px] font-medium',
+                                isToday ? 'text-background/80 group-hover:text-black/70' : 'text-muted-foreground',
+                              )}
+                            >
                               {holidayName}
                             </span>
                           )}

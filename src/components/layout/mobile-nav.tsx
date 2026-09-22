@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, LogOut, LayoutDashboard, UploadCloud, MessagesSquare, Settings, Package } from 'lucide-react';
+import { Menu, LogOut, LayoutDashboard, CalendarDays, MessagesSquare, Settings, Package } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
   { href: '/', label: '대시보드', icon: LayoutDashboard },
-  { href: '/upload', label: '업로드', icon: UploadCloud },
+  { href: '/upload', label: '캘린더', icon: CalendarDays },
   { href: '/board', label: '게시판', icon: MessagesSquare },
   { href: '/settings', label: '설정', icon: Settings },
 ];

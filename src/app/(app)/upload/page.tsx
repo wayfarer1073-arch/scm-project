@@ -38,12 +38,6 @@ export default async function UploadPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-lg font-semibold">재고 스냅샷 업로드</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          캘린더에서 날짜·창고 칸을 눌러 재고 Excel(.xls, .xlsx)을 업로드하세요.
-        </p>
-      </div>
       <UploadCalendar
         warehouses={warehouses.map((w) => ({ id: w.id, code: w.code, name: w.name }))}
         entries={calendarEntries}
