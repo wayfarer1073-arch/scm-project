@@ -5,9 +5,9 @@ import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, getDay, is
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { CalendarUploadDialog } from '@/components/upload/calendar-upload-dialog';
+import { DayDetailDialog } from '@/components/upload/day-detail-dialog';
 import { ScheduleDetailDialog } from '@/components/upload/schedule-detail-dialog';
-import { formatKstDateTime, todayKstDateString } from '@/lib/date';
+import { todayKstDateString } from '@/lib/date';
 import { SCHEDULE_COLOR_CLASSNAMES, type ScheduleColor } from '@/lib/schedule-colors';
 import { assignScheduleLanes } from '@/domain/events/schedule-layout';
 import type { ScheduleRow } from '@/domain/events/schedule-types';
@@ -32,14 +32,6 @@ interface UploadCalendarProps {
   isAdmin: boolean;
 }
 
-interface SelectedSlot {
-  warehouseId: string;
-  warehouseName: string;
-  date: string;
-  existing: { uploadedByName: string; uploadedAt: string; rowCount: number } | null;
-  blocked: boolean;
-}
-
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const MAX_LANES = 3;
 const BAR_H = 15;
@@ -54,7 +46,7 @@ function chunkIntoWeeks(days: Date[]): Date[][] {
 
 export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdmin }: UploadCalendarProps) {
   const [month, setMonth] = useState(() => new Date());
-  const [selected, setSelected] = useState<SelectedSlot | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [scheduleList, setScheduleList] = useState(schedules);
   const [openScheduleId, setOpenScheduleId] = useState<string | null>(null);
 
@@ -67,6 +59,16 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
     }
     return map;
   }, [entries]);
+
+  const entryByWarehouseIdForSelectedDate = useMemo(() => {
+    const map = new Map<string, CalendarEntry>();
+    if (!selectedDate) return map;
+    for (const w of warehouses) {
+      const entry = entryByKey.get(`${w.id}|${selectedDate}`);
+      if (entry) map.set(w.id, entry);
+    }
+    return map;
+  }, [entryByKey, warehouses, selectedDate]);
 
   const holidayByDate = useMemo(() => new Map(holidays.map((h) => [h.date, h.name])), [holidays]);
 
@@ -94,6 +96,9 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
   const barsSpacerHeight = lanesUsed > 0 ? lanesUsed * BAR_H + (lanesUsed - 1) * BAR_GAP : 0;
 
   const openSchedule = scheduleList.find((s) => s.id === openScheduleId) ?? null;
+  const selectedDateBlocked = selectedDate
+    ? getDay(new Date(`${selectedDate}T00:00:00`)) === 0 || getDay(new Date(`${selectedDate}T00:00:00`)) === 6 || holidayByDate.has(selectedDate)
+    : false;
 
   function handleColorChanged(scheduleId: string, color: ScheduleColor) {
     setScheduleList((prev) => prev.map((s) => (s.id === scheduleId ? { ...s, color } : s)));
@@ -105,9 +110,9 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
         <div>
           <h2 className="text-base font-semibold">업로드 현황 캘린더</h2>
           <p className="mt-0.5 text-xs text-sidebar-muted-foreground">
-            날짜별로 어떤 창고가 자료를 올렸는지 한눈에 확인하고, 블록을 눌러 바로 업로드하거나 교체할 수 있습니다. 주말·공휴일(옅은 회색)은
-            업로드할 수 없지만 KPI 계산에는 직전 영업일 자료가 그대로 포함됩니다. 색이 있는 막대는 SKU 상세에서 등록한 일정(메모/이벤트)이며,
-            눌러서 내용을 확인하거나 색상을 바꿀 수 있습니다.
+            날짜 칸을 눌러 창고별로 재고 Excel을 업로드하거나 입고 특이사항을 기록하세요. 업로드가 끝난 창고는 날짜 옆에 작게 코드로
+            표시됩니다. 주말·공휴일(옅은 회색)은 업로드할 수 없지만 KPI 계산에는 직전 영업일 자료가 그대로 포함됩니다. 색이 있는 막대는
+            SKU 상세에서 등록한 일정(메모/이벤트)이며, 눌러서 내용을 확인하거나 색상을 바꿀 수 있습니다.
           </p>
         </div>
         <div className="flex items-center gap-1">
@@ -165,27 +170,38 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
                     const holidayName = holidayByDate.get(dateStr);
                     const isWeekendDay = getDay(day) === 0 || getDay(day) === 6;
                     const isBlocked = isWeekendDay || holidayName !== undefined;
+                    const uploadedCodes = warehouses.filter((w) => entryByKey.has(`${w.id}|${dateStr}`)).map((w) => w.code);
                     return (
-                      <div
+                      <button
                         key={dateStr}
+                        type="button"
+                        disabled={isFuture}
+                        onClick={() => setSelectedDate(dateStr)}
                         className={cn(
-                          'flex min-h-[70px] flex-col p-2',
-                          'rounded-lg border',
+                          'flex min-h-[70px] flex-col rounded-lg border p-2 text-left transition-colors',
                           inMonth ? 'bg-background' : 'bg-muted/30',
                           isBlocked && !isToday && 'bg-muted/60',
                           isToday && 'border-foreground bg-foreground',
+                          isFuture ? 'cursor-default' : 'cursor-pointer hover:border-primary/40',
                         )}
                       >
                         <div className="flex h-4 items-start justify-between gap-1">
-                          <span
-                            className={cn(
-                              'text-xs tabular-nums',
-                              inMonth ? 'text-foreground' : 'text-muted-foreground/60',
-                              isToday && 'font-semibold text-background',
+                          <div className="flex items-baseline gap-1">
+                            <span
+                              className={cn(
+                                'text-xs tabular-nums',
+                                inMonth ? 'text-foreground' : 'text-muted-foreground/60',
+                                isToday && 'font-semibold text-background',
+                              )}
+                            >
+                              {format(day, 'd')}
+                            </span>
+                            {uploadedCodes.length > 0 && (
+                              <span className={cn('text-[9px] font-semibold', isToday ? 'text-background/80' : 'text-muted-foreground')}>
+                                {uploadedCodes.join(' ')}
+                              </span>
                             )}
-                          >
-                            {format(day, 'd')}
-                          </span>
+                          </div>
                           {holidayName && (
                             <span className={cn('truncate text-[9px] font-medium', isToday ? 'text-background/80' : 'text-muted-foreground')}>
                               {holidayName}
@@ -193,72 +209,7 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
                           )}
                         </div>
                         {barsSpacerHeight > 0 && <div style={{ height: barsSpacerHeight }} aria-hidden="true" />}
-                        {!isFuture && (
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {warehouses.map((w) => {
-                              const entry = entryByKey.get(`${w.id}|${dateStr}`);
-                              if (entry) {
-                                return (
-                                  <Tooltip key={w.id}>
-                                    <TooltipTrigger asChild>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          setSelected({
-                                            warehouseId: entry.warehouseId,
-                                            warehouseName: entry.warehouseName,
-                                            date: entry.date,
-                                            existing: {
-                                              uploadedByName: entry.uploadedByName,
-                                              uploadedAt: entry.uploadedAt,
-                                              rowCount: entry.rowCount,
-                                            },
-                                            blocked: isBlocked,
-                                          })
-                                        }
-                                        className={cn(
-                                          'flex size-5 items-center justify-center rounded-md text-[10px] font-bold transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                                          isToday ? 'bg-background text-foreground' : 'bg-foreground text-background',
-                                        )}
-                                        aria-label={`${entry.warehouseName} ${dateStr} 자료, ${entry.uploadedByName} 업로드, 누르면 상세 보기`}
-                                      >
-                                        {w.code}
-                                      </button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      {entry.warehouseName} · {entry.uploadedByName} 업로드 · {formatKstDateTime(entry.uploadedAt)} · {entry.rowCount.toLocaleString()}건
-                                      {entry.inboundCount > 0 ? ` · 입고 특이사항 ${entry.inboundCount}건` : ''}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                );
-                              }
-                              if (isBlocked) return null;
-                              return (
-                                <Tooltip key={w.id}>
-                                  <TooltipTrigger asChild>
-                                    <button
-                                      type="button"
-                                      onClick={() => setSelected({ warehouseId: w.id, warehouseName: w.name, date: dateStr, existing: null, blocked: false })}
-                                      className={cn(
-                                        'flex size-5 items-center justify-center rounded-md border border-dashed text-[10px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                                        isToday
-                                          ? 'border-background/50 text-background/70 hover:border-background hover:text-background'
-                                          : 'border-border text-muted-foreground/50 hover:border-primary/40 hover:text-primary',
-                                      )}
-                                      aria-label={`${w.name} ${dateStr} 자료 업로드`}
-                                    >
-                                      {w.code}
-                                    </button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    {w.name} · 업로드된 자료 없음 · 눌러서 업로드
-                                  </TooltipContent>
-                                </Tooltip>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -308,15 +259,15 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
         </div>
       </div>
 
-      {selected && (
-        <CalendarUploadDialog
+      {selectedDate && (
+        <DayDetailDialog
+          key={selectedDate}
           open
-          onOpenChange={(open) => !open && setSelected(null)}
-          warehouseId={selected.warehouseId}
-          warehouseName={selected.warehouseName}
-          date={selected.date}
-          existing={selected.existing}
-          blocked={selected.blocked}
+          onOpenChange={(open) => !open && setSelectedDate(null)}
+          date={selectedDate}
+          warehouses={warehouses}
+          entryByWarehouseId={entryByWarehouseIdForSelectedDate}
+          blocked={selectedDateBlocked}
           isAdmin={isAdmin}
         />
       )}
