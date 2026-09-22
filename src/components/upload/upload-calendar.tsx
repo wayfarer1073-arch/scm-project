@@ -178,7 +178,7 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
                         disabled={isFuture}
                         onClick={() => setSelectedDate(dateStr)}
                         className={cn(
-                          'flex min-h-[70px] flex-col rounded-lg border p-2 text-left transition-colors',
+                          'flex aspect-square flex-col rounded-lg border p-2 text-left transition-colors',
                           inMonth ? 'bg-background' : 'bg-muted/30',
                           isBlocked && !isToday && 'bg-muted/60',
                           isToday && 'border-foreground bg-foreground',
