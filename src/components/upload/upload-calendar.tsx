@@ -193,7 +193,7 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
                               className={cn(
                                 'text-xs tabular-nums',
                                 inMonth ? 'text-foreground' : 'text-muted-foreground/60',
-                                isBlocked && !isToday && 'text-status-danger',
+                                isBlocked && !isToday && (inMonth ? 'text-status-danger' : 'text-status-danger/40'),
                                 isToday && 'font-semibold text-background group-hover:text-black',
                               )}
                             >
@@ -214,7 +214,11 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
                             <span
                               className={cn(
                                 'truncate text-[9px] font-medium',
-                                isToday ? 'text-background/80 group-hover:text-black/70' : 'text-status-danger',
+                                isToday
+                                  ? 'text-background/80 group-hover:text-black/70'
+                                  : inMonth
+                                    ? 'text-status-danger'
+                                    : 'text-status-danger/40',
                               )}
                             >
                               {holidayName}
