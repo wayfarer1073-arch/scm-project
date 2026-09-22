@@ -6,7 +6,11 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { CalendarUploadDialog } from '@/components/upload/calendar-upload-dialog';
+import { ScheduleDetailDialog } from '@/components/upload/schedule-detail-dialog';
 import { formatKstDateTime, todayKstDateString } from '@/lib/date';
+import { SCHEDULE_COLOR_CLASSNAMES, type ScheduleColor } from '@/lib/schedule-colors';
+import { assignScheduleLanes } from '@/domain/events/schedule-layout';
+import type { ScheduleRow } from '@/domain/events/schedule-types';
 import { cn } from '@/lib/utils';
 
 export interface CalendarEntry {
@@ -24,6 +28,7 @@ interface UploadCalendarProps {
   warehouses: { id: string; code: string; name: string }[];
   entries: CalendarEntry[];
   holidays: { date: string; name: string }[];
+  schedules: ScheduleRow[];
   isAdmin: boolean;
 }
 
@@ -36,10 +41,22 @@ interface SelectedSlot {
 }
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+const MAX_LANES = 3;
+const BAR_H = 15;
+const BAR_GAP = 3;
+const BARS_TOP_OFFSET = 28; // 셀 padding(8) + 날짜 줄 높이(16) + 여백(4)
 
-export function UploadCalendar({ warehouses, entries, holidays, isAdmin }: UploadCalendarProps) {
+function chunkIntoWeeks(days: Date[]): Date[][] {
+  const weeks: Date[][] = [];
+  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+  return weeks;
+}
+
+export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdmin }: UploadCalendarProps) {
   const [month, setMonth] = useState(() => new Date());
   const [selected, setSelected] = useState<SelectedSlot | null>(null);
+  const [scheduleList, setScheduleList] = useState(schedules);
+  const [openScheduleId, setOpenScheduleId] = useState<string | null>(null);
 
   const today = todayKstDateString();
 
@@ -59,6 +76,29 @@ export function UploadCalendar({ warehouses, entries, holidays, isAdmin }: Uploa
     return eachDayOfInterval({ start, end });
   }, [month]);
 
+  const weeks = useMemo(() => chunkIntoWeeks(days), [days]);
+
+  const monthStart = format(days[0], 'yyyy-MM-dd');
+  const monthEnd = format(days[days.length - 1], 'yyyy-MM-dd');
+
+  const monthSchedules = useMemo(
+    () => scheduleList.filter((s) => s.endDate >= monthStart && s.startDate <= monthEnd),
+    [scheduleList, monthStart, monthEnd],
+  );
+  const laneOf = useMemo(() => assignScheduleLanes(monthSchedules), [monthSchedules]);
+  const lanesUsed = useMemo(() => {
+    let max = -1;
+    for (const s of monthSchedules) max = Math.max(max, laneOf.get(s.id) ?? -1);
+    return Math.min(MAX_LANES, max + 1);
+  }, [monthSchedules, laneOf]);
+  const barsSpacerHeight = lanesUsed > 0 ? lanesUsed * BAR_H + (lanesUsed - 1) * BAR_GAP : 0;
+
+  const openSchedule = scheduleList.find((s) => s.id === openScheduleId) ?? null;
+
+  function handleColorChanged(scheduleId: string, color: ScheduleColor) {
+    setScheduleList((prev) => prev.map((s) => (s.id === scheduleId ? { ...s, color } : s)));
+  }
+
   return (
     <section className="overflow-hidden rounded-xl border border-border">
       <div className="flex flex-wrap items-center justify-between gap-3 bg-sidebar px-5 py-3.5 text-sidebar-foreground">
@@ -66,7 +106,8 @@ export function UploadCalendar({ warehouses, entries, holidays, isAdmin }: Uploa
           <h2 className="text-base font-semibold">업로드 현황 캘린더</h2>
           <p className="mt-0.5 text-xs text-sidebar-muted-foreground">
             날짜별로 어떤 창고가 자료를 올렸는지 한눈에 확인하고, 블록을 눌러 바로 업로드하거나 교체할 수 있습니다. 주말·공휴일(옅은 회색)은
-            업로드할 수 없지만 KPI 계산에는 직전 영업일 자료가 그대로 포함됩니다.
+            업로드할 수 없지만 KPI 계산에는 직전 영업일 자료가 그대로 포함됩니다. 색이 있는 막대는 SKU 상세에서 등록한 일정(메모/이벤트)이며,
+            눌러서 내용을 확인하거나 색상을 바꿀 수 있습니다.
           </p>
         </div>
         <div className="flex items-center gap-1">
@@ -81,117 +122,190 @@ export function UploadCalendar({ warehouses, entries, holidays, isAdmin }: Uploa
       </div>
 
       <div className="p-4 sm:p-5">
-      <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-medium text-muted-foreground">
-        {WEEKDAYS.map((d) => (
-          <div key={d} className="py-1">
-            {d}
-          </div>
-        ))}
-      </div>
-      <div className="grid grid-cols-7 gap-1.5">
-        {days.map((day) => {
-          const dateStr = format(day, 'yyyy-MM-dd');
-          const inMonth = isSameMonth(day, month);
-          const isToday = dateStr === today;
-          const isFuture = dateStr > today;
-          const holidayName = holidayByDate.get(dateStr);
-          const isWeekendDay = getDay(day) === 0 || getDay(day) === 6;
-          const isBlocked = isWeekendDay || holidayName !== undefined;
-          return (
-            <div
-              key={dateStr}
-              className={cn(
-                'flex min-h-[92px] flex-col gap-1.5 rounded-lg border p-2',
-                inMonth ? 'bg-background' : 'bg-muted/30',
-                isBlocked && !isToday && 'bg-muted/60',
-                isToday && 'border-foreground bg-foreground',
-              )}
-            >
-              <div className="flex items-start justify-between gap-1">
-                <span
-                  className={cn(
-                    'text-xs tabular-nums',
-                    inMonth ? 'text-foreground' : 'text-muted-foreground/60',
-                    isToday && 'font-semibold text-background',
-                  )}
-                >
-                  {format(day, 'd')}
-                </span>
-                {holidayName && (
-                  <span className={cn('truncate text-[9px] font-medium', isToday ? 'text-background/80' : 'text-muted-foreground')}>
-                    {holidayName}
-                  </span>
-                )}
-              </div>
-              {!isFuture && (
-                <div className="flex flex-wrap gap-1">
-                  {warehouses.map((w) => {
-                    const entry = entryByKey.get(`${w.id}|${dateStr}`);
-                    if (entry) {
-                      return (
-                        <Tooltip key={w.id}>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setSelected({
-                                  warehouseId: entry.warehouseId,
-                                  warehouseName: entry.warehouseName,
-                                  date: entry.date,
-                                  existing: {
-                                    uploadedByName: entry.uploadedByName,
-                                    uploadedAt: entry.uploadedAt,
-                                    rowCount: entry.rowCount,
-                                  },
-                                  blocked: isBlocked,
-                                })
-                              }
-                              className={cn(
-                                'flex size-6 items-center justify-center rounded-md text-[11px] font-bold transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                                isToday ? 'bg-background text-foreground' : 'bg-foreground text-background',
-                              )}
-                              aria-label={`${entry.warehouseName} ${dateStr} 자료, ${entry.uploadedByName} 업로드, 누르면 상세 보기`}
-                            >
-                              {w.code}
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {entry.warehouseName} · {entry.uploadedByName} 업로드 · {formatKstDateTime(entry.uploadedAt)} · {entry.rowCount.toLocaleString()}건
-                            {entry.inboundCount > 0 ? ` · 입고 특이사항 ${entry.inboundCount}건` : ''}
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    }
-                    if (isBlocked) return null;
+        <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-medium text-muted-foreground">
+          {WEEKDAYS.map((d) => (
+            <div key={d} className="py-1">
+              {d}
+            </div>
+          ))}
+        </div>
+        <div className="space-y-1.5">
+          {weeks.map((week) => {
+            const weekStart = format(week[0], 'yyyy-MM-dd');
+            const weekEnd = format(week[6], 'yyyy-MM-dd');
+            const segments = monthSchedules
+              .map((s) => {
+                const lane = laneOf.get(s.id) ?? 0;
+                if (lane >= MAX_LANES) return null;
+                if (s.endDate < weekStart || s.startDate > weekEnd) return null;
+                const segStart = s.startDate > weekStart ? s.startDate : weekStart;
+                const segEnd = s.endDate < weekEnd ? s.endDate : weekEnd;
+                const colStart = week.findIndex((d) => format(d, 'yyyy-MM-dd') === segStart);
+                const colEnd = week.findIndex((d) => format(d, 'yyyy-MM-dd') === segEnd);
+                if (colStart === -1 || colEnd === -1) return null;
+                return {
+                  schedule: s,
+                  lane,
+                  colStart,
+                  colSpan: colEnd - colStart + 1,
+                  isTrueStart: segStart === s.startDate,
+                  isTrueEnd: segEnd === s.endDate,
+                };
+              })
+              .filter((v): v is NonNullable<typeof v> => v !== null);
+
+            return (
+              <div key={weekStart} className="relative">
+                <div className="grid grid-cols-7 gap-1.5">
+                  {week.map((day) => {
+                    const dateStr = format(day, 'yyyy-MM-dd');
+                    const inMonth = isSameMonth(day, month);
+                    const isToday = dateStr === today;
+                    const isFuture = dateStr > today;
+                    const holidayName = holidayByDate.get(dateStr);
+                    const isWeekendDay = getDay(day) === 0 || getDay(day) === 6;
+                    const isBlocked = isWeekendDay || holidayName !== undefined;
                     return (
-                      <Tooltip key={w.id}>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={() => setSelected({ warehouseId: w.id, warehouseName: w.name, date: dateStr, existing: null, blocked: false })}
+                      <div
+                        key={dateStr}
+                        className={cn(
+                          'flex min-h-[70px] flex-col p-2',
+                          'rounded-lg border',
+                          inMonth ? 'bg-background' : 'bg-muted/30',
+                          isBlocked && !isToday && 'bg-muted/60',
+                          isToday && 'border-foreground bg-foreground',
+                        )}
+                      >
+                        <div className="flex h-4 items-start justify-between gap-1">
+                          <span
                             className={cn(
-                              'flex size-6 items-center justify-center rounded-md border border-dashed text-[11px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                              isToday
-                                ? 'border-background/50 text-background/70 hover:border-background hover:text-background'
-                                : 'border-border text-muted-foreground/50 hover:border-primary/40 hover:text-primary',
+                              'text-xs tabular-nums',
+                              inMonth ? 'text-foreground' : 'text-muted-foreground/60',
+                              isToday && 'font-semibold text-background',
                             )}
-                            aria-label={`${w.name} ${dateStr} 자료 업로드`}
                           >
-                            {w.code}
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {w.name} · 업로드된 자료 없음 · 눌러서 업로드
-                        </TooltipContent>
-                      </Tooltip>
+                            {format(day, 'd')}
+                          </span>
+                          {holidayName && (
+                            <span className={cn('truncate text-[9px] font-medium', isToday ? 'text-background/80' : 'text-muted-foreground')}>
+                              {holidayName}
+                            </span>
+                          )}
+                        </div>
+                        {barsSpacerHeight > 0 && <div style={{ height: barsSpacerHeight }} aria-hidden="true" />}
+                        {!isFuture && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {warehouses.map((w) => {
+                              const entry = entryByKey.get(`${w.id}|${dateStr}`);
+                              if (entry) {
+                                return (
+                                  <Tooltip key={w.id}>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setSelected({
+                                            warehouseId: entry.warehouseId,
+                                            warehouseName: entry.warehouseName,
+                                            date: entry.date,
+                                            existing: {
+                                              uploadedByName: entry.uploadedByName,
+                                              uploadedAt: entry.uploadedAt,
+                                              rowCount: entry.rowCount,
+                                            },
+                                            blocked: isBlocked,
+                                          })
+                                        }
+                                        className={cn(
+                                          'flex size-5 items-center justify-center rounded-md text-[10px] font-bold transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                                          isToday ? 'bg-background text-foreground' : 'bg-foreground text-background',
+                                        )}
+                                        aria-label={`${entry.warehouseName} ${dateStr} 자료, ${entry.uploadedByName} 업로드, 누르면 상세 보기`}
+                                      >
+                                        {w.code}
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {entry.warehouseName} · {entry.uploadedByName} 업로드 · {formatKstDateTime(entry.uploadedAt)} · {entry.rowCount.toLocaleString()}건
+                                      {entry.inboundCount > 0 ? ` · 입고 특이사항 ${entry.inboundCount}건` : ''}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                );
+                              }
+                              if (isBlocked) return null;
+                              return (
+                                <Tooltip key={w.id}>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelected({ warehouseId: w.id, warehouseName: w.name, date: dateStr, existing: null, blocked: false })}
+                                      className={cn(
+                                        'flex size-5 items-center justify-center rounded-md border border-dashed text-[10px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                                        isToday
+                                          ? 'border-background/50 text-background/70 hover:border-background hover:text-background'
+                                          : 'border-border text-muted-foreground/50 hover:border-primary/40 hover:text-primary',
+                                      )}
+                                      aria-label={`${w.name} ${dateStr} 자료 업로드`}
+                                    >
+                                      {w.code}
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {w.name} · 업로드된 자료 없음 · 눌러서 업로드
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+
+                {segments.length > 0 && (
+                  <div
+                    className="pointer-events-none absolute inset-x-0"
+                    style={{
+                      top: BARS_TOP_OFFSET,
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+                      columnGap: '6px',
+                      rowGap: `${BAR_GAP}px`,
+                    }}
+                  >
+                    {segments.map((seg) => (
+                      <Tooltip key={seg.schedule.id}>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => setOpenScheduleId(seg.schedule.id)}
+                            style={{
+                              gridColumn: `${seg.colStart + 1} / span ${seg.colSpan}`,
+                              gridRow: seg.lane + 1,
+                              height: BAR_H,
+                            }}
+                            className={cn(
+                              'pointer-events-auto truncate px-1.5 text-left text-[10px] font-medium leading-[15px] transition-opacity hover:opacity-80',
+                              SCHEDULE_COLOR_CLASSNAMES[seg.schedule.color as ScheduleColor]?.bar ?? SCHEDULE_COLOR_CLASSNAMES.red.bar,
+                              seg.isTrueStart ? 'rounded-l-sm' : 'rounded-l-none',
+                              seg.isTrueEnd ? 'rounded-r-sm' : 'rounded-r-none',
+                            )}
+                          >
+                            {seg.schedule.title}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {seg.schedule.title} · {seg.schedule.events.length}건 · 눌러서 상세 보기
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {selected && (
@@ -206,6 +320,8 @@ export function UploadCalendar({ warehouses, entries, holidays, isAdmin }: Uploa
           isAdmin={isAdmin}
         />
       )}
+
+      <ScheduleDetailDialog schedule={openSchedule} onOpenChange={(open) => !open && setOpenScheduleId(null)} onColorChanged={handleColorChanged} />
     </section>
   );
 }
