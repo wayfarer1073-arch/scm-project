@@ -14,3 +14,15 @@ export function postTagLabel(tag: PostTagValue): string {
 export function postTagBadgeVariant(tag: PostTagValue) {
   return POST_TAG_OPTIONS.find((o) => o.value === tag)?.badgeVariant ?? 'outline';
 }
+
+const DOT_CLASS_NAMES: Record<PostTagValue, string> = {
+  NOTICE: 'bg-tag-notice',
+  ISSUE: 'bg-status-danger',
+  RESOLVED: 'bg-tag-resolved',
+  CHAT: 'bg-muted-foreground',
+};
+
+/** 사이드바 미리보기 등에서 태그를 나타내는 작은 점의 배경색 클래스. */
+export function postTagDotClassName(tag: PostTagValue): string {
+  return DOT_CLASS_NAMES[tag];
+}

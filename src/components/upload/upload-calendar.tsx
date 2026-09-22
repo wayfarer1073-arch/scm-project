@@ -127,14 +127,15 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
       </div>
 
       <div className="p-4 sm:p-5">
-        <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-medium text-muted-foreground">
+        <div className="border-t border-l border-border">
+        <div className="grid grid-cols-7 text-center text-xs font-medium text-muted-foreground">
           {WEEKDAYS.map((d) => (
-            <div key={d} className="py-1">
+            <div key={d} className="border-r border-b border-border py-1">
               {d}
             </div>
           ))}
         </div>
-        <div className="space-y-1.5">
+        <div>
           {weeks.map((week) => {
             const weekStart = format(week[0], 'yyyy-MM-dd');
             const weekEnd = format(week[6], 'yyyy-MM-dd');
@@ -161,7 +162,7 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
 
             return (
               <div key={weekStart} className="relative">
-                <div className="grid grid-cols-7 gap-1.5">
+                <div className="grid grid-cols-7">
                   {week.map((day) => {
                     const dateStr = format(day, 'yyyy-MM-dd');
                     const inMonth = isSameMonth(day, month);
@@ -178,11 +179,11 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
                         disabled={isFuture}
                         onClick={() => setSelectedDate(dateStr)}
                         className={cn(
-                          'flex aspect-square flex-col rounded-lg border p-2 text-left transition-colors',
+                          'flex aspect-square flex-col border-r border-b border-border p-2 text-left transition-colors',
                           inMonth ? 'bg-background' : 'bg-muted/30',
                           isBlocked && !isToday && 'bg-muted/60',
-                          isToday && 'border-foreground bg-foreground',
-                          isFuture ? 'cursor-default' : 'cursor-pointer hover:border-primary/40',
+                          isToday && 'bg-foreground',
+                          isFuture ? 'cursor-default' : 'cursor-pointer hover:bg-muted',
                         )}
                       >
                         <div className="flex h-4 items-start justify-between gap-1">
@@ -221,7 +222,7 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
                       top: BARS_TOP_OFFSET,
                       display: 'grid',
                       gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
-                      columnGap: '6px',
+                      columnGap: '0px',
                       rowGap: `${BAR_GAP}px`,
                     }}
                   >
@@ -239,8 +240,6 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
                             className={cn(
                               'pointer-events-auto truncate px-1.5 text-left text-[10px] font-medium leading-[15px] transition-opacity hover:opacity-80',
                               SCHEDULE_COLOR_CLASSNAMES[seg.schedule.color as ScheduleColor]?.bar ?? SCHEDULE_COLOR_CLASSNAMES.red.bar,
-                              seg.isTrueStart ? 'rounded-l-sm' : 'rounded-l-none',
-                              seg.isTrueEnd ? 'rounded-r-sm' : 'rounded-r-none',
                             )}
                           >
                             {seg.schedule.title}
@@ -256,6 +255,7 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
               </div>
             );
           })}
+        </div>
         </div>
       </div>
 

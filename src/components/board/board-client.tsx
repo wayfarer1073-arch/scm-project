@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { PenSquare, Trash2, Search, X } from 'lucide-react';
+import { PenSquare, Pencil, Trash2, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Pagination } from '@/components/ui/pagination';
-import { PostFormDialog } from '@/components/board/post-form-dialog';
+import { PostFormDialog, type EditingPost } from '@/components/board/post-form-dialog';
 import { formatKstDateTime } from '@/lib/date';
 import { postTagLabel, postTagBadgeVariant, POST_TAG_OPTIONS, type PostTagValue } from '@/lib/post-tags';
 import { cn } from '@/lib/utils';
@@ -56,6 +56,7 @@ const EMPTY_FILTER: BoardFilter = { keyword: '', tags: [], fromDate: '', toDate:
 export function BoardClient({ posts, page, totalPages, totalCount, currentUserId, currentUserRole, filter }: BoardClientProps) {
   const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState<EditingPost | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<BoardFilter>(filter);
 
@@ -112,7 +113,12 @@ export function BoardClient({ posts, page, totalPages, totalCount, currentUserId
             {hasActiveFilter ? `검색 결과 ${totalCount.toLocaleString('ko-KR')}건` : `${totalCount.toLocaleString('ko-KR')}건의 글이 있습니다.`}
           </p>
         </div>
-        <Button onClick={() => setFormOpen(true)}>
+        <Button
+          onClick={() => {
+            setEditingPost(null);
+            setFormOpen(true);
+          }}
+        >
           <PenSquare className="size-4" />
           글쓰기
         </Button>
@@ -203,7 +209,7 @@ export function BoardClient({ posts, page, totalPages, totalCount, currentUserId
       ) : (
         <ul className="divide-y divide-border rounded-xl border border-border">
           {posts.map((post) => {
-            const canDelete = post.authorId === currentUserId || currentUserRole === 'ADMIN';
+            const canManage = post.authorId === currentUserId || currentUserRole === 'ADMIN';
             return (
               <li key={post.id} className="flex items-start gap-3 px-5 py-4">
                 <Badge variant={postTagBadgeVariant(post.tag)} className="mt-0.5 shrink-0">
@@ -216,15 +222,27 @@ export function BoardClient({ posts, page, totalPages, totalCount, currentUserId
                     {post.authorName} · {formatKstDateTime(post.createdAt)}
                   </p>
                 </div>
-                {canDelete && (
-                  <button
-                    onClick={() => handleDelete(post.id)}
-                    disabled={deletingId === post.id}
-                    className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                    aria-label="삭제"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
+                {canManage && (
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    <button
+                      onClick={() => {
+                        setEditingPost({ id: post.id, tag: post.tag, title: post.title, body: post.body });
+                        setFormOpen(true);
+                      }}
+                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label="수정"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(post.id)}
+                      disabled={deletingId === post.id}
+                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                      aria-label="삭제"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
                 )}
               </li>
             );
@@ -236,10 +254,19 @@ export function BoardClient({ posts, page, totalPages, totalCount, currentUserId
 
       <PostFormDialog
         open={formOpen}
-        onOpenChange={setFormOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open);
+          if (!open) setEditingPost(null);
+        }}
+        editingPost={editingPost}
         onCreated={() => {
-          if (page === 1) router.refresh();
-          else goToPage(1);
+          if (editingPost) {
+            router.refresh();
+          } else if (page === 1) {
+            router.refresh();
+          } else {
+            goToPage(1);
+          }
         }}
       />
     </div>

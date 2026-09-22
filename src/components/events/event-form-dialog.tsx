@@ -10,13 +10,23 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateRangeCalendarInput, type DateRange } from '@/components/events/date-range-calendar-input';
 import { EVENT_TYPE_OPTIONS, type EventTypeValue } from '@/lib/event-types';
-import { todayKstDateString } from '@/lib/date';
+import { formatKstDate, todayKstDateString } from '@/lib/date';
 
 interface SimilarScheduleCandidate {
   scheduleId: string;
   title: string;
   startDate: string;
   endDate: string;
+}
+
+export interface EditingEvent {
+  id: string;
+  eventType: EventTypeValue;
+  quantity: number | null;
+  title: string | null;
+  note: string;
+  eventDate: string;
+  endDate: string | null;
 }
 
 interface EventFormDialogProps {
@@ -27,10 +37,12 @@ interface EventFormDialogProps {
   skuLabel?: string;
   defaultQuantity?: number;
   defaultEventDate?: string;
+  /** 넘기면 새로 만들지 않고 이 이벤트를 수정한다. */
+  editingEvent?: EditingEvent | null;
   onCreated?: () => void;
 }
 
-export function EventFormDialog({ open, onOpenChange, warehouseId, skuId, skuLabel, defaultQuantity, defaultEventDate, onCreated }: EventFormDialogProps) {
+export function EventFormDialog({ open, onOpenChange, warehouseId, skuId, skuLabel, defaultQuantity, defaultEventDate, editingEvent, onCreated }: EventFormDialogProps) {
   const [eventType, setEventType] = useState<EventTypeValue>('ADJUSTMENT');
   const [quantity, setQuantity] = useState('');
   const [title, setTitle] = useState('');
@@ -39,35 +51,44 @@ export function EventFormDialog({ open, onOpenChange, warehouseId, skuId, skuLab
   const [submitting, setSubmitting] = useState(false);
   const [confirmation, setConfirmation] = useState<SimilarScheduleCandidate | null>(null);
 
+  const isEditing = !!editingEvent;
+
   useEffect(() => {
-    if (open) {
-      const day = defaultEventDate ?? todayKstDateString();
+    if (!open) return;
+    if (editingEvent) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
+      setEventType(editingEvent.eventType);
+      setQuantity(editingEvent.quantity !== null ? String(editingEvent.quantity) : '');
+      setTitle(editingEvent.title ?? '');
+      setNote(editingEvent.note);
+      const start = formatKstDate(editingEvent.eventDate);
+      setDateRange({ start, end: editingEvent.endDate ? formatKstDate(editingEvent.endDate) : start });
+    } else {
+      const day = defaultEventDate ?? todayKstDateString();
       setQuantity(defaultQuantity !== undefined ? String(defaultQuantity) : '');
       setDateRange({ start: day, end: day });
       setTitle('');
       setNote('');
       setEventType('ADJUSTMENT');
-      setConfirmation(null);
     }
-  }, [open, defaultQuantity, defaultEventDate]);
+    setConfirmation(null);
+  }, [open, defaultQuantity, defaultEventDate, editingEvent]);
 
-  async function postEvent(extra?: { confirmChoice: 'use_existing' | 'create_new'; existingScheduleId?: string }) {
-    return fetch('/api/events', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        warehouseId,
-        skuId,
-        eventType,
-        quantity: quantity === '' ? null : Number(quantity),
-        note,
-        eventDate: `${dateRange.start}T09:00:00`,
-        endDate: dateRange.end !== dateRange.start ? `${dateRange.end}T09:00:00` : null,
-        title: title.trim() || null,
-        ...extra,
-      }),
-    });
+  async function submitEvent(extra?: { confirmChoice: 'use_existing' | 'create_new'; existingScheduleId?: string }) {
+    const payload = {
+      warehouseId,
+      skuId,
+      eventType,
+      quantity: quantity === '' ? null : Number(quantity),
+      note,
+      eventDate: `${dateRange.start}T09:00:00`,
+      endDate: dateRange.end !== dateRange.start ? `${dateRange.end}T09:00:00` : null,
+      title: title.trim() || null,
+      ...extra,
+    };
+    return isEditing
+      ? fetch(`/api/events/${editingEvent.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      : fetch('/api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   }
 
   async function submit() {
@@ -77,7 +98,7 @@ export function EventFormDialog({ open, onOpenChange, warehouseId, skuId, skuLab
     }
     setSubmitting(true);
     try {
-      const res = await postEvent();
+      const res = await submitEvent();
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
         toast.error(body.error ?? '저장에 실패했습니다.');
@@ -87,7 +108,7 @@ export function EventFormDialog({ open, onOpenChange, warehouseId, skuId, skuLab
         setConfirmation(body.candidate);
         return;
       }
-      toast.success('이벤트가 기록되었습니다.');
+      toast.success(isEditing ? '이벤트를 수정했습니다.' : '이벤트가 기록되었습니다.');
       onOpenChange(false);
       onCreated?.();
     } catch {
@@ -101,9 +122,9 @@ export function EventFormDialog({ open, onOpenChange, warehouseId, skuId, skuLab
     if (!confirmation) return;
     setSubmitting(true);
     try {
-      const res = await postEvent({ confirmChoice: choice, existingScheduleId: choice === 'use_existing' ? confirmation.scheduleId : undefined });
+      const res = await submitEvent({ confirmChoice: choice, existingScheduleId: choice === 'use_existing' ? confirmation.scheduleId : undefined });
       if (!res.ok) throw new Error();
-      toast.success('이벤트가 기록되었습니다.');
+      toast.success(isEditing ? '이벤트를 수정했습니다.' : '이벤트가 기록되었습니다.');
       setConfirmation(null);
       onOpenChange(false);
       onCreated?.();
@@ -118,7 +139,7 @@ export function EventFormDialog({ open, onOpenChange, warehouseId, skuId, skuLab
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>재고 이벤트 / 메모 추가</DialogTitle>
+          <DialogTitle>{isEditing ? '재고 이벤트 / 메모 수정' : '재고 이벤트 / 메모 추가'}</DialogTitle>
           <DialogDescription>{skuLabel ? `대상 상품: ${skuLabel}` : '창고 전체에 대한 메모입니다.'}</DialogDescription>
         </DialogHeader>
 
@@ -185,7 +206,7 @@ export function EventFormDialog({ open, onOpenChange, warehouseId, skuId, skuLab
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)}>취소</Button>
-              <Button onClick={submit} disabled={submitting}>{submitting ? '저장 중...' : '저장'}</Button>
+              <Button onClick={submit} disabled={submitting}>{submitting ? '저장 중...' : isEditing ? '수정' : '저장'}</Button>
             </DialogFooter>
           </>
         )}

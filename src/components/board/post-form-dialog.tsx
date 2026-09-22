@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,9 +13,17 @@ import { POST_TAG_OPTIONS, type PostTagValue } from '@/lib/post-tags';
 const TITLE_MAX = 50;
 const BODY_MAX = 200;
 
+export interface EditingPost {
+  id: string;
+  tag: PostTagValue;
+  title: string;
+  body: string;
+}
+
 interface PostFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editingPost?: EditingPost | null;
   onCreated: () => void;
 }
 
@@ -33,17 +41,27 @@ function CounterLabel({ length, max }: { length: number; max: number }) {
   );
 }
 
-export function PostFormDialog({ open, onOpenChange, onCreated }: PostFormDialogProps) {
+export function PostFormDialog({ open, onOpenChange, editingPost, onCreated }: PostFormDialogProps) {
   const [tag, setTag] = useState<PostTagValue>('NOTICE');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  function reset() {
-    setTag('NOTICE');
-    setTitle('');
-    setBody('');
-  }
+  const isEditing = !!editingPost;
+
+  useEffect(() => {
+    if (!open) return;
+    if (editingPost) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTag(editingPost.tag);
+      setTitle(editingPost.title);
+      setBody(editingPost.body);
+    } else {
+      setTag('NOTICE');
+      setTitle('');
+      setBody('');
+    }
+  }, [open, editingPost]);
 
   async function submit() {
     if (!title.trim()) {
@@ -56,38 +74,30 @@ export function PostFormDialog({ open, onOpenChange, onCreated }: PostFormDialog
     }
     setSubmitting(true);
     try {
-      const res = await fetch('/api/posts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tag, title: title.trim(), body: body.trim() }),
-      });
+      const payload = { tag, title: title.trim(), body: body.trim() };
+      const res = isEditing
+        ? await fetch(`/api/posts/${editingPost.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        : await fetch('/api/posts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        toast.error(data?.error ?? '등록에 실패했습니다.');
+        toast.error(data?.error ?? (isEditing ? '수정에 실패했습니다.' : '등록에 실패했습니다.'));
         return;
       }
-      toast.success('게시글이 등록되었습니다.');
-      reset();
+      toast.success(isEditing ? '게시글이 수정되었습니다.' : '게시글이 등록되었습니다.');
       onOpenChange(false);
       onCreated();
     } catch {
-      toast.error('네트워크 오류로 등록에 실패했습니다.');
+      toast.error(isEditing ? '네트워크 오류로 수정에 실패했습니다.' : '네트워크 오류로 등록에 실패했습니다.');
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) reset();
-        onOpenChange(next);
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>새 글 작성</DialogTitle>
+          <DialogTitle>{isEditing ? '글 수정' : '새 글 작성'}</DialogTitle>
           <DialogDescription>태그를 선택하고 제목과 내용을 작성하세요.</DialogDescription>
         </DialogHeader>
 
@@ -135,7 +145,7 @@ export function PostFormDialog({ open, onOpenChange, onCreated }: PostFormDialog
             취소
           </Button>
           <Button onClick={submit} disabled={submitting}>
-            {submitting ? '등록 중...' : '등록'}
+            {submitting ? (isEditing ? '수정 중...' : '등록 중...') : isEditing ? '수정' : '등록'}
           </Button>
         </DialogFooter>
       </DialogContent>

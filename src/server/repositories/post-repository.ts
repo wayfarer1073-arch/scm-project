@@ -48,10 +48,34 @@ export function createPost(input: { tag: PostTag; title: string; body: string; a
   return prisma.post.create({ data: input, include: { author: { select: { id: true, name: true } } } });
 }
 
+export async function updatePost(id: string, requester: { id: string; role: Role }, patch: { tag: PostTag; title: string; body: string }) {
+  const post = await prisma.post.findUniqueOrThrow({ where: { id } });
+  if (post.authorId !== requester.id && requester.role !== 'ADMIN') {
+    throw new PostPermissionError('본인 글 또는 관리자만 수정할 수 있습니다.');
+  }
+  return prisma.post.update({ where: { id }, data: patch, include: { author: { select: { id: true, name: true } } } });
+}
+
 export async function deletePost(id: string, requester: { id: string; role: Role }) {
   const post = await prisma.post.findUniqueOrThrow({ where: { id } });
   if (post.authorId !== requester.id && requester.role !== 'ADMIN') {
     throw new PostPermissionError('본인 글 또는 관리자만 삭제할 수 있습니다.');
   }
   await prisma.post.delete({ where: { id } });
+}
+
+const SIDEBAR_TAG_ORDER: PostTag[] = ['NOTICE', 'ISSUE', 'RESOLVED', 'CHAT'];
+
+export interface LatestPostByTag {
+  id: string;
+  tag: PostTag;
+  title: string;
+}
+
+/** 사이드바 미리보기용 — 태그별 가장 최근 글 제목 1건씩(글이 없는 태그는 결과에서 빠진다). */
+export async function listLatestPostPerTag(): Promise<LatestPostByTag[]> {
+  const results = await Promise.all(
+    SIDEBAR_TAG_ORDER.map((tag) => prisma.post.findFirst({ where: { tag }, orderBy: { createdAt: 'desc' }, select: { id: true, tag: true, title: true } })),
+  );
+  return results.filter((r): r is LatestPostByTag => r !== null);
 }

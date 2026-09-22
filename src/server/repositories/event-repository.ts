@@ -1,8 +1,10 @@
 import { prisma } from '@/lib/prisma';
-import type { EventType } from '@prisma/client';
+import type { EventType, Prisma } from '@prisma/client';
 import { dateOnlyToString, formatKstDate } from '@/lib/date';
 import { defaultScheduleColorFor } from '@/lib/schedule-colors';
 import { areTitlesSimilar } from '@/domain/events/title-similarity';
+
+type Db = typeof prisma | Prisma.TransactionClient;
 
 export interface CreateEventInput {
   warehouseId: string;
@@ -40,8 +42,9 @@ export interface SimilarScheduleCandidate {
 
 /**
  * 같은 유형·같은 기간(일자까지 정확히 동일)인데 제목만 "유사한"(완전히 같지는 않은) 기존 일정을
- * 찾는다. 완전히 같은 제목은 createEvent에서 자동으로 병합되므로 여기서는 후보에서 제외한다 —
- * 이건 어디까지나 "제목이 조금 다른데 같은 사안 같아 보이는" 경우 사용자에게 물어보기 위한 것.
+ * 찾는다. 완전히 같은 제목은 createEvent/updateEvent에서 자동으로 병합되므로 여기서는 후보에서
+ * 제외한다 — 이건 어디까지나 "제목이 조금 다른데 같은 사안 같아 보이는" 경우 사용자에게 물어보기
+ * 위한 것.
  */
 export async function findSimilarSchedule(
   eventType: EventType,
@@ -69,28 +72,41 @@ export async function findSimilarSchedule(
  * 없으면 새로 만든다 — 서로 다른 SKU가 같은 이름·기간으로 이벤트를 등록해도 캘린더에는 하나의
  * 일정으로 합쳐 보이게 하기 위함. 이미 있던 일정이면 사용자가 지정해둔 색상을 그대로 유지한다.
  * attachToScheduleId가 오면(유사 일정 확인 후 사용자가 승인한 경우) 그 일정을 그대로 쓰고,
- * 이 이벤트의 title도 그 일정의 제목으로 맞춘다.
+ * title도 그 일정의 제목으로 맞춘다. 제목이 없으면 일정 연결을 하지 않는다(수정 시 제목을
+ * 지우면 연결도 함께 해제됨).
  */
-export async function createEvent(input: CreateEventInput) {
-  const trimmedTitle = input.title?.trim() || null;
-  let scheduleId: string | null = null;
-  let resolvedTitle = trimmedTitle;
+async function resolveScheduleLink(
+  db: Db,
+  params: { eventType: EventType; title: string | null | undefined; eventDate: Date; endDate: Date | null | undefined; attachToScheduleId?: string },
+): Promise<{ scheduleId: string | null; resolvedTitle: string | null }> {
+  const trimmedTitle = params.title?.trim() || null;
 
-  if (input.attachToScheduleId) {
-    const schedule = await prisma.eventSchedule.findUnique({ where: { id: input.attachToScheduleId } });
-    if (schedule) {
-      scheduleId = schedule.id;
-      resolvedTitle = schedule.title;
-    }
-  } else if (trimmedTitle) {
-    const { startDate, endDate } = rangeDateOnly(input.eventDate, input.endDate);
-    const schedule = await prisma.eventSchedule.upsert({
-      where: { eventType_title_startDate_endDate: { eventType: input.eventType, title: trimmedTitle, startDate, endDate } },
-      create: { eventType: input.eventType, title: trimmedTitle, startDate, endDate, color: defaultScheduleColorFor(trimmedTitle) },
+  if (params.attachToScheduleId) {
+    const schedule = await db.eventSchedule.findUnique({ where: { id: params.attachToScheduleId } });
+    if (schedule) return { scheduleId: schedule.id, resolvedTitle: schedule.title };
+  }
+
+  if (trimmedTitle) {
+    const { startDate, endDate } = rangeDateOnly(params.eventDate, params.endDate);
+    const schedule = await db.eventSchedule.upsert({
+      where: { eventType_title_startDate_endDate: { eventType: params.eventType, title: trimmedTitle, startDate, endDate } },
+      create: { eventType: params.eventType, title: trimmedTitle, startDate, endDate, color: defaultScheduleColorFor(trimmedTitle) },
       update: {},
     });
-    scheduleId = schedule.id;
+    return { scheduleId: schedule.id, resolvedTitle: trimmedTitle };
   }
+
+  return { scheduleId: null, resolvedTitle: null };
+}
+
+export async function createEvent(input: CreateEventInput) {
+  const { scheduleId, resolvedTitle } = await resolveScheduleLink(prisma, {
+    eventType: input.eventType,
+    title: input.title,
+    eventDate: input.eventDate,
+    endDate: input.endDate,
+    attachToScheduleId: input.attachToScheduleId,
+  });
 
   return prisma.inventoryEvent.create({
     data: {
@@ -139,11 +155,17 @@ export function listEventsForWarehouse(warehouseId: string, limit = 50) {
   });
 }
 
-export async function updateEvent(
-  id: string,
-  changedById: string,
-  patch: { eventType?: EventType; quantity?: number | null; note?: string; eventDate?: Date },
-) {
+export interface UpdateEventPatch {
+  eventType: EventType;
+  quantity: number | null;
+  note: string;
+  eventDate: Date;
+  endDate?: Date | null;
+  title?: string | null;
+  attachToScheduleId?: string;
+}
+
+export async function updateEvent(id: string, changedById: string, patch: UpdateEventPatch) {
   return prisma.$transaction(async (tx) => {
     // FOR UPDATE로 행을 잠가, 동시에 같은 이벤트를 수정하는 두 요청이 같은 "수정 전" 값으로
     // 감사이력(EventHistory)을 중복 기록하지 않도록 한다 (두 번째 요청은 첫 번째가 커밋된 뒤의
@@ -159,11 +181,33 @@ export async function updateEvent(
           quantity: existing.quantity,
           note: existing.note,
           eventDate: existing.eventDate.toISOString(),
+          endDate: existing.endDate ? existing.endDate.toISOString() : null,
+          title: existing.title,
         },
         changedById,
       },
     });
-    return tx.inventoryEvent.update({ where: { id }, data: patch });
+
+    const { scheduleId, resolvedTitle } = await resolveScheduleLink(tx, {
+      eventType: patch.eventType,
+      title: patch.title,
+      eventDate: patch.eventDate,
+      endDate: patch.endDate,
+      attachToScheduleId: patch.attachToScheduleId,
+    });
+
+    return tx.inventoryEvent.update({
+      where: { id },
+      data: {
+        eventType: patch.eventType,
+        quantity: patch.quantity,
+        note: patch.note,
+        eventDate: patch.eventDate,
+        endDate: patch.endDate ?? null,
+        title: resolvedTitle,
+        scheduleId,
+      },
+    });
   });
 }
 

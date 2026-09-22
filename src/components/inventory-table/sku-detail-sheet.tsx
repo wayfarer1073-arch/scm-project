@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
-import { EventFormDialog } from '@/components/events/event-form-dialog';
+import { EventFormDialog, type EditingEvent } from '@/components/events/event-form-dialog';
 import { buildDailyDeltas, calculatePeriodComparison, sortObservations } from '@/domain/inventory/calculations';
 import type { InventoryValueBreakdown, SkuAnalysis, StockObservation } from '@/domain/inventory/types';
 import { formatCurrency, formatNumber, formatSigned } from '@/lib/format';
@@ -59,6 +59,7 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
   const [rangeDays, setRangeDays] = useState<30 | 60 | 90>(30);
   const [formOpen, setFormOpen] = useState(false);
   const [formPrefill, setFormPrefill] = useState<{ quantity?: number; date?: string }>({});
+  const [editingEvent, setEditingEvent] = useState<EditingEvent | null>(null);
   const [editingThresholds, setEditingThresholds] = useState(false);
   const [dangerInput, setDangerInput] = useState('');
   const [warningInput, setWarningInput] = useState('');
@@ -486,6 +487,7 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
                         variant="outline"
                         className="h-6 text-[11px]"
                         onClick={() => {
+                          setEditingEvent(null);
                           setFormPrefill({ quantity: d.increase, date: d.toDate });
                           setFormOpen(true);
                         }}
@@ -506,6 +508,7 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
                     size="sm"
                     variant="outline"
                     onClick={() => {
+                      setEditingEvent(null);
                       setFormPrefill({});
                       setFormOpen(true);
                     }}
@@ -530,6 +533,24 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
                           <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
                             {dateLabel}
                             <button
+                              onClick={() => {
+                                setEditingEvent({
+                                  id: e.id,
+                                  eventType: e.eventType as EditingEvent['eventType'],
+                                  quantity: e.quantity,
+                                  title: e.title,
+                                  note: e.note,
+                                  eventDate: e.eventDate,
+                                  endDate: e.endDate,
+                                });
+                                setFormOpen(true);
+                              }}
+                              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              aria-label="수정"
+                            >
+                              <Pencil className="size-3.5" />
+                            </button>
+                            <button
                               onClick={() => handleDeleteEvent(e.id)}
                               className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               aria-label="삭제"
@@ -549,12 +570,16 @@ export function SkuDetailSheet({ skuId, asOfDate, fromDate, isAdmin, isFavorited
 
             <EventFormDialog
               open={formOpen}
-              onOpenChange={setFormOpen}
+              onOpenChange={(open) => {
+                setFormOpen(open);
+                if (!open) setEditingEvent(null);
+              }}
               warehouseId={detail.descriptor.warehouseId}
               skuId={detail.descriptor.skuId}
               skuLabel={detail.descriptor.productName}
               defaultQuantity={formPrefill.quantity}
               defaultEventDate={formPrefill.date}
+              editingEvent={editingEvent}
               onCreated={reload}
             />
           </>
