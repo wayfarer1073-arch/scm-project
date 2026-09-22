@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, getDay, isSameMonth, startOfMonth, startOfWeek, subMonths } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { DayDetailDialog } from '@/components/upload/day-detail-dialog';
 import { ScheduleDetailDialog } from '@/components/upload/schedule-detail-dialog';
@@ -106,14 +107,14 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
 
   return (
     <section className="overflow-hidden rounded-xl border border-border">
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-sidebar px-5 py-3.5 text-sidebar-foreground">
-        <div>
+      <div className="flex items-center justify-between gap-3 bg-sidebar px-5 py-3.5 text-sidebar-foreground">
+        <div className="flex items-center gap-1.5">
           <h2 className="text-base font-semibold">업로드 현황 캘린더</h2>
-          <p className="mt-0.5 text-xs text-sidebar-muted-foreground">
+          <InfoTooltip className="text-lime-400 hover:text-lime-300">
             날짜 칸을 눌러 창고별로 재고 Excel을 업로드하거나 입고 특이사항을 기록하세요. 업로드가 끝난 창고는 날짜 옆에 작게 코드로
             표시됩니다. 주말·공휴일(옅은 회색)은 업로드할 수 없지만 KPI 계산에는 직전 영업일 자료가 그대로 포함됩니다. 색이 있는 막대는
             SKU 상세에서 등록한 일정(메모/이벤트)이며, 눌러서 내용을 확인하거나 색상을 바꿀 수 있습니다.
-          </p>
+          </InfoTooltip>
         </div>
         <div className="flex items-center gap-1">
           <Button variant="outline" size="icon" className="text-foreground hover:text-brand-accent" onClick={() => setMonth((m) => subMonths(m, 1))} aria-label="이전 달">
@@ -192,6 +193,7 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
                               className={cn(
                                 'text-xs tabular-nums',
                                 inMonth ? 'text-foreground' : 'text-muted-foreground/60',
+                                isBlocked && !isToday && 'text-status-danger',
                                 isToday && 'font-semibold text-background group-hover:text-black',
                               )}
                             >
@@ -212,7 +214,7 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
                             <span
                               className={cn(
                                 'truncate text-[9px] font-medium',
-                                isToday ? 'text-background/80 group-hover:text-black/70' : 'text-muted-foreground',
+                                isToday ? 'text-background/80 group-hover:text-black/70' : 'text-status-danger',
                               )}
                             >
                               {holidayName}
