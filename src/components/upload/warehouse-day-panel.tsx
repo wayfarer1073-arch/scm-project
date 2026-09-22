@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, Info, RotateCcw, UploadCloud } from 'lucide-react';
+import { AlertTriangle, Download, Info, RotateCcw, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -142,6 +142,12 @@ export function WarehouseDayPanel({ warehouseId, warehouseName, date, existing, 
             <Button onClick={submit} disabled={uploading || !file}>
               <UploadCloud className="size-4" />
               {uploading ? '업로드 중...' : existing ? '교체하기' : '업로드'}
+            </Button>
+            <Button variant="outline" size="sm" className="text-foreground hover:text-brand-accent" asChild>
+              <a href="/api/templates/inventory">
+                <Download className="size-3.5" />
+                샘플파일 다운로드
+              </a>
             </Button>
             {existing && isAdmin && (
               <Button variant="outline" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={resetUpload} disabled={resetting}>

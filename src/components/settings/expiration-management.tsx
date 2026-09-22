@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Pencil, Check, X, UploadCloud, Trash2, Search, Plus } from 'lucide-react';
+import { Pencil, Check, X, Download, UploadCloud, Trash2, Search, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { Input } from '@/components/ui/input';
@@ -358,6 +358,12 @@ export function ExpirationManagement({ isAdmin, warehouses, initialEntries }: Ex
             <Button onClick={handleUpload} disabled={uploading || !file}>
               <UploadCloud className="size-4" />
               {uploading ? '업로드 중...' : '업로드'}
+            </Button>
+            <Button variant="outline" size="sm" className="text-foreground hover:text-brand-accent" asChild>
+              <a href="/api/templates/expiration">
+                <Download className="size-3.5" />
+                샘플파일 다운로드
+              </a>
             </Button>
           </div>
         )}
