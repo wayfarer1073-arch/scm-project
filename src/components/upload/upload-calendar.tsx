@@ -179,7 +179,7 @@ export function UploadCalendar({ warehouses, entries, holidays, schedules, isAdm
                         disabled={isFuture}
                         onClick={() => setSelectedDate(dateStr)}
                         className={cn(
-                          'flex aspect-square flex-col border-r border-b border-border p-2 text-left transition-colors',
+                          'flex aspect-[6/5] flex-col border-r border-b border-border p-2 text-left transition-colors',
                           inMonth ? 'bg-background' : 'bg-muted/30',
                           isBlocked && !isToday && 'bg-muted/60',
                           isToday && 'bg-foreground',

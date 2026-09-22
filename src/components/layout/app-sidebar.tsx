@@ -68,7 +68,7 @@ export function AppSidebar({ userName, userRole, recentPosts, className }: AppSi
       </nav>
 
       {recentPosts && recentPosts.length > 0 && (
-        <div className="mt-auto flex flex-col gap-1 border-t border-sidebar-border px-3 py-3">
+        <div className="mt-auto flex flex-col gap-1 px-3 py-3">
           <p className="px-3 pb-1 text-[11px] font-medium tracking-wide text-sidebar-muted-foreground">최근 게시글</p>
           {recentPosts.map((post) => (
             <Link
