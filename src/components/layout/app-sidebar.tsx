@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, CalendarDays, MessagesSquare, Settings, Package } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, MessagesSquare, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SignOutButton } from '@/components/layout/sign-out-button';
 import { postTagLabel, postTagDotClassName, type PostTagValue } from '@/lib/post-tags';
@@ -38,10 +38,9 @@ export function AppSidebar({ userName, userRole, recentPosts, className }: AppSi
       )}
     >
       <div className="flex items-center gap-2.5 px-5 py-6">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-accent text-brand-accent-foreground">
-          <Package className="size-5" aria-hidden="true" />
-        </span>
-        <span className="text-base font-semibold tracking-tight">StockBoard</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-icon.png" alt="" className="size-9 shrink-0" />
+        <span className="text-base font-semibold tracking-tight">Limenote</span>
       </div>
 
       <nav className="flex flex-col gap-1 px-3 py-2">

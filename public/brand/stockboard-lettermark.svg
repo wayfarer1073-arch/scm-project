@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
-  <title id="title">StockBoard Lettermark</title>
-  <desc id="desc">A geometric S monogram made from stacked inventory bands.</desc>
-  <path d="M54 58C54 43 66 32 81 32h121v36H92c-6 0-10 4-10 10s4 10 10 10h72c31 0 56 25 56 56s-25 56-56 56H54v-36h108c13 0 22-8 22-20s-9-20-22-20H90c-28 0-50-22-50-50 0-6 1-11 3-16Z" fill="#0F1F33"/>
-  <path d="M52 112h124c13 0 22 8 22 20s-9 20-22 20H88c-20 0-36-16-36-36 0-1 0-3 .1-4Z" fill="#2563EB"/>
-</svg>

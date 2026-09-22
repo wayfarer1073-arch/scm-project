@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, LogOut, LayoutDashboard, CalendarDays, MessagesSquare, Settings, Package } from 'lucide-react';
+import { Menu, LogOut, LayoutDashboard, CalendarDays, MessagesSquare, Settings } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -53,10 +53,9 @@ export function MobileNav({ userName, userRole }: MobileNavProps) {
         <SheetHeader>
           <SheetTitle asChild>
             <span className="inline-flex items-center gap-2.5">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-accent text-brand-accent-foreground">
-                <Package className="size-5" aria-hidden="true" />
-              </span>
-              <span className="text-base font-semibold tracking-tight">StockBoard</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo-icon.png" alt="" className="size-9 shrink-0" />
+              <span className="text-base font-semibold tracking-tight">Limenote</span>
             </span>
           </SheetTitle>
           <SheetDescription className="sr-only">사이트 이동 메뉴</SheetDescription>

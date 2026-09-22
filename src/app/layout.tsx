@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: '재고관리 대시보드',
+  title: 'Limenote',
   description: '창고별 재고 Snapshot 기반 재고관리 대시보드',
 };
 
